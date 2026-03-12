@@ -35,3 +35,8 @@ timestamp,participant_id,round,role,word_type,board,targets,bomb,hint,hint_numbe
 2026-03-12T19:25:28.618131,relax,7,human_clue,concrete,car;window;table;cup;mountain;chair;house;lamp;pencil,car;house;cup;pencil,table,Property,2,house;table,1,1,-1,70.842105,3
 2026-03-12T19:25:57.817568,relax,8,ai_clue,concrete,table;car;street;window;book;tree;computer;chair;apple,car;chair;computer;table,street,FURNITURE,3,chair;table;computer,1,0,3,27.961363,3
 2026-03-12T19:26:02.965181,relax,8,ai_clue,concrete,table;car;street;window;book;tree;computer;chair;apple,car;chair;computer;table,street,FURNITURE,3,chair;table;computer,1,0,3,33.109822,3
+2026-03-12T19:59:29.735276,general,1,human_clue,abstract,belief;hope;identity;justice;honor;value;dream;faith;emotion,value;belief;justice;faith,hope,Credit,2,value;honor,1,0,1,32.99766,3
+2026-03-12T20:01:22.941473,relax,1,human_clue,abstract,memory;faith;logic;emotion;justice;culture;trust;power;identity,emotion;faith;justice;trust,power,Value,2,trust;justice,1,0,2,26.283696,3
+2026-03-12T20:06:07.271515,Test,1,human_clue,abstract,justice;identity;belief;morality;honor;emotion;fear;power;culture,honor;morality;justice;power,identity,value,2,belief;honor,1,0,1,31.718693,3
+2026-03-12T20:34:58.905907,general,1,human_clue,abstract,freedom;hope;faith;logic;belief;honor;dream;fear;justice,faith;dream;logic;justice,hope,plan,1,logic,1,0,1,28.395851,3
+2026-03-12T20:38:02.740148,relax,1,human_clue,abstract,value;faith;emotion;dream;freedom;desire;belief;morality;power,value;power;desire;faith,belief,idea,1,belief,0,1,-1,8.899351,3

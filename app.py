@@ -422,8 +422,19 @@ Click **Start Game** to begin.
                     st.session_state.hint_number = num
 
         if st.session_state.hint:
-            st.markdown(f"**AI Hint:** `{st.session_state.hint}` – {st.session_state.hint_number} word(s)")
-            st.info("Click on the cards to make your guesses.")
+           st.markdown(f"""
+<div style="background-color:#fff3cd;border-left:6px solid #ffca2c;padding:18px;border-radius:10px;margin:15px 0;box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+<span style="font-size:16px;font-weight:800;color:#7a5a00;display:block;margin-bottom:8px;">🔍 AI Hint</span>
+<span style="font-size:20px;font-weight:900;color:#5c4400;display:block;margin-bottom:6px;">{st.session_state.hint.upper()}</span>
+<span style="font-size:18px;font-weight:700;color:#7a5a00;display:block;">{st.session_state.hint_number} word(s)</span>
+</div>
+""", unsafe_allow_html=True)
+
+           st.info("Click on the cards to make your guesses.")
+
+
+
+
 
         render_colored_board(
             st.session_state.board,
