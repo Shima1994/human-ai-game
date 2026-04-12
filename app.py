@@ -16,24 +16,58 @@ MODEL_NAME = "gpt-4o-mini"
 # -----------------------------
 # WORD POOLS 
 # -----------------------------
-ABSTRACT_WORDS = [
-    "freedom", "justice", "emotion", "love", "power", "trust", "fear", "hope",
-    "honor", "belief", "memory", "dream", "logic", "reason", "faith", "desire",
-    "value", "culture", "identity", "morality"
-]
+ABSTRACT_CATEGORIES = {
 
-CONCRETE_WORDS = [
-    "apple", "car", "table", "dog", "chair", "phone", "book", "house",
-    "tree", "river", "mountain", "cup", "door", "window", "shoe", "bottle",
-    "lamp", "pencil", "computer", "street"
-]
+    "emotion": [
+        "love", "fear", "joy", "sadness", "anger", "hope", "happiness",
+        "surprise", "weakness",
+        "shame", "loneliness", "peace"
+    ],
 
+    "social": [
+        "friend", "family", "team", "community", "leader",
+        "respect", "cooperation", "freedom", 
+        "support", "loyalty", "unity",  "kindness"
+    ],
+
+    "cognitive": [
+        "thought", "learning", "understanding", "idea", 
+        "reason", "focus", "imagination",
+        "decision", "problem",  "knowledge", "memory", "awareness"
+    ]
+
+}
+
+
+
+CONCRETE_CATEGORIES = {
+
+    "objects": [
+        "apple", "book", "chair", "table", "lamp",  "cup", 
+        "shoe", "door",  "phone", "bag", "pen", "clock"
+    ],
+
+    "animals": [
+        "dog", "cat",  "fish", "horse",  "elephant", "lion",
+        "tiger", "monkey", "mouse", "rabbit", "sheep", "bear"
+    ],
+
+    "places": [
+        "house", "school", "park", "river", "mountain", "street", "beach",
+        "forest", "city", "market", "airport", "hospital"
+    ]
+
+}
 DATA_FILE = "game_data.csv"
 N_ROUNDS = 8
 
 # -----------------------------
 # UTILS
 # -----------------------------
+
+ABSTRACT_POOLS = {cat: words.copy() for cat, words in ABSTRACT_CATEGORIES.items()}
+CONCRETE_POOLS = {cat: words.copy() for cat, words in CONCRETE_CATEGORIES.items()}
+
 def init_session_state():
     if "round" not in st.session_state:
         st.session_state.round = 1
@@ -51,6 +85,8 @@ def init_session_state():
         st.session_state.round_finished = False
         st.session_state.start_time = None
         st.session_state.perception_rating = None
+        st.session_state.golden_target = None
+
 
 def get_word_type_for_round(r):
     return "abstract" if r in [1, 2, 5, 6] else "concrete"
@@ -58,24 +94,50 @@ def get_word_type_for_round(r):
 def get_role_for_round(r):
     return "human_clue" if r % 2 == 1 else "ai_clue"
 
-def sample_words(word_type):
-    pool = ABSTRACT_WORDS if word_type == "abstract" else CONCRETE_WORDS
-    targets = random.sample(pool, 4)
-    remaining = [w for w in pool if w not in targets]
-    neutrals = random.sample(remaining, 4)
-    remaining2 = [w for w in remaining if w not in neutrals]
-    if not remaining2:
-        remaining2 = neutrals
-    bomb = random.choice(remaining2)
-    board = targets + neutrals + [bomb]
-    random.shuffle(board)
+def sample_words_no_replacement(word_type):
+    pools = ABSTRACT_POOLS if word_type == "abstract" else CONCRETE_POOLS
+
+    selected_words = []
+
+    # pick 3 words from each category (total = 9)
+    for category, words in pools.items():
+        if len(words) < 3:
+            raise ValueError(f"Not enough words left in category {category}")
+
+        chosen = random.sample(words, 3)
+        selected_words.extend(chosen)
+
+        # remove chosen words from pool
+        for w in chosen:
+            words.remove(w)
+
+    # shuffle final board
+    random.shuffle(selected_words)
+
+    # assign roles: 4 targets, 4 neutrals, 1 bomb
+    targets = selected_words[:4]
+    neutrals = selected_words[4:8]
+    bomb = selected_words[8]
+
+    # pick one golden target
+    golden_target = random.choice(targets)
+
     word_roles = {}
     for w in targets:
-        word_roles[w] = "target"
+        if w == golden_target:
+            word_roles[w] = "gold_target"   # ⭐ 3-point target
+        else:
+            word_roles[w] = "target"
+
     for w in neutrals:
         word_roles[w] = "neutral"
+
     word_roles[bomb] = "bomb"
-    return board, targets, neutrals, bomb, word_roles
+
+    return selected_words, targets, neutrals, bomb, word_roles, golden_target
+
+
+
 
 def ensure_data_file():
     if not os.path.exists(DATA_FILE):
@@ -94,7 +156,15 @@ def log_round(participant_id):
     guesses = st.session_state.guesses
     correct = any(g in st.session_state.target_words for g in guesses)
     bomb_hit = any(g == st.session_state.bomb_word for g in guesses)
-    score_change = -1 if bomb_hit else sum(1 for g in guesses if g in st.session_state.target_words)
+    score_change = 0
+
+    for g in guesses:
+        if g == st.session_state.bomb_word:
+            score_change -= 1
+        elif g == st.session_state.golden_target:
+            score_change += 3
+        elif g in st.session_state.target_words:
+            score_change += 1
 
     response_time = None
     if st.session_state.start_time is not None:
@@ -137,18 +207,26 @@ def call_openai_chat(system_prompt, user_prompt):
     )
     return resp.choices[0].message.content.strip()
 
-def generate_ai_hint(target_words, bomb_word, neutral_words, word_type):
+def generate_ai_hint(target_words, bomb_word, neutral_words, word_type,golden_target):
     system_prompt = (
-        "You are the AI clue-giver in a Codenames-like game. "
-        "Give ONE hint word and a number in the format HINT|N. "
-        "The hint must relate to the target words and avoid the bomb word."
+    "You are the AI clue-giver in a Codenames-like game. "
+    "Your goal is to maximize the team's score. "
+    "One of the target words is a GOLDEN TARGET worth 3 points. "
+    "Give ONE hint word and a number in the format HINT|N. "
+    "STRICT RULE: You are NOT allowed to use any board word as a hint, "
+    "and you are NOT allowed to use any morphological variant, "
+    "plural form, conjugation, or derivation of any board word. "
+    "For example, if the board contains 'sad', you cannot use 'sadness', "
+    "'sadly', 'sadder', or anything sharing the same root. "
+    "Your hint must relate to the target words and avoid the bomb word."
     )
 
     user_prompt = (
-        f"Target words: {', '.join(target_words)}\n"
-        f"Neutral words: {', '.join(neutral_words)}\n"
-        f"Bomb word: {bomb_word}\n"
-        f"Word type: {word_type}\n"
+         f"Target words: {', '.join(target_words)}\n"
+         f"Golden target (worth 3 points): {golden_target}\n"
+         f"Neutral words: {', '.join(neutral_words)}\n"
+         f"Bomb word: {bomb_word}\n"
+         f"Word type: {word_type}\n"
     )
 
     raw = call_openai_chat(system_prompt, user_prompt)
@@ -168,10 +246,14 @@ def generate_ai_hint(target_words, bomb_word, neutral_words, word_type):
 
 def ai_guess(board, hint, hint_number):
     system_prompt = (
-        "You are the AI guesser in a Codenames-like game. "
-        "You MUST output EXACTLY the number of words requested. "
-        "All guessed words MUST be chosen ONLY from the board words I give you. "
-        "Output format: word1, word2, word3"
+    "You are the AI guesser in a Codenames-like game. "
+    "Your goal is to maximize the team's score. "
+    "One of the target words is a GOLDEN TARGET worth 3 points. "
+    "You MUST output EXACTLY the number of words requested. "
+    "IMPORTANT RULE: The hint will NEVER be identical to any board word "
+    "or any morphological variant of a board word. "
+    "Choose ONLY from the board words I give you. "
+    "Output format: word1, word2, word3"
     )
 
     user_prompt = (
@@ -209,13 +291,16 @@ def render_colored_board(board, word_roles, guesses=None, reveal_all=False, clic
         is_guessed = w in guesses
 
         if reveal_all or is_guessed:
-            if role == "target":
-                color = "#2e7d32"
+            if role == "gold_target":
+                color = "#d4af37"   # طلایی
+            elif role == "target":
+                color = "#2e7d32"   # سبز
             elif role == "bomb":
-                color = "#c62828"
+                color = "#c62828"   # قرمز
             else:
-                color = "#616161"
+                color = "#616161"   # خاکستری
             text_color = "white"
+
         else:
             color = "#1976d2"
             text_color = "white"
@@ -293,12 +378,13 @@ def main():
 
         <h4 style='margin-bottom:6px; color:#333;'>🎯 Your goal</h4>
         <p style='font-size:15px; color:#444; margin-top:0;'>
-         Try to reach a total of <b>10 points</b> together with the AI by the end of all 8 rounds.
+         Try to reach a total of <b>15 points</b> together with the AI by the end of all 8 rounds.
          </p>
 
         <h4 style='margin-bottom:6px; color:#333;'>📊 Scoring</h4>
         <ul style='font-size:15px; color:#444; margin-top:0;'>
             <li><b>+1 point</b> for each correct guess</li>
+            <li><b style="color:#d4af37;">+3 points</b> for the Golden Target</li>
             <li><b>–1 point</b> if you hit the bomb word</li>
             <li>The round ends immediately if the bomb is selected</li>
         </ul>
@@ -347,22 +433,32 @@ def main():
         st.stop()
 
     # --- Participant ID Screen ---
+    # --- Participant ID Screen ---
     if "participant_id" not in st.session_state:
         st.markdown("<h3>Who’s playing?</h3>", unsafe_allow_html=True)
 
-        pid = st.text_input("Type your name to begin:")
+        pid = st.text_input(
+        "Type your name to begin:",
+        placeholder="Enter your name..."
+    )
 
-        if pid:
-            st.session_state.participant_id = pid
-            st.rerun()
+        if st.button("🚀 Lets Go"):
+            if pid.strip() == "":
+               st.error("Please enter your name.")
+            else:
+               st.session_state.participant_id = pid.strip()
+               st.rerun()
 
         st.stop()
+
+       
+
 
     # --- New Round Setup ---
     if st.session_state.board is None:
         st.session_state.word_type = get_word_type_for_round(st.session_state.round)
         st.session_state.role = get_role_for_round(st.session_state.round)
-        board, targets, neutrals, bomb, word_roles = sample_words(st.session_state.word_type)
+        board, targets, neutrals, bomb, word_roles, golden_target = sample_words_no_replacement(st.session_state.word_type)
 
         st.session_state.board = board
         st.session_state.target_words = targets
@@ -375,6 +471,8 @@ def main():
         st.session_state.hint_number = 0
         st.session_state.perception_rating = None
         st.session_state.start_time = datetime.utcnow()
+        st.session_state.golden_target = golden_target
+
 
     # --- Sidebar (ONLY AFTER GAME STARTS) ---
     if (
@@ -457,7 +555,8 @@ def main():
                             st.session_state.target_words,
                             st.session_state.bomb_word,
                             st.session_state.neutral_words,
-                            st.session_state.word_type
+                            st.session_state.word_type,
+                            st.session_state.golden_target
                         )
                         st.session_state.hint = hint
                         st.session_state.hint_number = num
@@ -525,9 +624,7 @@ def main():
                             color:#333;
                             text-align:center;
                         ">
-                            The AI will give you a clue next.<br>
-                            Take a moment to read the words.
-                        </div>
+                         
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -568,9 +665,17 @@ def main():
             guesses = st.session_state.guesses
             correct = any(g in st.session_state.target_words for g in guesses)
             bomb_hit = any(g == st.session_state.bomb_word for g in guesses)
-            score_change = -1 if bomb_hit else sum(
-                1 for g in guesses if g in st.session_state.target_words
-            )
+            score_change = 0
+
+            if bomb_hit:
+                score_change = -1
+            else:
+                for g in guesses:
+                    if g == st.session_state.golden_target:
+                        score_change += 3
+                    elif g in st.session_state.target_words:
+                        score_change += 1
+            
 
             if st.session_state.role == "human_clue":
                 html = """
@@ -592,6 +697,8 @@ def main():
                 """
 
                 html = html.replace("__GUESSES__", ", ".join(st.session_state.guesses))
+
+                st.markdown(f"**Golden target:** ⭐ {st.session_state.golden_target}")
                 html = html.replace("__SCORE__", str(score_change))
 
                 st.markdown(html, unsafe_allow_html=True)
@@ -624,6 +731,7 @@ def main():
                 """
 
                 html = html.replace("__SCORE__", str(score_change))
+                st.markdown(f"**Golden target:** ⭐ {st.session_state.golden_target}")
                 st.markdown(html, unsafe_allow_html=True)
 
         # -----------------------------
