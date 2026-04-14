@@ -17,44 +17,36 @@ MODEL_NAME = "gpt-4o-mini"
 # WORD POOLS 
 # -----------------------------
 ABSTRACT_CATEGORIES = {
-
     "emotion": [
         "love", "fear", "joy", "sadness", "anger", "hope", "happiness",
         "surprise", "weakness",
         "shame", "loneliness", "peace"
     ],
-
     "social": [
         "friend", "family", "team", "community", "leader",
         "respect", "cooperation", "freedom", 
         "support", "loyalty", "unity",  "kindness"
     ],
-
     "cognitive": [
         "thought", "learning", "understanding", "idea", 
         "reason", "focus", "imagination",
         "decision", "problem",  "knowledge", "memory", "awareness"
     ]
-
 }
 
 CONCRETE_CATEGORIES = {
-
     "objects": [
         "apple", "book", "chair", "table", "lamp",  "cup", 
         "shoe", "door",  "phone", "bag", "pen", "clock"
     ],
-
     "animals": [
         "dog", "cat",  "fish", "horse",  "elephant", "lion",
         "tiger", "monkey", "mouse", "rabbit", "sheep", "bear"
     ],
-
     "places": [
         "house", "school", "park", "river", "mountain", "street", "beach",
         "forest", "city", "market", "airport", "hospital"
     ]
-
 }
 
 DATA_FILE = "game_data.csv"
@@ -63,10 +55,6 @@ N_ROUNDS = 8
 # -----------------------------
 # UTILS
 # -----------------------------
-
-ABSTRACT_POOLS = {cat: words.copy() for cat, words in ABSTRACT_CATEGORIES.items()}
-CONCRETE_POOLS = {cat: words.copy() for cat, words in CONCRETE_CATEGORIES.items()}
-
 def init_session_state():
     if "round" not in st.session_state:
         st.session_state.round = 1
@@ -85,10 +73,15 @@ def init_session_state():
         st.session_state.start_time = None
         st.session_state.perception_rating = None
         st.session_state.golden_target = None
+        st.session_state.previous_hint = None
 
         # Global rerolls for the whole game (not per round)
         st.session_state.ai_rerolls = 2      # AI (as guesser) can ask for a new hint at most 2 times in the whole game
         st.session_state.human_rerolls = 2   # Human (as guesser) can ask AI for a new hint at most 2 times in the whole game
+
+        # Pools stored in session_state to avoid repetition across rounds
+        st.session_state.abstract_pools = {cat: words.copy() for cat, words in ABSTRACT_CATEGORIES.items()}
+        st.session_state.concrete_pools = {cat: words.copy() for cat, words in CONCRETE_CATEGORIES.items()}
 
 def get_word_type_for_round(r):
     return "abstract" if r in [1, 2, 5, 6] else "concrete"
@@ -97,14 +90,21 @@ def get_role_for_round(r):
     return "human_clue" if r % 2 == 1 else "ai_clue"
 
 def sample_words_no_replacement(word_type):
-    pools = ABSTRACT_POOLS if word_type == "abstract" else CONCRETE_POOLS
+    """
+    Sample 3 words from each of the 3 categories (total 9),
+    without replacement across rounds, using pools stored in session_state.
+    """
+    if word_type == "abstract":
+        pools = st.session_state.abstract_pools
+    else:
+        pools = st.session_state.concrete_pools
 
     selected_words = []
 
     # pick 3 words from each category (total = 9)
     for category, words in pools.items():
         if len(words) < 3:
-            raise ValueError(f"Not enough words left in category {category}")
+            raise ValueError(f"Not enough words left in category {category} for word_type={word_type}")
 
         chosen = random.sample(words, 3)
         selected_words.extend(chosen)
@@ -222,6 +222,7 @@ def generate_ai_hint(target_words, bomb_word, neutral_words, word_type, golden_t
         "3) Your hint must relate to the target words and avoid the bomb word.\n"
         "4) Try to choose a clue that helps the human connect as many target words "
         "   as possible, especially the golden target, while avoiding the bomb.\n"
+        "5) Do not explain your reasoning. Only output the hint and the number.\n"
     )
 
     user_prompt = (
@@ -230,8 +231,7 @@ def generate_ai_hint(target_words, bomb_word, neutral_words, word_type, golden_t
         f"Neutral words: {', '.join(neutral_words)}\n"
         f"Bomb word: {bomb_word}\n"
         f"Word type: {word_type}\n"
-        "Return exactly one hint and one number in the format: HINT|N\n"
-        "Do not explain your reasoning. Only output the hint and the number."
+        "Return exactly one hint and one number in the format: HINT|N"
     )
 
     raw = call_openai_chat(system_prompt, user_prompt)
@@ -248,13 +248,14 @@ def generate_ai_hint(target_words, bomb_word, neutral_words, word_type, golden_t
         n = len(target_words)
 
     return hint, n
+
 def generate_ai_hint_reroll(
     target_words, bomb_word, neutral_words, word_type, golden_target, previous_hint
 ):
     system_prompt = (
         "You are the AI clue-giver in a Codenames-like cooperative game. "
         "The human player has requested a NEW hint because the previous hint was too difficult. "
-        "You MUST provide a completely different hint from the previous one. "
+        "You MUST provide a completely different hint from the previous one.\n\n"
         "STRICT RULES:\n"
         "1) DO NOT repeat the previous hint.\n"
         "2) DO NOT use any board word or any morphological variant of a board word.\n"
@@ -378,7 +379,6 @@ def render_colored_board(board, word_roles, guesses=None, reveal_all=False, clic
             else:
                 color = "#616161"   # خاکستری
             text_color = "white"
-
         else:
             color = "#1976d2"
             text_color = "white"
@@ -475,6 +475,13 @@ def main():
             <li>You and the AI <b>alternate roles</b> between clue-giver and guesser</li>
         </ul>
 
+        <h4 style='margin-bottom:6px; color:#333;'>♻️ Extra hint chances</h4>
+        <ul style='font-size:15px; color:#444; margin-top:0;'>
+            <li>The human guesser can request a <b>new AI hint up to 2 times</b> in the whole game.</li>
+            <li>The AI guesser can also request a <b>new human hint up to 2 times</b> in the whole game.</li>
+            <li>Each unused hint chance becomes a <b>bonus point at the end of the game</b> (maximum +4).</li>
+        </ul>
+
         <p style='font-size:15px; color:#444; margin-top:10px;'>
             When you're ready, click the button below to begin.
         </p>
@@ -547,7 +554,6 @@ def main():
         st.session_state.start_time = datetime.utcnow()
         st.session_state.golden_target = golden_target
         st.session_state.previous_hint = None
-
 
     # --- Sidebar (ONLY AFTER GAME STARTS) ---
     if (
@@ -659,7 +665,8 @@ def main():
             if st.session_state.hint and st.session_state.human_rerolls > 0:
                 if st.button(f"🔄 I need a different hint ({st.session_state.human_rerolls} left)"):
                     st.session_state.human_rerolls -= 1
-                    old_hint = st.session_state.hint
+                    st.session_state.previous_hint = st.session_state.hint
+
                     with st.spinner("AI is generating a new clue..."):
                         hint, num = generate_ai_hint_reroll(
                             st.session_state.target_words,
@@ -667,13 +674,24 @@ def main():
                             st.session_state.neutral_words,
                             st.session_state.word_type,
                             st.session_state.golden_target,
-                            previous_hint=old_hint
+                            st.session_state.previous_hint
                         )
                         st.session_state.hint = hint
                         st.session_state.hint_number = num
                         st.rerun()
 
             if st.session_state.hint:
+                prev_hint_html = (
+                    f"""
+                    <div style="margin-bottom:6px;">
+                        <span style="font-size:13px;font-weight:600;color:#6c757d;">Previous hint:</span><br>
+                        <span style="font-size:16px;font-weight:700;color:#8a6d3b;">
+                            {st.session_state.previous_hint.upper() if st.session_state.previous_hint else '—'}
+                        </span>
+                    </div>
+                    """
+                )
+
                 st.markdown(
                     f"""
                     <div style="background-color:#fff3cd;border-left:4px solid #ffca2c;
@@ -683,10 +701,17 @@ def main():
                     <span style="font-size:18px;font-weight:800;color:#7a5a00;
                     display:block;margin-bottom:4px;">🔍 AI Hint</span>
 
-                    <span style="font-size:22px;font-weight:900;color:#5c4400;
-                    display:block;margin-bottom:4px;">{st.session_state.hint.upper()}</span>
+                    {prev_hint_html}
 
-                    <span style="font-size:16px;font-weight:700;color:#7a5a00;
+                    <div style="margin-top:4px;">
+                        <span style="font-size:14px;font-weight:600;color:#5c4400;">Current hint:</span><br>
+                        <span style="font-size:22px;font-weight:900;color:#5c4400;
+                        display:block;margin-bottom:4px;letter-spacing:0.5px;">
+                            {st.session_state.hint.upper()}
+                        </span>
+                    </div>
+
+                    <span style="font-size:15px;font-weight:700;color:#7a5a00;
                     display:block;">{st.session_state.hint_number} word(s)</span>
 
                     </div>
