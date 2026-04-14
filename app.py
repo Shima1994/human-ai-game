@@ -38,8 +38,6 @@ ABSTRACT_CATEGORIES = {
 
 }
 
-
-
 CONCRETE_CATEGORIES = {
 
     "objects": [
@@ -58,6 +56,7 @@ CONCRETE_CATEGORIES = {
     ]
 
 }
+
 DATA_FILE = "game_data.csv"
 N_ROUNDS = 8
 
@@ -87,6 +86,9 @@ def init_session_state():
         st.session_state.perception_rating = None
         st.session_state.golden_target = None
 
+        # Global rerolls for the whole game (not per round)
+        st.session_state.ai_rerolls = 2      # AI (as guesser) can ask for a new hint at most 2 times in the whole game
+        st.session_state.human_rerolls = 2   # Human (as guesser) can ask AI for a new hint at most 2 times in the whole game
 
 def get_word_type_for_round(r):
     return "abstract" if r in [1, 2, 5, 6] else "concrete"
@@ -135,9 +137,6 @@ def sample_words_no_replacement(word_type):
     word_roles[bomb] = "bomb"
 
     return selected_words, targets, neutrals, bomb, word_roles, golden_target
-
-
-
 
 def ensure_data_file():
     if not os.path.exists(DATA_FILE):
@@ -207,26 +206,73 @@ def call_openai_chat(system_prompt, user_prompt):
     )
     return resp.choices[0].message.content.strip()
 
-def generate_ai_hint(target_words, bomb_word, neutral_words, word_type,golden_target):
+def generate_ai_hint(target_words, bomb_word, neutral_words, word_type, golden_target):
     system_prompt = (
-    "You are the AI clue-giver in a Codenames-like game. "
-    "Your goal is to maximize the team's score. "
-    "One of the target words is a GOLDEN TARGET worth 3 points. "
-    "Give ONE hint word and a number in the format HINT|N. "
-    "STRICT RULE: You are NOT allowed to use any board word as a hint, "
-    "and you are NOT allowed to use any morphological variant, "
-    "plural form, conjugation, or derivation of any board word. "
-    "For example, if the board contains 'sad', you cannot use 'sadness', "
-    "'sadly', 'sadder', or anything sharing the same root. "
-    "Your hint must relate to the target words and avoid the bomb word."
+        "You are the AI clue-giver in a Codenames-like cooperative word game. "
+        "You play together with a human as a team. "
+        "Your goal is to maximize the team's score by giving a single, smart clue. "
+        "One of the target words is a GOLDEN TARGET worth 3 points. "
+        "You must give ONE hint word and a number in the format HINT|N. "
+        "STRICT RULES:\n"
+        "1) You are NOT allowed to use any board word as a hint.\n"
+        "2) You are NOT allowed to use any morphological variant, plural form, "
+        "   conjugation, or derivation of any board word.\n"
+        "   For example, if the board contains 'sad', you cannot use 'sadness', "
+        "   'sadly', 'sadder', or anything sharing the same root.\n"
+        "3) Your hint must relate to the target words and avoid the bomb word.\n"
+        "4) Try to choose a clue that helps the human connect as many target words "
+        "   as possible, especially the golden target, while avoiding the bomb.\n"
     )
 
     user_prompt = (
-         f"Target words: {', '.join(target_words)}\n"
-         f"Golden target (worth 3 points): {golden_target}\n"
-         f"Neutral words: {', '.join(neutral_words)}\n"
-         f"Bomb word: {bomb_word}\n"
-         f"Word type: {word_type}\n"
+        f"Target words: {', '.join(target_words)}\n"
+        f"Golden target (worth 3 points): {golden_target}\n"
+        f"Neutral words: {', '.join(neutral_words)}\n"
+        f"Bomb word: {bomb_word}\n"
+        f"Word type: {word_type}\n"
+        "Return exactly one hint and one number in the format: HINT|N\n"
+        "Do not explain your reasoning. Only output the hint and the number."
+    )
+
+    raw = call_openai_chat(system_prompt, user_prompt)
+
+    if "|" in raw:
+        hint, num = raw.split("|", 1)
+        hint = hint.strip()
+        try:
+            n = int(num.strip())
+        except:
+            n = len(target_words)
+    else:
+        hint = raw.strip()
+        n = len(target_words)
+
+    return hint, n
+def generate_ai_hint_reroll(
+    target_words, bomb_word, neutral_words, word_type, golden_target, previous_hint
+):
+    system_prompt = (
+        "You are the AI clue-giver in a Codenames-like cooperative game. "
+        "The human player has requested a NEW hint because the previous hint was too difficult. "
+        "You MUST provide a completely different hint from the previous one. "
+        "STRICT RULES:\n"
+        "1) DO NOT repeat the previous hint.\n"
+        "2) DO NOT use any board word or any morphological variant of a board word.\n"
+        "3) DO NOT use any morphological variant of the previous hint.\n"
+        "4) The new hint MUST be easier, clearer, and more helpful.\n"
+        "5) Output format: HINT|N\n"
+        "6) Do NOT explain your reasoning.\n"
+    )
+
+    user_prompt = (
+        f"Previous hint: {previous_hint}\n"
+        f"Target words: {', '.join(target_words)}\n"
+        f"Golden target (worth 3 points): {golden_target}\n"
+        f"Neutral words: {', '.join(neutral_words)}\n"
+        f"Bomb word: {bomb_word}\n"
+        f"Word type: {word_type}\n"
+        "Provide a NEW hint that is different from the previous one.\n"
+        "Return exactly one hint and one number in the format: HINT|N"
     )
 
     raw = call_openai_chat(system_prompt, user_prompt)
@@ -244,40 +290,72 @@ def generate_ai_hint(target_words, bomb_word, neutral_words, word_type,golden_ta
 
     return hint, n
 
-def ai_guess(board, hint, hint_number):
+def ai_guess(board, hint, hint_number, remaining_rerolls):
+    """
+    AI is the guesser. It can either:
+    - Output exactly 'REROLL_HINT' (uppercase) if the hint is too ambiguous AND remaining_rerolls > 0
+    - Or output a comma-separated list of guesses from the board, e.g.: word1, word2, word3
+    """
     system_prompt = (
-    "You are the AI guesser in a Codenames-like game. "
-    "Your goal is to maximize the team's score. "
-    "One of the target words is a GOLDEN TARGET worth 3 points. "
-    "You MUST output EXACTLY the number of words requested. "
-    "IMPORTANT RULE: The hint will NEVER be identical to any board word "
-    "or any morphological variant of a board word. "
-    "Choose ONLY from the board words I give you. "
-    "Output format: word1, word2, word3"
+        "You are the AI guesser in a Codenames-like cooperative word game. "
+        "You and a human are playing together as a team. "
+        "Your goal is to maximize the team's score by choosing the best possible guesses.\n\n"
+        "There is a set of board words. Some of them are target words (including one GOLDEN TARGET worth 3 points), "
+        "some are neutral, and one is a bomb word that ends the round with a penalty.\n\n"
+        "You will receive:\n"
+        "- The list of board words\n"
+        "- A single hint word\n"
+        "- A number N (how many guesses you are allowed to make)\n\n"
+        "IMPORTANT RULES:\n"
+        "1) You MUST choose ONLY from the given board words.\n"
+        "2) You MUST output EXACTLY the number of words requested (N), unless you decide to request a new hint.\n"
+        "3) The hint will NEVER be identical to any board word or any morphological variant of a board word.\n\n"
+        "SPECIAL OPTION (REQUESTING A NEW HINT):\n"
+        "If you think the hint is too ambiguous, unclear, or not helpful enough, and you still have at least one "
+        "remaining chance to request a new hint, you may output EXACTLY the single token:\n"
+        "REROLL_HINT\n"
+        "This means: you are asking the human clue-giver to provide a different hint.\n\n"
+        "If you choose to request a new hint, do NOT output any guesses. Only output 'REROLL_HINT'.\n"
+        "Otherwise, output your guesses as a comma-separated list of board words, e.g.: word1, word2, word3\n"
+        "Do not explain your reasoning."
     )
 
     user_prompt = (
         f"Board words: {', '.join(board)}\n"
         f"Hint: {hint}\n"
-        f"Number: {hint_number}\n"
-        "Choose ONLY from the board. No outside words."
+        f"Number of guesses (N): {hint_number}\n"
+        f"Remaining chances to request a new hint: {remaining_rerolls}\n\n"
+        "If the hint is too hard or ambiguous AND remaining chances > 0, you may output exactly:\n"
+        "REROLL_HINT\n"
+        "Otherwise, output exactly N guesses as a comma-separated list of board words.\n"
+        "Examples of valid outputs:\n"
+        "- love, fear, joy\n"
+        "- house, school\n"
+        "- REROLL_HINT\n"
+        "Do not add any extra text."
     )
 
-    raw = call_openai_chat(system_prompt, user_prompt)
+    raw = call_openai_chat(system_prompt, user_prompt).strip()
 
-    model_words = [g.strip() for g in raw.split(",")]
+    # If the model explicitly requests a new hint
+    if raw.upper() == "REROLL_HINT":
+        return ["__REROLL_HINT__"]
+
+    model_words = [g.strip() for g in raw.split(",") if g.strip()]
     valid = [w for w in model_words if w in board]
 
     if len(valid) < hint_number:
         remaining = [w for w in board if w not in valid]
-        needed = hint_number - len(valid)
-        valid += random.sample(remaining, needed)
+        if remaining:
+            needed = hint_number - len(valid)
+            if needed > len(remaining):
+                needed = len(remaining)
+            valid += random.sample(remaining, needed)
 
     if len(valid) > hint_number:
         valid = valid[:hint_number]
 
     return valid
-
 # -----------------------------
 # UI HELPERS — ULTRA‑COMPACT BOARD
 # -----------------------------
@@ -433,26 +511,22 @@ def main():
         st.stop()
 
     # --- Participant ID Screen ---
-    # --- Participant ID Screen ---
     if "participant_id" not in st.session_state:
         st.markdown("<h3>Who’s playing?</h3>", unsafe_allow_html=True)
 
         pid = st.text_input(
-        "Type your name to begin:",
-        placeholder="Enter your name..."
-    )
+            "Type your name to begin:",
+            placeholder="Enter your name..."
+        )
 
         if st.button("🚀 Lets Go"):
             if pid.strip() == "":
-               st.error("Please enter your name.")
+                st.error("Please enter your name.")
             else:
-               st.session_state.participant_id = pid.strip()
-               st.rerun()
+                st.session_state.participant_id = pid.strip()
+                st.rerun()
 
         st.stop()
-
-       
-
 
     # --- New Round Setup ---
     if st.session_state.board is None:
@@ -472,6 +546,7 @@ def main():
         st.session_state.perception_rating = None
         st.session_state.start_time = datetime.utcnow()
         st.session_state.golden_target = golden_target
+        st.session_state.previous_hint = None
 
 
     # --- Sidebar (ONLY AFTER GAME STARTS) ---
@@ -487,6 +562,8 @@ def main():
             st.markdown(f"**Word type:** {st.session_state.word_type.capitalize()}")
             st.markdown(f"**Score:** {st.session_state.score}")
             st.markdown(f"**Round:** {st.session_state.round} / {N_ROUNDS}")
+            total_rerolls_left = st.session_state.ai_rerolls + st.session_state.human_rerolls
+            st.markdown(f"**Unused hint chances (global):** {total_rerolls_left} / 4")
 
     # -----------------------------
     # GAME LOGIC
@@ -528,10 +605,26 @@ def main():
                     ai_guesses = ai_guess(
                         st.session_state.board,
                         st.session_state.hint,
-                        st.session_state.hint_number
+                        st.session_state.hint_number,
+                        st.session_state.ai_rerolls
                     )
-                    st.session_state.guesses = ai_guesses
-                    st.session_state.round_finished = True
+
+                    # Check if AI requested a new hint instead of guessing
+                    if len(ai_guesses) == 1 and ai_guesses[0] == "__REROLL_HINT__":
+                        if st.session_state.ai_rerolls > 0:
+                            st.session_state.ai_rerolls -= 1
+                            st.info(
+                                "The AI found your hint too difficult and requested a new hint. "
+                                "You can adjust your hint and click 'Let AI guess' again."
+                            )
+                        else:
+                            st.warning(
+                                "The AI tried to request a new hint, but there are no remaining AI rerolls. "
+                                "Please keep your current hint or change it manually and try again."
+                            )
+                    else:
+                        st.session_state.guesses = ai_guesses
+                        st.session_state.round_finished = True
 
     else:
         # -----------------------------
@@ -557,6 +650,24 @@ def main():
                             st.session_state.neutral_words,
                             st.session_state.word_type,
                             st.session_state.golden_target
+                        )
+                        st.session_state.hint = hint
+                        st.session_state.hint_number = num
+                        st.rerun()
+
+            # Human reroll button (global 2 chances in the whole game)
+            if st.session_state.hint and st.session_state.human_rerolls > 0:
+                if st.button(f"🔄 I need a different hint ({st.session_state.human_rerolls} left)"):
+                    st.session_state.human_rerolls -= 1
+                    old_hint = st.session_state.hint
+                    with st.spinner("AI is generating a new clue..."):
+                        hint, num = generate_ai_hint_reroll(
+                            st.session_state.target_words,
+                            st.session_state.bomb_word,
+                            st.session_state.neutral_words,
+                            st.session_state.word_type,
+                            st.session_state.golden_target,
+                            previous_hint=old_hint
                         )
                         st.session_state.hint = hint
                         st.session_state.hint_number = num
@@ -590,7 +701,7 @@ def main():
             st.markdown("<h4>Board</h4>", unsafe_allow_html=True)
 
             if st.session_state.hint == "":
-                # BLURRED, LOCKED BOARD (OPTION C)
+                # BLURRED, LOCKED BOARD
                 st.markdown(
                     """
                     <div style="position:relative;">
@@ -648,7 +759,6 @@ def main():
                 ):
                     st.info("All guesses used. Round ends.")
                     st.session_state.round_finished = True
-
     # -----------------------------
     # ROUND SUMMARY (ULTRA‑COMPACT + SIDE-BY-SIDE)
     # -----------------------------
@@ -675,7 +785,8 @@ def main():
                         score_change += 3
                     elif g in st.session_state.target_words:
                         score_change += 1
-            
+
+            total_rerolls_left = st.session_state.ai_rerolls + st.session_state.human_rerolls
 
             if st.session_state.role == "human_clue":
                 html = """
@@ -690,17 +801,27 @@ def main():
                 <div style="background-color:#eef3ff;padding:8px;border-radius:6px;
                 border:1px solid #c7d4ff;margin-bottom:8px;">
                     <div style="font-size:13px;font-weight:700;color:#1a3e8a;margin-bottom:2px;">
-                        Score change
+                        Score change (this round, without unused-hint bonus)
                     </div>
                     <div style="font-size:18px;font-weight:800;color:#0d47a1;">__SCORE__</div>
                 </div>
+
+                <div style="background-color:#f3f6ff;padding:8px;border-radius:6px;
+                border:1px solid #d0d8ff;margin-bottom:8px;">
+                    <div style="font-size:13px;font-weight:700;color:#1a237e;margin-bottom:2px;">
+                        Unused hint chances (global)
+                    </div>
+                    <div style="font-size:13px;color:#1a237e;">
+                        __REROLLS__ / 4 (bonus will be added at the end of the game)
+                    </div>
+                </div>
                 """
 
-                html = html.replace("__GUESSES__", ", ".join(st.session_state.guesses))
+                html = html.replace("__GUESSES__", ", ".join(st.session_state.guesses) if st.session_state.guesses else "No guesses")
+                html = html.replace("__SCORE__", str(score_change))
+                html = html.replace("__REROLLS__", str(total_rerolls_left))
 
                 st.markdown(f"**Golden target:** ⭐ {st.session_state.golden_target}")
-                html = html.replace("__SCORE__", str(score_change))
-
                 st.markdown(html, unsafe_allow_html=True)
 
             else:
@@ -716,7 +837,7 @@ def main():
 
                 st.markdown(
                     f"<div style='font-size:12px;margin-top:4px;'>Your guesses: "
-                    f"<b>{', '.join(st.session_state.guesses)}</b></div>",
+                    f"<b>{', '.join(st.session_state.guesses) if st.session_state.guesses else 'No guesses'}</b></div>",
                     unsafe_allow_html=True
                 )
 
@@ -724,13 +845,25 @@ def main():
                 <div style="background-color:#eef3ff;padding:8px;border-radius:6px;
                 border:1px solid #c7d4ff;margin-top:8px;">
                     <div style="font-size:13px;font-weight:700;color:#1a3e8a;margin-bottom:2px;">
-                        Score change
+                        Score change (this round, without unused-hint bonus)
                     </div>
                     <div style="font-size:18px;font-weight:800;color:#0d47a1;">__SCORE__</div>
+                </div>
+
+                <div style="background-color:#f3f6ff;padding:8px;border-radius:6px;
+                border:1px solid #d0d8ff;margin-top:8px;">
+                    <div style="font-size:13px;font-weight:700;color:#1a237e;margin-bottom:2px;">
+                        Unused hint chances (global)
+                    </div>
+                    <div style="font-size:13px;color:#1a237e;">
+                        __REROLLS__ / 4 (bonus will be added at the end of the game)
+                    </div>
                 </div>
                 """
 
                 html = html.replace("__SCORE__", str(score_change))
+                html = html.replace("__REROLLS__", str(total_rerolls_left))
+
                 st.markdown(f"**Golden target:** ⭐ {st.session_state.golden_target}")
                 st.markdown(html, unsafe_allow_html=True)
 
@@ -747,11 +880,28 @@ def main():
             )
 
             if st.button("Save round and continue", use_container_width=True):
+                # Log this round (without unused-hint bonus)
                 log_round(st.session_state.participant_id)
 
                 if st.session_state.round >= N_ROUNDS:
-                    st.success("Game finished. Thank you!")
+                    # End of the game: add bonus from unused hint chances
+                    unused_rerolls = st.session_state.ai_rerolls + st.session_state.human_rerolls
+                    st.session_state.score += unused_rerolls
+
+                    st.success(
+                        f"Game finished. Thank you for playing! "
+                        f"You earned +{unused_rerolls} bonus point(s) from unused hint chances."
+                    )
+
+                    st.markdown(f"**Final team score (including bonus):** {st.session_state.score}")
+
+                    if st.session_state.score >= 15:
+                        st.success("🎉 Congratulations! You reached the team goal of 15 points or more!")
+                    else:
+                        st.info("You didn't reach 15 points this time. You can play again and try to beat the score!")
+
                 else:
+                    # Go to next round
                     st.session_state.round += 1
                     st.session_state.board = None
                     st.rerun()
