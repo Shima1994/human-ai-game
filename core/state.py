@@ -32,16 +32,28 @@ def init_session_state():
         "word_roles": {},
         "hint": "",
         "hint_number": 1,
+        "hint_targets": [],
+        "used_hints": [],
         "guesses": [],
+        "pending_guesses": [],
+        "found_targets": [],
+        "interaction_history": [],
+        "ai_round_summaries": [],
+        "round_interactions": 0,
         "round_finished": False,
         "start_time": None,
         "perception_rating": 3,
-        "golden_target": None,
         "previous_hint": None,
+        "last_ai_guesses": [],
+        "last_ai_hint": "",
         "ai_rerolls": AI_REROLLS_PER_GAME,
         "human_rerolls": HUMAN_REROLLS_PER_GAME,
         "game_over": False,
         "last_score_change": 0,
+        "round_medal": "none",
+        "round_success": False,
+        "round_bomb_hit": False,
+        "medal_counts": {"gold": 0, "silver": 0, "bronze": 0, "none": 0},
     }
     defaults.update(_fresh_pools())
 
@@ -60,13 +72,22 @@ def reset_round_state():
     st.session_state.word_roles = {}
     st.session_state.hint = ""
     st.session_state.hint_number = 1
+    st.session_state.hint_targets = []
     st.session_state.guesses = []
+    st.session_state.pending_guesses = []
+    st.session_state.found_targets = []
+    st.session_state.interaction_history = []
+    st.session_state.round_interactions = 0
     st.session_state.round_finished = False
     st.session_state.start_time = None
     st.session_state.perception_rating = 3
-    st.session_state.golden_target = None
     st.session_state.previous_hint = None
+    st.session_state.last_ai_guesses = []
+    st.session_state.last_ai_hint = ""
     st.session_state.last_score_change = 0
+    st.session_state.round_medal = "none"
+    st.session_state.round_success = False
+    st.session_state.round_bomb_hit = False
 
 
 def restart_game(keep_participant=False):
@@ -84,4 +105,7 @@ def restart_game(keep_participant=False):
     st.session_state.ai_rerolls = AI_REROLLS_PER_GAME
     st.session_state.human_rerolls = HUMAN_REROLLS_PER_GAME
     st.session_state.game_over = False
+    st.session_state.medal_counts = {"gold": 0, "silver": 0, "bronze": 0, "none": 0}
+    st.session_state.used_hints = []
+    st.session_state.ai_round_summaries = []
     st.session_state.start_time = datetime.utcnow()

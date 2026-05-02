@@ -3,13 +3,39 @@ from datetime import datetime
 
 import streamlit as st
 
+from core.constants import (
+    BOARD_SIZE,
+    BOMB_COUNT,
+    MAX_INTERACTIONS_PER_ROUND,
+    MEDAL_POINTS,
+    TARGET_COUNT,
+)
+from core.words import ABSTRACT_CATEGORIES, CONCRETE_CATEGORIES
+
 
 def get_word_type_for_round(round_number):
-    return "abstract" if round_number in [1, 2, 5, 6] else "concrete"
+    return "abstract" if ((round_number - 1) // 2) % 2 == 0 else "concrete"
 
 
 def get_role_for_round(round_number):
-    return "human_clue" if round_number % 2 == 1 else "ai_clue"
+    return "human_clue" if round_number % 2 else "ai_clue"
+
+
+def _reset_word_pool(word_type):
+    if word_type == "abstract":
+        st.session_state.abstract_pools = {
+            category: words.copy() for category, words in ABSTRACT_CATEGORIES.items()
+        }
+    else:
+        st.session_state.concrete_pools = {
+            category: words.copy() for category, words in CONCRETE_CATEGORIES.items()
+        }
+
+
+def _remove_selected_words_from_pool(pools, selected_pairs):
+    selected_words = {word for word, _ in selected_pairs}
+    for category, words in pools.items():
+        pools[category] = [word for word in words if word not in selected_words]
 
 
 def sample_words_no_replacement(word_type):
@@ -18,32 +44,37 @@ def sample_words_no_replacement(word_type):
         if word_type == "abstract"
         else st.session_state.concrete_pools
     )
+    available_pairs = [
+        (word, category)
+        for category, words in pools.items()
+        for word in words
+    ]
+    if len(available_pairs) < BOARD_SIZE:
+        _reset_word_pool(word_type)
+        pools = (
+            st.session_state.abstract_pools
+            if word_type == "abstract"
+            else st.session_state.concrete_pools
+        )
+        available_pairs = [
+            (word, category)
+            for category, words in pools.items()
+            for word in words
+        ]
+        if len(available_pairs) < BOARD_SIZE:
+            raise ValueError(f"Not enough words for a {BOARD_SIZE}-card {word_type} board.")
 
-    selected_words = []
-    selected_pairs = []
-    for category, words in pools.items():
-        if len(words) < 3:
-            raise ValueError(
-                f"Not enough words left in category {category} for word_type={word_type}"
-            )
-
-        chosen = random.sample(words, 3)
-        selected_words.extend(chosen)
-        selected_pairs.extend((word, category) for word in chosen)
-        for word in chosen:
-            words.remove(word)
-
+    selected_pairs = random.sample(available_pairs, BOARD_SIZE)
+    _remove_selected_words_from_pool(pools, selected_pairs)
+    board_words = [word for word, _ in selected_pairs]
     targets, neutrals, bomb = _assign_balanced_roles(selected_pairs)
-    golden_target = random.choice(targets)
 
-    word_roles = {}
-    for word in targets:
-        word_roles[word] = "gold_target" if word == golden_target else "target"
-    for word in neutrals:
-        word_roles[word] = "neutral"
+    word_roles = {word: "target" for word in targets}
+    word_roles.update({word: "neutral" for word in neutrals})
     word_roles[bomb] = "bomb"
 
-    return selected_words, targets, neutrals, bomb, word_roles, golden_target
+    random.shuffle(board_words)
+    return board_words, targets, neutrals, bomb, word_roles
 
 
 def _category_count(words_with_categories):
@@ -62,28 +93,25 @@ def _assign_balanced_roles(selected_pairs):
     shuffled = selected_pairs[:]
     for _ in range(250):
         random.shuffle(shuffled)
-        target_pairs = shuffled[:4]
-        neutral_pairs = shuffled[4:8]
-        bomb_pair = shuffled[8]
+        target_pairs = shuffled[:TARGET_COUNT]
+        bomb_pair = shuffled[TARGET_COUNT]
+        neutral_pairs = shuffled[TARGET_COUNT + BOMB_COUNT:]
 
-        if _is_balanced_group(target_pairs, 2) and _is_balanced_group(neutral_pairs, 2):
+        if _is_balanced_group(target_pairs, 2) and _is_balanced_group(neutral_pairs, 4):
             targets = [word for word, _ in target_pairs]
             neutrals = [word for word, _ in neutral_pairs]
-            bomb = bomb_pair[0]
-            return targets, neutrals, bomb
+            return targets, neutrals, bomb_pair[0]
 
-    targets = [word for word, _ in shuffled[:4]]
-    neutrals = [word for word, _ in shuffled[4:8]]
-    bomb = shuffled[8][0]
+    targets = [word for word, _ in shuffled[:TARGET_COUNT]]
+    bomb = shuffled[TARGET_COUNT][0]
+    neutrals = [word for word, _ in shuffled[TARGET_COUNT + BOMB_COUNT:]]
     return targets, neutrals, bomb
 
 
 def setup_new_round():
     word_type = get_word_type_for_round(st.session_state.round)
     role = get_role_for_round(st.session_state.round)
-    board, targets, neutrals, bomb, word_roles, golden_target = sample_words_no_replacement(
-        word_type
-    )
+    board, targets, neutrals, bomb, word_roles = sample_words_no_replacement(word_type)
 
     st.session_state.word_type = word_type
     st.session_state.role = role
@@ -92,35 +120,151 @@ def setup_new_round():
     st.session_state.neutral_words = neutrals
     st.session_state.bomb_word = bomb
     st.session_state.word_roles = word_roles
-    st.session_state.golden_target = golden_target
     st.session_state.guesses = []
+    st.session_state.pending_guesses = []
+    st.session_state.found_targets = []
+    st.session_state.interaction_history = []
+    st.session_state.round_interactions = 0
     st.session_state.round_finished = False
     st.session_state.hint = ""
     st.session_state.hint_number = 1
+    st.session_state.hint_targets = []
+    st.session_state.last_ai_guesses = []
+    st.session_state.last_ai_hint = ""
     st.session_state.perception_rating = 3
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.utcnow()
     st.session_state.last_score_change = 0
+    st.session_state.round_medal = "none"
+    st.session_state.round_success = False
+    st.session_state.round_bomb_hit = False
 
 
-def compute_score_change(guesses, target_words, golden_target, bomb_word):
-    if bomb_word in guesses:
-        return -1
+def get_medal_for_round(interactions, success, bomb_hit):
+    if bomb_hit or not success:
+        return "none"
+    if interactions <= 2:
+        return "gold"
+    if interactions == 3:
+        return "silver"
+    if interactions == 4:
+        return "bronze"
+    return "none"
 
-    score_change = 0
-    for guess in guesses:
-        if guess == golden_target:
-            score_change += 3
-        elif guess in target_words:
-            score_change += 1
-    return score_change
+
+def compute_score_change(guesses, target_words, bomb_word, interactions=None):
+    bomb_hit = bomb_word in guesses
+    found_targets = {guess for guess in guesses if guess in target_words}
+    success = len(found_targets) == len(target_words)
+    if interactions is None:
+        interactions = st.session_state.get("round_interactions", 0)
+    medal = get_medal_for_round(interactions, success, bomb_hit)
+    return MEDAL_POINTS[medal]
+
+
+def record_interaction(hint, hint_number, guesses, intended_targets=None):
+    intended_targets = intended_targets or []
+    normalized_hint = hint.strip().lower()
+    correct_guesses = [guess for guess in guesses if guess in st.session_state.target_words]
+    neutral_guesses = [guess for guess in guesses if guess in st.session_state.neutral_words]
+    bomb_hit = st.session_state.bomb_word in guesses
+    bomb_guess = st.session_state.bomb_word if bomb_hit else None
+    new_targets = [
+        guess
+        for guess in correct_guesses
+        if guess not in st.session_state.found_targets
+    ]
+    clue_giver = "human" if st.session_state.role == "human_clue" else "ai"
+    guesser = "ai" if st.session_state.role == "human_clue" else "human"
+    if bomb_hit:
+        outcome = "bomb"
+    elif correct_guesses:
+        outcome = "correct"
+    else:
+        outcome = "wrong"
+
+    st.session_state.round_interactions += 1
+    st.session_state.guesses.extend(
+        guess for guess in guesses if guess not in st.session_state.guesses
+    )
+    st.session_state.found_targets.extend(new_targets)
+    if normalized_hint and normalized_hint not in st.session_state.used_hints:
+        st.session_state.used_hints.append(normalized_hint)
+    st.session_state.interaction_history.append(
+        {
+            "turn": st.session_state.round_interactions,
+            "clue_giver": clue_giver,
+            "guesser": guesser,
+            "hint": normalized_hint,
+            "hint_number": hint_number,
+            "intended_targets": intended_targets,
+            "guesses": guesses,
+            "correct": bool(correct_guesses),
+            "correct_guesses": correct_guesses,
+            "neutral_guesses": neutral_guesses,
+            "bomb_guess": bomb_guess,
+            "bomb_hit": bomb_hit,
+            "outcome": outcome,
+        }
+    )
+
+    if (
+        bomb_hit
+        or len(st.session_state.found_targets) == len(st.session_state.target_words)
+        or st.session_state.round_interactions >= MAX_INTERACTIONS_PER_ROUND
+    ):
+        finish_round()
 
 
 def finish_round():
     st.session_state.round_finished = True
-    st.session_state.last_score_change = compute_score_change(
-        st.session_state.guesses,
-        st.session_state.target_words,
-        st.session_state.golden_target,
-        st.session_state.bomb_word,
+    st.session_state.round_bomb_hit = st.session_state.bomb_word in st.session_state.guesses
+    st.session_state.round_success = (
+        len(st.session_state.found_targets) == len(st.session_state.target_words)
+    )
+    st.session_state.round_medal = get_medal_for_round(
+        st.session_state.round_interactions,
+        st.session_state.round_success,
+        st.session_state.round_bomb_hit,
+    )
+    st.session_state.last_score_change = MEDAL_POINTS[st.session_state.round_medal]
+    append_ai_round_summary()
+
+
+def append_ai_round_summary():
+    if any(
+        item.get("round") == st.session_state.round
+        for item in st.session_state.ai_round_summaries
+    ):
+        return
+
+    st.session_state.ai_round_summaries.append(
+        {
+            "round": st.session_state.round,
+            "role": st.session_state.role,
+            "word_type": st.session_state.word_type,
+            "targets": list(st.session_state.target_words),
+            "bomb": st.session_state.bomb_word,
+            "success": bool(st.session_state.round_success),
+            "bomb_hit": bool(st.session_state.round_bomb_hit),
+            "medal": st.session_state.round_medal,
+            "turns": st.session_state.round_interactions,
+            "found_targets": list(st.session_state.found_targets),
+            "interactions": [
+                {
+                    "turn": item.get("turn"),
+                    "clue_giver": item.get("clue_giver"),
+                    "guesser": item.get("guesser"),
+                    "hint": item.get("hint"),
+                    "hint_number": item.get("hint_number"),
+                    "intended_targets": list(item.get("intended_targets", [])),
+                    "guesses": list(item.get("guesses", [])),
+                    "correct_guesses": list(item.get("correct_guesses", [])),
+                    "neutral_guesses": list(item.get("neutral_guesses", [])),
+                    "bomb_guess": item.get("bomb_guess"),
+                    "outcome": item.get("outcome"),
+                }
+                for item in st.session_state.interaction_history
+            ],
+        }
     )

@@ -92,7 +92,7 @@ def inject_css():
         }
         .top-status {
             display: grid;
-            grid-template-columns: repeat(6, minmax(0, 1fr));
+            grid-template-columns: repeat(7, minmax(0, 1fr));
             gap: 0.75rem;
             margin-bottom: 0;
             align-items: stretch;
@@ -134,6 +134,7 @@ def inject_css():
             margin-bottom: 0.95rem;
         }
         .word-card {
+            box-sizing: border-box;
             border-radius: 16px;
             padding: 0.9rem 0.7rem;
             text-align: center;
@@ -142,7 +143,9 @@ def inject_css():
             letter-spacing: 0.01em;
             margin-bottom: 0.7rem;
             border: 1px solid transparent;
+            height: 72px;
             min-height: 72px;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -158,6 +161,11 @@ def inject_css():
             background: #3f7b11;
             color: #f5fff0;
         }
+        .word-found {
+            background: #3f7b11;
+            color: #f5fff0;
+        }
+        .word-ai-found,
         .word-gold {
             background: #c88015;
             color: #fff8e8;
@@ -165,6 +173,10 @@ def inject_css():
         .word-neutral {
             background: #6d6a63;
             color: #f9f8f6;
+        }
+        .word-neutral-miss {
+            background: #2f6f8f;
+            color: #f0fbff;
         }
         .word-bomb {
             background: #b43232;
@@ -174,6 +186,11 @@ def inject_css():
             font-size: 0.82rem;
             line-height: 1;
             opacity: 0.95;
+        }
+        .word-selected {
+            outline: 4px solid #17324d;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 6px rgba(255,255,255,0.75);
         }
         .legend {
             display: flex;
@@ -203,6 +220,11 @@ def inject_css():
             color: #5c5a55;
             border-color: rgba(109, 106, 99, 0.22);
             background: rgba(109, 106, 99, 0.08);
+        }
+        .legend-neutral-miss {
+            color: #245f7c;
+            border-color: rgba(47, 111, 143, 0.22);
+            background: rgba(47, 111, 143, 0.08);
         }
         .legend-bomb {
             color: #a12727;
@@ -323,6 +345,81 @@ def inject_css():
         .summary-stat strong {
             color: #17324d;
         }
+        .history-panel {
+            border-radius: 18px;
+            padding: 0.85rem;
+            background: rgba(255,255,255,0.86);
+            border: 1px solid rgba(23, 50, 77, 0.08);
+            margin-top: 0.85rem;
+            margin-bottom: 0.85rem;
+        }
+        .history-row {
+            display: grid;
+            grid-template-columns: 32px 1fr auto;
+            gap: 0.65rem;
+            align-items: start;
+            padding: 0.65rem 0;
+            border-top: 1px solid rgba(23, 50, 77, 0.08);
+            color: #40566a;
+            font-size: 0.88rem;
+            line-height: 1.4;
+        }
+        .history-index,
+        .history-outcome {
+            font-weight: 900;
+            color: #17324d;
+        }
+        .history-number {
+            color: #1d5ea8;
+            font-weight: 900;
+        }
+        .history-empty {
+            color: #66788a;
+            font-weight: 700;
+        }
+        .medal-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+        .medal {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.38rem 0.58rem;
+            font-size: 1.05rem;
+            font-weight: 950;
+            line-height: 1;
+            border: 1px solid rgba(23, 50, 77, 0.08);
+        }
+        .medal.gold {
+            background: rgba(200, 128, 21, 0.24);
+            color: #704400;
+        }
+        .medal.silver {
+            background: rgba(109, 106, 99, 0.20);
+            color: #403f3b;
+        }
+        .medal.bronze {
+            background: rgba(142, 84, 38, 0.23);
+            color: #5f3415;
+        }
+        .final-score {
+            display: inline-flex;
+            margin-top: 0.9rem;
+            border-radius: 16px;
+            padding: 0.7rem 0.95rem;
+            background: rgba(29, 94, 168, 0.08);
+            color: #17324d;
+            font-weight: 950;
+            font-size: 1.05rem;
+        }
+        .score-tiers {
+            margin-top: 0.55rem;
+            color: #66788a;
+            font-size: 0.9rem;
+            font-weight: 800;
+        }
         .locked-board {
             filter: blur(2.2px);
             opacity: 0.48;
@@ -343,8 +440,19 @@ def inject_css():
         .stTextInput input,
         .stSelectbox [data-baseweb="select"] > div {
             border-radius: 16px;
-            background: rgba(255,255,255,0.95);
+            background: #17324d;
+            color: #fffdf8;
             border: 1px solid rgba(23, 50, 77, 0.10);
+        }
+        .stTextInput input::placeholder {
+            color: rgba(255, 253, 248, 0.62);
+        }
+        .stTextInput input:focus {
+            color: #fffdf8;
+            background: #17324d;
+        }
+        .stSelectbox [data-baseweb="select"] * {
+            color: #fffdf8;
         }
         .stSelectbox [data-baseweb="select"] {
             min-width: 110px;
@@ -364,8 +472,33 @@ def inject_css():
             transform: translateY(-1px);
             box-shadow: 0 10px 22px rgba(29, 94, 168, 0.16);
         }
-        .board-wrap .stButton > button {
+        .stButton > button[kind="secondary"],
+        .stButton [data-testid="stBaseButton-secondary"] {
+            height: 72px;
             min-height: 72px;
+            max-height: 72px;
+            overflow: hidden;
+            border-radius: 16px;
+            padding: 0.9rem 0.7rem;
+            text-align: center;
+            font-size: 0.98rem;
+            font-weight: 800;
+            letter-spacing: 0.01em;
+            margin-bottom: 0.7rem;
+            background: linear-gradient(135deg, #2b68d8, #2f80ed);
+            color: #eff6ff;
+            border: 1px solid rgba(255,255,255,0.24);
+            box-shadow: none;
+        }
+        .stButton > button[kind="secondary"]:hover,
+        .stButton [data-testid="stBaseButton-secondary"]:hover {
+            box-shadow: none;
+        }
+        .board-wrap .stButton > button {
+            height: 72px;
+            min-height: 72px;
+            max-height: 72px;
+            overflow: hidden;
             border-radius: 16px;
             background: linear-gradient(135deg, #2b68d8, #2f80ed);
             color: #eff6ff;
@@ -389,6 +522,19 @@ def inject_css():
         .game-over-card {
             margin-bottom: 1rem;
         }
+        .celebration-card {
+            position: relative;
+            overflow: hidden;
+            border-color: rgba(200, 128, 21, 0.28);
+            background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.92));
+        }
+        .celebration-medals {
+            display: flex;
+            gap: 0.55rem;
+            font-size: 2.4rem;
+            margin-bottom: 0.75rem;
+            filter: drop-shadow(0 8px 12px rgba(115, 78, 16, 0.18));
+        }
         @media (max-width: 900px) {
             .top-status-shell,
             .top-status,
@@ -406,8 +552,12 @@ def inject_css():
                 min-height: auto;
             }
             .word-card,
+            .stButton > button[kind="secondary"],
+            .stButton [data-testid="stBaseButton-secondary"],
             .board-wrap .stButton > button {
+                height: 64px;
                 min-height: 64px;
+                max-height: 64px;
                 font-size: 0.9rem;
             }
         }
