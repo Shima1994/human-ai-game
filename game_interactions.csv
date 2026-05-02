@@ -1,0 +1,16 @@
+timestamp,participant_id,round,role,word_type,turn,clue_giver,guesser,hint,hint_number,intended_targets,guesses,correct_guesses,missed_intended_targets,extra_correct_guesses,neutral_guesses,bomb_guess,outcome,bomb_hit,round_medal,round_success,perception_rating
+2026-05-01T23:50:52.962250,Shima,1,human_clue,abstract,1,human,ai,rabatt,2,price;smile,price;luck,price,smile,,luck,,correct,0,none,0,2
+2026-05-01T23:50:52.962250,Shima,1,human_clue,abstract,2,human,ai,batman,3,smile;hero;hide,hero;shadow;time,hero,smile;hide,,shadow,time,bomb,1,none,0,2
+2026-05-01T23:52:08.719003,Shima,2,ai_clue,concrete,1,ai,human,light,2,sun;sword,sun;sword,sun;sword,,,,,correct,0,silver,1,4
+2026-05-01T23:52:08.719003,Shima,2,ai_clue,concrete,2,ai,human,knot,2,tie;wood,tie;leather,tie,wood,,leather,,correct,0,silver,1,4
+2026-05-01T23:52:08.719003,Shima,2,ai_clue,concrete,3,ai,human,tree,1,wood,wood,wood,,,,,correct,0,silver,1,4
+2026-05-01T23:53:32.025694,Shima,3,human_clue,abstract,1,human,ai,party,4,surprise;memory;secret;light,light;surprise;memory;ghost,light;surprise;memory,secret,,ghost,,correct,0,gold,1,5
+2026-05-01T23:53:32.025694,Shima,3,human_clue,abstract,2,human,ai,hide,1,secret,secret,secret,,,,,correct,0,gold,1,5
+2026-05-01T23:58:56.256103,Shima,4,ai_clue,concrete,1,ai,human,fruit,1,lemon,lemon,lemon,,,,,correct,0,none,0,3
+2026-05-01T23:58:56.256103,Shima,4,ai_clue,concrete,2,ai,human,bag,2,purse;baby,purse;cotton,purse,baby,,cotton,,correct,0,none,0,3
+2026-05-01T23:58:56.256103,Shima,4,ai_clue,concrete,3,ai,human,hatch,2,baby;octopus,skyscraper;igloo,,baby;octopus,,skyscraper;igloo,,wrong,0,none,0,3
+2026-05-01T23:58:56.256103,Shima,4,ai_clue,concrete,4,ai,human,ocean,1,octopus,octopus,octopus,,,,,correct,0,none,0,3
+2026-05-02T00:50:24.342681,Shima,1,human_clue,abstract,1,human,ai,applewatch,3,time;degree;light,time;light;game,time;light,degree,,game,,correct,0,silver,1,4
+2026-05-02T00:50:24.342681,Shima,1,human_clue,abstract,2,human,ai,love,1,soul,soul,soul,,,,,correct,0,silver,1,4
+2026-05-02T00:50:24.342681,Shima,1,human_clue,abstract,3,human,ai,farenheit,1,degree,degree,degree,,,,,correct,0,silver,1,4
+2026-05-02T00:51:01.592243,Shima,2,ai_clue,abstract,1,ai,human,music,2,melody;wake,melody;love,melody,wake,,,love,bomb,1,none,0,3

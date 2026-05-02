@@ -3,5 +3,4 @@
 venv/
 __pycache__/
 *.pyc
-game_data_multi_round*.csv
-game_interactions.csv
+
