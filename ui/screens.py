@@ -28,37 +28,52 @@ from ui.components import (
 def screen_welcome():
     st.markdown(
         f"""
-        <div class="welcome-grid">
-            <div class="glass-card">
-                <div class="panel-title">How to play</div>
-                <h2 style="margin-top:0; margin-bottom:0.55rem;">Play this game with the AI as one team</h2>
-                <p class="subtle-text">
-                    You and the AI help each other find the correct word cards.
-                    In each round, one of you gives a clue and the other one guesses.
-                </p>
-                <div class="feature-list">
-                    <div class="feature-item feature-target"><strong>Find 4 green cards</strong>Each board has 4 targets hidden among 12 cards.</div>
-                    <div class="feature-item feature-gold"><strong>&#129351; &#129352; &#129353; Earn medals</strong>Finish in 1-2 turns for gold, 3 for silver, 4 for bronze.</div>
-                    <div class="feature-item feature-bomb"><strong>Do not touch red</strong>If anyone picks the red bomb card, that round ends immediately.</div>
-                    <div class="feature-item feature-neutral"><strong>Connect your clue</strong>When you give a clue, mark the exact target words you expect it to point toward.</div>
-                </div>
+        <div class="guide-shell">
+            <div class="glass-card guide-intro">
+                <div class="panel-title">Game Guide: Team Up with AI!</div>
+                <p class="subtle-text">Welcome! In this game, you and the AI are on the same team. Your goal is to understand each other and find hidden target words together.</p>
             </div>
-            <div class="glass-card">
-                <div class="panel-title">Simple steps</div>
-                <h3 style="margin-top:0; margin-bottom:0.55rem;">What you do in the game</h3>
-                <div class="choice-row">
-                    <div class="choice-pill">{N_ROUNDS} rounds</div>
-                    <div class="choice-pill">Take turns with the AI</div>
-                    <div class="choice-pill">Some words are easy, some are tricky</div>
-                    <div class="choice-pill">Medals start at zero</div>
+            <div class="guide-grid">
+                <div class="guide-card guide-goal">
+                    <h3>The Goal:</h3>
+                    <p>There are 8 rounds in total. In each round, you will see 12 cards on the screen:</p>
+                    <ul>
+                        <li>4 Target Cards (The ones you need to find!)</li>
+                        <li>1 Bomb Card (Avoid this at all costs!)</li>
+                        <li>7 Neutral Cards (Wrong, but safe.)</li>
+                    </ul>
                 </div>
-                <div class="mini-steps">
-                    <div class="mini-step">1. Look at the words on the board.</div>
-                    <div class="mini-step">2. You and the AI alternate clue-giving each round.</div>
-                    <div class="mini-step">3. Abstract and concrete boards rotate round by round.</div>
-                    <div class="mini-step">4. Each board can have up to 4 clue/guess interactions.</div>
-                    <div class="mini-step">5. Pick the words that best match the clue and avoid the bomb.</div>
-                    <div class="mini-step">6. Save the round and move to the next one.</div>
+                <div class="guide-card">
+                    <h3>How to Play:</h3>
+                    <ol>
+                        <li><strong>Take Turns:</strong> In one round, you give the hint and the AI guesses. In the next round, the AI gives the hint and you guess.</li>
+                        <li><strong>Give a Clue:</strong> A clue is just one word and one number.</li>
+                    </ol>
+                    <p class="guide-example">Example: If the target words are "Apple" and "Banana," you could say: "Fruit, 2".</p>
+                    <ol start="3">
+                        <li><strong>Don't Hit the Bomb:</strong> If anyone picks the Red Bomb, the round ends immediately, and you lose all points for that round.</li>
+                        <li><strong>4 Tries Only:</strong> You have a maximum of 4 turns per round to find all 4 targets.</li>
+                    </ol>
+                </div>
+                <div class="guide-card guide-medals">
+                    <h3>Win Medals & Points:</h3>
+                    <p>The faster you find the 4 targets, the better your medal:</p>
+                    <ul>
+                        <li>&#129351; Gold (5 pts): Finish in 1 or 2 turns.</li>
+                        <li>&#129352; Silver (4 pts): Finish in 3 turns.</li>
+                        <li>&#129353; Bronze (3 pts): Finish in 4 turns.</li>
+                    </ul>
+                    <p>Pro Tip: Try to think like your AI partner! The better you "connect," the more points you'll earn.</p>
+                </div>
+                <div class="guide-card guide-research">
+                    <h3>Important: Help Our Research! &#128300;</h3>
+                    <p>Since this is a research project, please pay attention to these 3 extra steps. They help us understand how humans and AI connect:</p>
+                    <ol>
+                        <li><strong>Read the Round History:</strong><br>After each round, take a moment to read the summary. It helps you and the AI understand each other’s logic better for the next rounds.</li>
+                        <li><strong>Mark Your Targets (Your Intent):</strong><br>When it's your turn to give a hint, we need to know what you’re thinking! After you give your clue and number, please select/mark the exact cards you expect the AI to pick. This shows us your "hidden plan."</li>
+                        <li><strong>Rate Your Connection:</strong> Rate the Connection: After each round, rate our "Shared Understanding" from 1 to 5.</li>
+                    </ol>
+                    <p>(5 = We understood each other perfectly | 1 = We were totally lost).</p>
                 </div>
             </div>
         </div>
@@ -67,23 +82,13 @@ def screen_welcome():
     )
 
     st.markdown('<div class="center-actions">', unsafe_allow_html=True)
-    if st.button("Start game", type="primary", use_container_width=True):
+    if st.button("Start the game", type="primary", use_container_width=True):
         st.session_state.started = True
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 
 def screen_name():
-    st.markdown(
-        """
-        <div class="glass-card compact-card">
-            <div class="panel-title">Player</div>
-            <h3 style="margin-top:0; margin-bottom:0.35rem;">Enter your name</h3>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     st.markdown('<div class="center-actions compact-field">', unsafe_allow_html=True)
     name = st.text_input("Your name", placeholder="Your name", label_visibility="collapsed")
     if st.button("Continue", type="primary", use_container_width=True):
@@ -101,7 +106,7 @@ def screen_human_clue():
         return
 
     render_top_status()
-    render_round_chip("You are the clue-giver this round")
+   
 
     with st.container(border=True):
         st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
@@ -160,7 +165,8 @@ def screen_human_clue():
         selected_count,
     )
 
-    if st.button("Let AI guess", type="primary", use_container_width=True):
+    st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
+    if st.button("Let AI Guess", type="primary", use_container_width=True):
         is_valid, error_message = validate_human_hint_with_history(
             hint,
             st.session_state.board,
@@ -216,7 +222,7 @@ def screen_human_guesser():
         return
 
     render_top_status()
-    render_round_chip("You are the guesser this round")
+  
 
     with st.container(border=True):
         st.markdown('<div class="panel-title">Board</div>', unsafe_allow_html=True)
@@ -333,9 +339,9 @@ def screen_round_summary():
     with action_col:
         st.markdown(
             """
-            <div class="glass-card compact-card">
+                <div class="glass-card compact-card">
                 <div class="panel-title">Quick rating</div>
-                <p class="subtle-text" style="margin:0;">How well did the AI fit your thinking this round?</p>
+                <p class="subtle-text" style="margin:0;">Rate our Shared Understanding from 1 to 5.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -350,7 +356,7 @@ def screen_round_summary():
             label_visibility="collapsed",
             key=f"rating_radio_{st.session_state.round}",
         )
-        st.caption("1 low  2  3  4  5 strong")
+
         st.session_state.perception_rating = selected_label
 
         if st.button("Save round and continue", type="primary", use_container_width=True):

@@ -92,7 +92,7 @@ def inject_css():
         }
         .top-status {
             display: grid;
-            grid-template-columns: repeat(7, minmax(0, 1fr));
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 0.75rem;
             margin-bottom: 0;
             align-items: stretch;
@@ -273,6 +273,62 @@ def inject_css():
             gap: 0.9rem;
             margin-bottom: 0.9rem;
         }
+        .guide-shell {
+            display: grid;
+            gap: 0.9rem;
+            margin-bottom: 0.9rem;
+        }
+        .guide-intro .subtle-text {
+            margin-bottom: 0;
+            font-size: 1rem;
+        }
+        .guide-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.85rem;
+        }
+        .guide-card {
+            border-radius: 18px;
+            padding: 1rem 1.05rem;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(23, 50, 77, 0.08);
+            color: #4f6275;
+            line-height: 1.48;
+        }
+        .guide-card h3 {
+            margin: 0 0 0.55rem 0;
+            font-size: 1.05rem;
+        }
+        .guide-card p {
+            margin: 0 0 0.55rem 0;
+        }
+        .guide-card ul,
+        .guide-card ol {
+            margin: 0.35rem 0 0 1.15rem;
+            padding: 0;
+        }
+        .guide-card li {
+            margin-bottom: 0.38rem;
+        }
+        .guide-example {
+            border-radius: 14px;
+            padding: 0.62rem 0.72rem;
+            background: rgba(29, 94, 168, 0.07);
+            color: #275b8c;
+            font-weight: 750;
+        }
+        .guide-goal {
+            background: rgba(63, 123, 17, 0.08);
+            border-color: rgba(63, 123, 17, 0.16);
+        }
+        .guide-medals {
+            background: rgba(200, 128, 21, 0.10);
+            border-color: rgba(200, 128, 21, 0.18);
+        }
+        .guide-research {
+            background: rgba(47, 111, 143, 0.08);
+            border-color: rgba(47, 111, 143, 0.16);
+        }
         .feature-list {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -444,6 +500,15 @@ def inject_css():
             color: #fffdf8;
             border: 1px solid rgba(23, 50, 77, 0.10);
         }
+        .compact-field .stTextInput input {
+            min-height: 58px;
+            font-size: 1.05rem;
+            padding: 0.85rem 1rem;
+        }
+        .name-card {
+            max-width: 420px;
+            margin: 0 auto 0.35rem auto;
+        }
         .stTextInput input::placeholder {
             color: rgba(255, 253, 248, 0.62);
         }
@@ -471,6 +536,16 @@ def inject_css():
         .stButton > button:hover {
             transform: translateY(-1px);
             box-shadow: 0 10px 22px rgba(29, 94, 168, 0.16);
+        }
+        .let-ai-guess-marker + div [data-testid="stButton"] > button,
+        .let-ai-guess-marker + div button {
+            background: linear-gradient(135deg, #9b4d11, #c88015);
+            border-color: rgba(155, 77, 17, 0.28);
+            box-shadow: 0 10px 24px rgba(155, 77, 17, 0.18);
+        }
+        .let-ai-guess-marker + div [data-testid="stButton"] > button:hover,
+        .let-ai-guess-marker + div button:hover {
+            box-shadow: 0 12px 26px rgba(155, 77, 17, 0.22);
         }
         .stButton > button[kind="secondary"],
         .stButton [data-testid="stBaseButton-secondary"] {
@@ -511,12 +586,24 @@ def inject_css():
         .stRadio > div {
             gap: 0.45rem;
         }
+        .stRadio [role="radiogroup"] {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(44px, 1fr));
+            gap: 0.45rem;
+            width: 100%;
+        }
         .stRadio label {
             border-radius: 14px;
             padding: 0.45rem 0.6rem;
             background: rgba(255,255,255,0.85);
             border: 1px solid rgba(23, 50, 77, 0.08);
-            min-width: 44px;
+            min-width: 0;
+            width: 100%;
+            min-height: 46px;
+            justify-content: center;
+            margin: 0;
+        }
+        .stRadio label > div {
             justify-content: center;
         }
         .game-over-card {
@@ -539,6 +626,7 @@ def inject_css():
             .top-status-shell,
             .top-status,
             .welcome-grid,
+            .guide-grid,
             .feature-list {
                 grid-template-columns: 1fr;
             }
@@ -559,6 +647,123 @@ def inject_css():
                 min-height: 64px;
                 max-height: 64px;
                 font-size: 0.9rem;
+            }
+        }
+        @media (max-width: 640px) {
+            .block-container {
+                padding: 1rem 0.7rem 1.6rem 0.7rem;
+            }
+            .hero {
+                border-radius: 18px;
+                padding: 1rem;
+            }
+            .hero-title {
+                font-size: 1.35rem;
+                line-height: 1.12;
+            }
+            .hero-subtitle {
+                font-size: 0.9rem;
+            }
+            .hero-badge {
+                font-size: 0.74rem;
+                padding: 0.34rem 0.58rem;
+            }
+            .top-status-shell {
+                border-radius: 16px;
+                padding: 0.65rem;
+                margin-bottom: 0.75rem;
+            }
+            .top-status {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.55rem;
+            }
+            .status-pill {
+                border-radius: 12px;
+                padding: 0.58rem 0.62rem;
+            }
+            .status-label {
+                font-size: 0.62rem;
+                letter-spacing: 0.06em;
+            }
+            .status-value {
+                font-size: 0.9rem;
+                overflow-wrap: anywhere;
+            }
+            .guide-card,
+            .glass-card {
+                border-radius: 16px;
+                padding: 0.85rem;
+            }
+            .guide-card {
+                font-size: 0.9rem;
+            }
+            .guide-card h3 {
+                font-size: 0.98rem;
+            }
+            .legend {
+                gap: 0.38rem;
+            }
+            .legend-pill {
+                font-size: 0.72rem;
+                padding: 0.28rem 0.48rem;
+            }
+            div[data-testid="column"] {
+                min-width: 0;
+            }
+            div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(4)) {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.35rem;
+            }
+            div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(4)) > div[data-testid="column"] {
+                flex: 1 1 calc(33.333% - 0.35rem) !important;
+                min-width: calc(33.333% - 0.35rem) !important;
+                width: calc(33.333% - 0.35rem) !important;
+            }
+            .word-card,
+            .stButton > button[kind="secondary"],
+            .stButton [data-testid="stBaseButton-secondary"],
+            .board-wrap .stButton > button {
+                height: 58px;
+                min-height: 58px;
+                max-height: 58px;
+                border-radius: 12px;
+                padding: 0.55rem 0.35rem;
+                font-size: 0.78rem;
+                overflow-wrap: anywhere;
+            }
+            .hint-card {
+                border-radius: 16px;
+                padding: 0.8rem;
+            }
+            .hint-main {
+                font-size: 1.35rem;
+            }
+            .history-row {
+                grid-template-columns: 26px 1fr;
+                gap: 0.48rem;
+                font-size: 0.78rem;
+            }
+            .history-outcome {
+                grid-column: 2;
+                justify-self: start;
+            }
+            .summary-stat {
+                border-radius: 12px;
+                padding: 0.68rem 0.75rem;
+                font-size: 0.9rem;
+            }
+            .stRadio [role="radiogroup"] {
+                grid-template-columns: repeat(5, minmax(38px, 1fr));
+                gap: 0.32rem;
+            }
+            .stRadio label {
+                min-height: 44px;
+                padding: 0.35rem 0.25rem;
+                border-radius: 12px;
+            }
+            .compact-field .stTextInput input {
+                min-height: 62px;
             }
         }
         </style>

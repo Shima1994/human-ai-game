@@ -14,3 +14,11 @@ timestamp,participant_id,round,role,word_type,turn,clue_giver,guesser,hint,hint_
 2026-05-02T00:50:24.342681,Shima,1,human_clue,abstract,2,human,ai,love,1,soul,soul,soul,,,,,correct,0,silver,1,4
 2026-05-02T00:50:24.342681,Shima,1,human_clue,abstract,3,human,ai,farenheit,1,degree,degree,degree,,,,,correct,0,silver,1,4
 2026-05-02T00:51:01.592243,Shima,2,ai_clue,abstract,1,ai,human,music,2,melody;wake,melody;love,melody,wake,,,love,bomb,1,none,0,3
+2026-05-02T09:14:56.820699,Shima,1,human_clue,abstract,1,human,ai,nap,2,break;wake,wake;break,wake;break,,,,,correct,0,none,0,1
+2026-05-02T09:14:56.820699,Shima,1,human_clue,abstract,2,human,ai,connect,2,game;link,link;respect,link,game,,,respect,bomb,1,none,0,1
+2026-05-02T09:15:44.805356,Shima,2,ai_clue,abstract,1,ai,human,spirit,3,ghost;soul;wish,soul;ghost;wish,soul;ghost;wish,,,,,correct,0,gold,1,5
+2026-05-02T09:15:44.805356,Shima,2,ai_clue,abstract,2,ai,human,level,1,degree,degree,degree,,,,,correct,0,gold,1,5
+2026-05-02T09:24:12.733187,Shima,1,human_clue,abstract,1,human,ai,sun,2,light;shadow,light;shadow,light;shadow,,,,,correct,0,none,0,3
+2026-05-02T09:24:12.733187,Shima,1,human_clue,abstract,2,human,ai,mather,1,respect,memory,,respect,,memory,,wrong,0,none,0,3
+2026-05-02T09:24:12.733187,Shima,1,human_clue,abstract,3,human,ai,hope,2,wish;respect,wish;surprise,wish,respect,,surprise,,correct,0,none,0,3
+2026-05-02T09:24:12.733187,Shima,1,human_clue,abstract,4,human,ai,eltern,1,respect,hide,,respect,,hide,,wrong,0,none,0,3

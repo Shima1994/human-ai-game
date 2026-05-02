@@ -22,9 +22,9 @@ ROLE_CLASS = {
 }
 
 ROLE_MARK = {
-    "target": "&#8226;",
-    "bomb": "&#10005;",
-    "neutral": "&#9670;",
+    "target": "",
+    "bomb": "",
+    "neutral": "",
 }
 
 RATING_OPTIONS = {
@@ -44,7 +44,7 @@ def render_app_header():
             <p class="hero-subtitle">Give smart clues, connect as many safe target cards as you can, and avoid the bomb card.</p>
             <div class="hero-badge-row">
                 <div class="hero-badge">8 rounds</div>
-                <div class="hero-badge">Alternating roles</div>
+                <div class="hero-badge">Alternating turns</div>
                 <div class="hero-badge">Medals</div>
             </div>
         </div>
@@ -67,10 +67,9 @@ def render_top_status():
                 <div class="status-pill"><div class="status-label">Player</div><div class="status-value">{player_name}</div></div>
                 <div class="status-pill"><div class="status-label">Round</div><div class="status-value">{st.session_state.round} / {N_ROUNDS}</div></div>
                 <div class="status-pill medal-pill"><div class="status-label">Medals</div><div class="status-value medal-row"><span class="medal gold">&#129351; {medals.get("gold", 0)}</span><span class="medal silver">&#129352; {medals.get("silver", 0)}</span><span class="medal bronze">&#129353; {medals.get("bronze", 0)}</span></div></div>
-                <div class="status-pill"><div class="status-label">Targets</div><div class="status-value">{found} / {TARGET_COUNT}</div></div>
+                <div class="status-pill"><div class="status-label">Target words</div><div class="status-value">{found} / {TARGET_COUNT}</div></div>
                 <div class="status-pill"><div class="status-label">Turns</div><div class="status-value">{interactions} / {MAX_INTERACTIONS_PER_ROUND}</div></div>
-                <div class="status-pill"><div class="status-label">Role</div><div class="status-value">{role_label}</div></div>
-                <div class="status-pill"><div class="status-label">Words</div><div class="status-value">{st.session_state.word_type.capitalize()}</div></div>
+                <div class="status-pill"><div class="status-label">Human role</div><div class="status-value">{role_label}</div></div>
             </div>
         </div>
         """,
@@ -93,7 +92,7 @@ def _render_static_card(word, role, revealed, guessed=False):
         css_class = "word-neutral-miss"
     selected_class = " word-selected" if guessed else ""
     mark = ""
-    if revealed:
+    if revealed and ROLE_MARK.get(role):
         mark = f"<div class='card-mark'>{ROLE_MARK.get(role, '')}</div>"
 
     st.markdown(
@@ -133,11 +132,11 @@ def render_board_legend():
     st.markdown(
         """
         <div class="legend">
-            <div class="legend-pill legend-target">Green &#8226; target</div>
-            <div class="legend-pill legend-gold">Gold &#8226; target found by AI</div>
-            <div class="legend-pill legend-neutral">Gray &#9670; neutral</div>
-            <div class="legend-pill legend-neutral-miss">Blue &#9670; wrong neutral</div>
-            <div class="legend-pill legend-bomb">Red &#10005; bomb</div>
+            <div class="legend-pill legend-target">Green target</div>
+            <div class="legend-pill legend-gold">Gold target found by AI</div>
+            <div class="legend-pill legend-neutral">Gray neutral</div>
+            <div class="legend-pill legend-neutral-miss">Blue wrong neutral</div>
+            <div class="legend-pill legend-bomb">Red bomb</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -146,8 +145,6 @@ def render_board_legend():
 
 def render_hint_panel(current_hint, hint_number, previous_hint=None):
     chips = [f"<div class='hint-chip'>{hint_number} guesses</div>"]
-    if previous_hint:
-        chips.append(f"<div class='hint-chip'>Previous: {previous_hint.upper()}</div>")
     chips_html = "".join(chips)
     chips_section = f"<div class=\"hint-chip-row\">{chips_html}</div>" if chips_html else ""
 
