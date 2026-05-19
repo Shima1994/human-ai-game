@@ -7,8 +7,28 @@ This project implements a cooperative word association game where a human player
 - Turn-taking between human and AI
 - AI-generated clues using OpenAI’s API
 - Scoring system and round-based structure
-- Post-round rating form for evaluating collaboration quality
+- Before/after AI-guess ratings plus end-of-round reflection notes
 - Simple browser-based interface built with Streamlit
+
+## Data Storage on Streamlit Cloud
+
+Streamlit Cloud's local filesystem is not durable, so production CSV data should be written to GitHub through repository secrets.
+
+Add these secrets in Streamlit Cloud:
+
+```toml
+GITHUB_TOKEN = "github_pat_or_classic_token_with_repo_contents_write"
+GITHUB_REPO = "your-username/your-repo"
+GITHUB_BRANCH = "main"
+GITHUB_ROUND_CSV_PATH = "data/game_data_rounds.csv"
+GITHUB_INTERACTION_CSV_PATH = "data/game_interactions.csv"
+```
+
+The app still writes local CSV files as a fallback, but GitHub CSV logging is the durable path for public tests and Amazon Mechanical Turk.
+
+## AI Prompts
+
+All AI prompts are documented in `AI_PROMPTS.md`.
 
 ## 🌐 Online Version
 The game is deployed on Streamlit Cloud and can be played directly in the browser:

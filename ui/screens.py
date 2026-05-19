@@ -4,12 +4,24 @@ import streamlit as st
 
 from core.ai_service import (
     ai_guess,
+    generate_ai_round_reflection,
     generate_ai_hint,
     remaining_target_count,
     validate_human_hint_with_history,
 )
-from core.constants import MAX_TEAM_SCORE, N_ROUNDS, TEAM_GOAL_SCORE
-from core.game_logic import record_interaction
+from core.constants import (
+    MAX_SKIPS_PER_ROUND,
+    MAX_TEAM_SCORE,
+    N_ROUNDS,
+    TARGET_COUNT,
+    TEAM_GOAL_SCORE,
+)
+from core.game_logic import (
+    can_skip_current_clue,
+    record_interaction,
+    record_skip,
+    update_current_round_summary,
+)
 from core.storage import log_round
 from core.state import restart_game
 from ui.components import (
@@ -36,11 +48,11 @@ def screen_welcome():
             <div class="guide-grid">
                 <div class="guide-card guide-goal">
                     <h3>The Goal:</h3>
-                    <p>There are 8 rounds in total. In each round, you will see 12 cards on the screen:</p>
+                    <p>There are 4 rounds in total: abstract words with human clue-giver, abstract words with AI clue-giver, concrete words with human clue-giver, and concrete words with AI clue-giver. In each round, you will see 15 cards on the screen:</p>
                     <ul>
-                        <li>4 Target Cards (The ones you need to find!)</li>
+                        <li>5 Target Cards (The ones you need to find!)</li>
                         <li>1 Bomb Card (Avoid this at all costs!)</li>
-                        <li>7 Neutral Cards (Wrong, but safe.)</li>
+                        <li>9 Neutral Cards (Wrong, but safe.)</li>
                     </ul>
                 </div>
                 <div class="guide-card">
@@ -52,12 +64,13 @@ def screen_welcome():
                     <p class="guide-example">Example: If the target words are "Apple" and "Banana," you could say: "Fruit, 2".</p>
                     <ol start="3">
                         <li><strong>Don't Hit the Bomb:</strong> If anyone picks the Red Bomb, the round ends immediately, and you lose all points for that round.</li>
-                        <li><strong>4 Tries Only:</strong> You have a maximum of 4 turns per round to find all 4 targets.</li>
+                        <li><strong>4 Tries Only:</strong> You have a maximum of 4 turns per round to find all 5 targets.</li>
+                        <li><strong>Next Clue:</strong> If a clue feels too risky, the guesser can skip it and ask for the next clue. This burns one turn, works at most twice per round, and is unavailable on the final turn.</li>
                     </ol>
                 </div>
                 <div class="guide-card guide-medals">
                     <h3>Win Medals & Points:</h3>
-                    <p>The faster you find the 4 targets, the better your medal:</p>
+                    <p>The faster you find the 5 targets, the better your medal:</p>
                     <ul>
                         <li>&#129351; Gold (5 pts): Finish in 1 or 2 turns.</li>
                         <li>&#129352; Silver (4 pts): Finish in 3 turns.</li>
@@ -69,9 +82,9 @@ def screen_welcome():
                     <h3>Important: Help Our Research! &#128300;</h3>
                     <p>Since this is a research project, please pay attention to these 3 extra steps. They help us understand how humans and AI connect:</p>
                     <ol>
-                        <li><strong>Read the Round History:</strong><br>After each round, take a moment to read the summary. It helps you and the AI understand each other’s logic better for the next rounds.</li>
-                        <li><strong>Mark Your Targets (Your Intent):</strong><br>When it's your turn to give a hint, we need to know what you’re thinking! After you give your clue and number, please select/mark the exact cards you expect the AI to pick. This shows us your "hidden plan."</li>
-                        <li><strong>Rate Your Connection:</strong> Rate the Connection: After each round, rate our "Shared Understanding" from 1 to 5.</li>
+                        <li><strong>Read the Round Reflection:</strong><br>After each round, read the AI reflection and write back what you meant. It helps you and the AI understand each other's logic better for the next rounds.</li>
+                        <li><strong>Mark Your Targets (Your Intent):</strong><br>When it's your turn to give a hint, we need to know what you're thinking! After you give your clue and number, please select/mark the exact cards you expect the AI to pick. This shows us your "hidden plan."</li>
+                        <li><strong>Rate AI Understanding:</strong> When the AI is guessing your clue, rate from 1 to 5 before the AI guesses and again after you see the guess.</li>
                     </ol>
                     <p>(5 = We understood each other perfectly | 1 = We were totally lost).</p>
                 </div>
@@ -100,6 +113,30 @@ def screen_name():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _skip_help_text():
+    used = st.session_state.get("round_skips", 0)
+    remaining = max(0, MAX_SKIPS_PER_ROUND - used)
+    if not can_skip_current_clue():
+        return "Next clue is not available now: you either used both skips or this is the final turn."
+    return (
+        f"Use only when the clue feels too risky. It burns one of the 4 turns in this round. "
+        f"Remaining skips this round: {remaining}."
+    )
+
+
+def _clear_current_clue():
+    st.session_state.previous_hint = st.session_state.hint
+    st.session_state.hint = ""
+    st.session_state.hint_number = 1
+    st.session_state.hint_targets = []
+    st.session_state.pending_guesses = []
+    st.session_state.pending_ai_guess_review = None
+
+
+def _word_count(text):
+    return len([word for word in text.split() if word.strip()])
+
+
 def screen_human_clue():
     if st.session_state.round_finished:
         screen_round_summary()
@@ -110,13 +147,59 @@ def screen_human_clue():
 
     with st.container(border=True):
         st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
+        pending_review = st.session_state.get("pending_ai_guess_review")
+        review_guesses = pending_review.get("guesses", []) if pending_review else []
         render_board(
             st.session_state.board,
             st.session_state.word_roles,
-            guesses=st.session_state.guesses,
+            guesses=st.session_state.guesses + review_guesses,
             reveal_all=True,
         )
         render_board_legend()
+
+    if st.session_state.get("pending_ai_guess_review"):
+        pending_review = st.session_state.pending_ai_guess_review
+        guesses_text = ", ".join(pending_review.get("guesses", []))
+        st.info(f"AI selected: {guesses_text}")
+        st.markdown(
+            """
+            <div class="glass-card compact-card section-gap">
+                <div class="panel-title">After AI guessed</div>
+                <p class="subtle-text" style="margin:0;">Now rate how well the AI understood your clue.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        rating_after = st.radio(
+            "After AI guess rating",
+            options=list(RATING_OPTIONS.keys()),
+            index=max(0, st.session_state.ai_understanding_rating_after - 1),
+            format_func=lambda option: f"{option}",
+            horizontal=True,
+            label_visibility="collapsed",
+            key=f"after_ai_guess_rating_{st.session_state.round}_{st.session_state.round_interactions}",
+        )
+        st.session_state.ai_understanding_rating_after = rating_after
+        if st.button("Save this turn", type="primary", use_container_width=True):
+            st.session_state.last_ai_guesses = pending_review.get("guesses", [])
+            record_interaction(
+                pending_review.get("hint", ""),
+                pending_review.get("hint_number", 1),
+                pending_review.get("guesses", []),
+                pending_review.get("intended_targets", []),
+                pending_review.get("rating_before"),
+                rating_after,
+            )
+            st.session_state.perception_rating = rating_after
+            st.session_state.pending_ai_guess_review = None
+            if not st.session_state.round_finished:
+                st.session_state.previous_hint = st.session_state.hint
+                st.session_state.hint = ""
+                st.session_state.hint_number = 1
+                st.session_state.hint_targets = []
+            st.rerun()
+        render_interaction_history(st.session_state.interaction_history)
+        return
 
     st.markdown(
         """
@@ -166,6 +249,30 @@ def screen_human_clue():
     )
 
     st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
+    st.caption(
+        "The AI can also ask for the next clue if this clue looks too risky. "
+        + _skip_help_text()
+    )
+    st.markdown(
+        """
+        <div class="glass-card compact-card section-gap">
+            <div class="panel-title">Before AI guesses</div>
+            <p class="subtle-text" style="margin:0;">How well do you expect the AI understood your clue?</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    rating_before = st.radio(
+        "Before AI guess rating",
+        options=list(RATING_OPTIONS.keys()),
+        index=max(0, st.session_state.ai_understanding_rating_before - 1),
+        format_func=lambda option: f"{option}",
+        horizontal=True,
+        label_visibility="collapsed",
+        key=f"before_ai_guess_rating_{st.session_state.round}_{st.session_state.round_interactions}",
+    )
+    st.session_state.ai_understanding_rating_before = rating_before
+
     if st.button("Let AI Guess", type="primary", use_container_width=True):
         is_valid, error_message = validate_human_hint_with_history(
             hint,
@@ -190,6 +297,8 @@ def screen_human_clue():
                     st.session_state.interaction_history,
                     st.session_state.guesses,
                     st.session_state.ai_round_summaries,
+                    MAX_SKIPS_PER_ROUND - st.session_state.get("round_skips", 0),
+                    can_skip_current_clue(),
                 )
 
             if ai_guesses == ["__REROLL_HINT__"]:
@@ -198,19 +307,24 @@ def screen_human_clue():
                     st.warning("The AI asked for another clue.")
                 else:
                     st.warning("No AI rerolls remain. Please adjust the clue.")
-            else:
-                st.session_state.last_ai_guesses = ai_guesses
-                record_interaction(
+            elif ai_guesses == ["__SKIP_CLUE__"]:
+                record_skip(
                     st.session_state.hint,
                     st.session_state.hint_number,
-                    ai_guesses,
                     intended_targets,
+                    skipped_by="ai",
                 )
-                if not st.session_state.round_finished:
-                    st.session_state.previous_hint = st.session_state.hint
-                    st.session_state.hint = ""
-                    st.session_state.hint_number = 1
-                    st.session_state.hint_targets = []
+                _clear_current_clue()
+                st.info("AI chose not to risk this clue. One turn was used; please give the next clue.")
+                st.rerun()
+            else:
+                st.session_state.pending_ai_guess_review = {
+                    "hint": st.session_state.hint,
+                    "hint_number": st.session_state.hint_number,
+                    "guesses": ai_guesses,
+                    "intended_targets": intended_targets,
+                    "rating_before": rating_before,
+                }
                 st.rerun()
 
     render_interaction_history(st.session_state.interaction_history)
@@ -295,6 +409,20 @@ def screen_human_guesser():
             st.session_state.hint_number,
             st.session_state.previous_hint,
         )
+        st.caption(_skip_help_text())
+        if st.button(
+            "Skip this clue and ask for the next one",
+            use_container_width=True,
+            disabled=not can_skip_current_clue() or bool(st.session_state.pending_guesses),
+        ):
+            record_skip(
+                st.session_state.hint,
+                st.session_state.hint_number,
+                st.session_state.hint_targets,
+                skipped_by="human",
+            )
+            _clear_current_clue()
+            st.rerun()
     render_interaction_history(st.session_state.interaction_history)
 
 
@@ -337,29 +465,45 @@ def screen_round_summary():
         )
 
     with action_col:
+        if not st.session_state.get("ai_round_reflection"):
+            with st.spinner("AI is reflecting on this round..."):
+                st.session_state.ai_round_reflection = generate_ai_round_reflection(
+                    st.session_state.target_words,
+                    st.session_state.bomb_word,
+                    st.session_state.neutral_words,
+                    st.session_state.word_type,
+                    st.session_state.role,
+                    st.session_state.interaction_history,
+                    st.session_state.round_success,
+                    st.session_state.round_bomb_hit,
+                    st.session_state.round_medal,
+                )
+                update_current_round_summary()
+
         st.markdown(
-            """
+            f"""
                 <div class="glass-card compact-card">
-                <div class="panel-title">Quick rating</div>
-                <p class="subtle-text" style="margin:0;">Rate our Shared Understanding from 1 to 5.</p>
+                <div class="panel-title">AI reflection</div>
+                <p class="subtle-text" style="margin:0;">{escape(st.session_state.ai_round_reflection)}</p>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        selected_label = st.radio(
-            "Round rating",
-            options=list(RATING_OPTIONS.keys()),
-            index=max(0, st.session_state.perception_rating - 1),
-            format_func=lambda option: f"{option}",
-            horizontal=True,
-            label_visibility="collapsed",
-            key=f"rating_radio_{st.session_state.round}",
+        st.session_state.human_round_feedback = st.text_area(
+            "Your message to the AI for next rounds",
+            value=st.session_state.get("human_round_feedback", ""),
+            placeholder="Tell the AI what you meant by your clue or how you interpreted its clue...",
+            key=f"human_round_feedback_{st.session_state.round}",
         )
-
-        st.session_state.perception_rating = selected_label
+        feedback_words = _word_count(st.session_state.human_round_feedback)
+        st.caption(f"{feedback_words} / 200 words")
 
         if st.button("Save round and continue", type="primary", use_container_width=True):
+            if feedback_words > 200:
+                st.error("Please keep your message to 200 words or fewer.")
+                return
+            update_current_round_summary()
             log_round(st.session_state.participant_id)
             medal = st.session_state.round_medal
             st.session_state.medal_counts[medal] = st.session_state.medal_counts.get(medal, 0) + 1
@@ -372,12 +516,16 @@ def screen_round_summary():
                 st.session_state.round_finished = False
                 st.session_state.guesses = []
                 st.session_state.pending_guesses = []
+                st.session_state.round_skips = 0
                 st.session_state.hint = ""
                 st.session_state.hint_number = 1
                 st.session_state.hint_targets = []
                 st.session_state.previous_hint = None
                 st.session_state.last_ai_guesses = []
                 st.session_state.last_ai_hint = ""
+                st.session_state.pending_ai_guess_review = None
+                st.session_state.ai_round_reflection = ""
+                st.session_state.human_round_feedback = ""
 
             st.rerun()
 
@@ -385,11 +533,11 @@ def screen_round_summary():
 def screen_game_over():
     player_name = st.session_state.get("participant_id") or "Player"
     total_score = st.session_state.get("score", 0)
-    if total_score >= 35:
+    if total_score >= 16:
         title = "Elite team!"
         subtitle = f"Fantastic finish, {player_name}! Your team was sharp, fast, and beautifully in sync."
         tier = "Elite team"
-    elif total_score >= 30:
+    elif total_score >= 14:
         title = "Excellent team!"
         subtitle = f"Great work, {player_name}! That was a confident run with strong clue-reading."
         tier = "Excellent team"
@@ -412,7 +560,7 @@ def screen_game_over():
             <h2 style="margin-top:0; margin-bottom:0.45rem;">{title}</h2>
             <p class="subtle-text" style="margin-bottom:0;">{subtitle}</p>
             <div class="final-score">Total score: {total_score} / {MAX_TEAM_SCORE} &middot; {tier}</div>
-            <div class="score-tiers">25+ Strong team &middot; 30+ Excellent team &middot; 35+ Elite team</div>
+            <div class="score-tiers">12+ Strong team &middot; 14+ Excellent team &middot; 16+ Elite team</div>
         </div>
         """,
         unsafe_allow_html=True,

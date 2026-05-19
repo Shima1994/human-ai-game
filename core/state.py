@@ -40,12 +40,18 @@ def init_session_state():
         "interaction_history": [],
         "ai_round_summaries": [],
         "round_interactions": 0,
+        "round_skips": 0,
         "round_finished": False,
         "start_time": None,
         "perception_rating": 3,
+        "ai_understanding_rating_before": 3,
+        "ai_understanding_rating_after": 3,
+        "pending_ai_guess_review": None,
         "previous_hint": None,
         "last_ai_guesses": [],
         "last_ai_hint": "",
+        "ai_round_reflection": "",
+        "human_round_feedback": "",
         "ai_rerolls": AI_REROLLS_PER_GAME,
         "human_rerolls": HUMAN_REROLLS_PER_GAME,
         "game_over": False,
@@ -78,12 +84,18 @@ def reset_round_state():
     st.session_state.found_targets = []
     st.session_state.interaction_history = []
     st.session_state.round_interactions = 0
+    st.session_state.round_skips = 0
     st.session_state.round_finished = False
     st.session_state.start_time = None
     st.session_state.perception_rating = 3
+    st.session_state.ai_understanding_rating_before = 3
+    st.session_state.ai_understanding_rating_after = 3
+    st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
     st.session_state.last_ai_guesses = []
     st.session_state.last_ai_hint = ""
+    st.session_state.ai_round_reflection = ""
+    st.session_state.human_round_feedback = ""
     st.session_state.last_score_change = 0
     st.session_state.round_medal = "none"
     st.session_state.round_success = False

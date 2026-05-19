@@ -7,6 +7,7 @@ from core.constants import (
     BOARD_SIZE,
     BOMB_COUNT,
     MAX_INTERACTIONS_PER_ROUND,
+    MAX_SKIPS_PER_ROUND,
     MEDAL_POINTS,
     TARGET_COUNT,
 )
@@ -125,6 +126,7 @@ def setup_new_round():
     st.session_state.found_targets = []
     st.session_state.interaction_history = []
     st.session_state.round_interactions = 0
+    st.session_state.round_skips = 0
     st.session_state.round_finished = False
     st.session_state.hint = ""
     st.session_state.hint_number = 1
@@ -132,12 +134,17 @@ def setup_new_round():
     st.session_state.last_ai_guesses = []
     st.session_state.last_ai_hint = ""
     st.session_state.perception_rating = 3
+    st.session_state.ai_understanding_rating_before = 3
+    st.session_state.ai_understanding_rating_after = 3
+    st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.utcnow()
     st.session_state.last_score_change = 0
     st.session_state.round_medal = "none"
     st.session_state.round_success = False
     st.session_state.round_bomb_hit = False
+    st.session_state.ai_round_reflection = ""
+    st.session_state.human_round_feedback = ""
 
 
 def get_medal_for_round(interactions, success, bomb_hit):
@@ -162,7 +169,14 @@ def compute_score_change(guesses, target_words, bomb_word, interactions=None):
     return MEDAL_POINTS[medal]
 
 
-def record_interaction(hint, hint_number, guesses, intended_targets=None):
+def record_interaction(
+    hint,
+    hint_number,
+    guesses,
+    intended_targets=None,
+    ai_understanding_rating_before=None,
+    ai_understanding_rating_after=None,
+):
     intended_targets = intended_targets or []
     normalized_hint = hint.strip().lower()
     correct_guesses = [guess for guess in guesses if guess in st.session_state.target_words]
@@ -205,6 +219,8 @@ def record_interaction(hint, hint_number, guesses, intended_targets=None):
             "bomb_guess": bomb_guess,
             "bomb_hit": bomb_hit,
             "outcome": outcome,
+            "ai_understanding_rating_before": ai_understanding_rating_before,
+            "ai_understanding_rating_after": ai_understanding_rating_after,
         }
     )
 
@@ -213,6 +229,50 @@ def record_interaction(hint, hint_number, guesses, intended_targets=None):
         or len(st.session_state.found_targets) == len(st.session_state.target_words)
         or st.session_state.round_interactions >= MAX_INTERACTIONS_PER_ROUND
     ):
+        finish_round()
+
+
+def can_skip_current_clue():
+    return (
+        st.session_state.get("round_skips", 0) < MAX_SKIPS_PER_ROUND
+        and st.session_state.get("round_interactions", 0) < MAX_INTERACTIONS_PER_ROUND - 1
+    )
+
+
+def record_skip(hint, hint_number, intended_targets=None, skipped_by=None):
+    intended_targets = intended_targets or []
+    normalized_hint = hint.strip().lower()
+    clue_giver = "human" if st.session_state.role == "human_clue" else "ai"
+    guesser = "ai" if st.session_state.role == "human_clue" else "human"
+    skipped_by = skipped_by or guesser
+
+    st.session_state.round_interactions += 1
+    st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
+    if normalized_hint and normalized_hint not in st.session_state.used_hints:
+        st.session_state.used_hints.append(normalized_hint)
+    st.session_state.interaction_history.append(
+        {
+            "turn": st.session_state.round_interactions,
+            "clue_giver": clue_giver,
+            "guesser": guesser,
+            "hint": normalized_hint,
+            "hint_number": hint_number,
+            "intended_targets": intended_targets,
+            "guesses": [],
+            "correct": False,
+            "correct_guesses": [],
+            "neutral_guesses": [],
+            "bomb_guess": None,
+            "bomb_hit": False,
+            "outcome": "skip",
+            "skipped": True,
+            "skipped_by": skipped_by,
+            "ai_understanding_rating_before": None,
+            "ai_understanding_rating_after": None,
+        }
+    )
+
+    if st.session_state.round_interactions >= MAX_INTERACTIONS_PER_ROUND:
         finish_round()
 
 
@@ -250,6 +310,7 @@ def append_ai_round_summary():
             "medal": st.session_state.round_medal,
             "turns": st.session_state.round_interactions,
             "found_targets": list(st.session_state.found_targets),
+            "skips": st.session_state.get("round_skips", 0),
             "interactions": [
                 {
                     "turn": item.get("turn"),
@@ -263,8 +324,22 @@ def append_ai_round_summary():
                     "neutral_guesses": list(item.get("neutral_guesses", [])),
                     "bomb_guess": item.get("bomb_guess"),
                     "outcome": item.get("outcome"),
+                    "skipped": bool(item.get("skipped", False)),
+                    "skipped_by": item.get("skipped_by"),
+                    "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
+                    "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
                 }
                 for item in st.session_state.interaction_history
             ],
+            "ai_reflection": st.session_state.get("ai_round_reflection", ""),
+            "human_feedback": st.session_state.get("human_round_feedback", ""),
         }
     )
+
+
+def update_current_round_summary():
+    for summary in st.session_state.ai_round_summaries:
+        if summary.get("round") == st.session_state.round:
+            summary["ai_reflection"] = st.session_state.get("ai_round_reflection", "")
+            summary["human_feedback"] = st.session_state.get("human_round_feedback", "")
+            return

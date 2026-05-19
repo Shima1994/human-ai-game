@@ -1,6 +1,10 @@
+import base64
 import csv
+import io
 import json
 from datetime import datetime
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import streamlit as st
 
@@ -22,6 +26,7 @@ ROUND_LOG_FIELDS = [
     "guesses",
     "interaction_history",
     "turns",
+    "skips",
     "targets_found",
     "correct",
     "bomb_hit",
@@ -29,6 +34,8 @@ ROUND_LOG_FIELDS = [
     "score_change",
     "response_time_sec",
     "perception_rating",
+    "ai_round_reflection",
+    "human_round_feedback",
 ]
 
 INTERACTION_LOG_FIELDS = [
@@ -50,10 +57,14 @@ INTERACTION_LOG_FIELDS = [
     "neutral_guesses",
     "bomb_guess",
     "outcome",
+    "skipped",
+    "skipped_by",
     "bomb_hit",
     "round_medal",
     "round_success",
     "perception_rating",
+    "ai_understanding_rating_before",
+    "ai_understanding_rating_after",
 ]
 
 
@@ -75,7 +86,14 @@ def get_data_file():
             multi_round_header = next(reader, [])
         if multi_round_header == ROUND_LOG_FIELDS:
             return multi_round_file
-        return DATA_FILE.with_name("game_data_multi_round_intended.csv")
+        intended_file = DATA_FILE.with_name("game_data_multi_round_intended.csv")
+        if intended_file.exists():
+            with intended_file.open("r", newline="", encoding="utf-8") as file:
+                reader = csv.reader(file)
+                intended_header = next(reader, [])
+            if intended_header == ROUND_LOG_FIELDS:
+                return intended_file
+        return DATA_FILE.with_name("game_data_multi_round_skip_reflection.csv")
 
     return multi_round_file
 
@@ -90,7 +108,16 @@ def ensure_data_file():
 
 
 def get_interaction_data_file():
-    return DATA_FILE.with_name("game_interactions.csv")
+    interaction_file = DATA_FILE.with_name("game_interactions.csv")
+    if not interaction_file.exists():
+        return interaction_file
+
+    with interaction_file.open("r", newline="", encoding="utf-8") as file:
+        reader = csv.reader(file)
+        header = next(reader, [])
+    if header == INTERACTION_LOG_FIELDS:
+        return interaction_file
+    return DATA_FILE.with_name("game_interactions_skip_reflection.csv")
 
 
 def ensure_interaction_data_file():
@@ -100,6 +127,130 @@ def ensure_interaction_data_file():
             writer = csv.writer(file)
             writer.writerow(INTERACTION_LOG_FIELDS)
     return data_file
+
+
+def _csv_line(values):
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(values)
+    return buffer.getvalue()
+
+
+def _secret_value(key, default=""):
+    try:
+        return st.secrets.get(key, default)
+    except Exception:
+        return default
+
+
+def _github_storage_config():
+    token = _secret_value("GITHUB_TOKEN")
+    repo = _secret_value("GITHUB_REPO")
+    branch = _secret_value("GITHUB_BRANCH", "main")
+    if not token or not repo:
+        return None
+    return {
+        "token": token,
+        "repo": repo,
+        "branch": branch,
+        "round_path": _secret_value(
+            "GITHUB_ROUND_CSV_PATH",
+            "data/game_data_rounds.csv",
+        ),
+        "interaction_path": _secret_value(
+            "GITHUB_INTERACTION_CSV_PATH",
+            "data/game_interactions.csv",
+        ),
+    }
+
+
+def _github_request(url, token, method="GET", payload=None):
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        },
+    )
+    with urlopen(request, timeout=15) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _append_to_github_csv_once(path, header, rows, message):
+    config = _github_storage_config()
+    if not config:
+        return
+
+    token = config["token"]
+    encoded_path = "/".join(part.replace(" ", "%20") for part in path.split("/"))
+    url = (
+        f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
+        f"?ref={config['branch']}"
+    )
+    content = _csv_line(header)
+    sha = None
+
+    try:
+        existing = _github_request(url, token)
+        sha = existing.get("sha")
+        raw_content = base64.b64decode(existing.get("content", "")).decode("utf-8")
+        content = raw_content
+        if not content.endswith("\n"):
+            content += "\n"
+    except HTTPError as error:
+        if error.code != 404:
+            raise
+
+    for row in rows:
+        content += _csv_line(row)
+
+    payload = {
+        "message": message,
+        "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+        "branch": config["branch"],
+    }
+    if sha:
+        payload["sha"] = sha
+
+    put_url = f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
+    _github_request(put_url, token, method="PUT", payload=payload)
+
+
+def _append_to_github_csv(path, header, rows, message):
+    for attempt in range(3):
+        try:
+            _append_to_github_csv_once(path, header, rows, message)
+            return
+        except HTTPError as error:
+            if error.code != 409 or attempt == 2:
+                raise
+
+
+def append_remote_csv(round_row, interaction_rows):
+    try:
+        config = _github_storage_config()
+        if not config:
+            return
+        _append_to_github_csv(
+            config["round_path"],
+            ROUND_LOG_FIELDS,
+            [round_row],
+            "Append word game round data",
+        )
+        if interaction_rows:
+            _append_to_github_csv(
+                config["interaction_path"],
+                INTERACTION_LOG_FIELDS,
+                interaction_rows,
+                "Append word game interaction data",
+            )
+    except (HTTPError, URLError, TimeoutError, OSError) as error:
+        st.session_state.remote_log_error = str(error)
 
 
 def clean_interaction_history(history):
@@ -127,7 +278,11 @@ def clean_interaction_history(history):
                 "neutral_guesses": list(item.get("neutral_guesses", [])),
                 "bomb_guess": item.get("bomb_guess"),
                 "outcome": item.get("outcome", "correct" if correct_guesses else "wrong"),
+                "skipped": bool(item.get("skipped", False)),
+                "skipped_by": item.get("skipped_by", ""),
                 "bomb_hit": bool(item.get("bomb_hit", False)),
+                "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
+                "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
             }
         )
     return clean_items
@@ -157,63 +312,75 @@ def log_round(participant_id):
     if st.session_state.start_time is not None:
         response_time = (datetime.utcnow() - st.session_state.start_time).total_seconds()
 
-    with data_file.open("a", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(
+    round_row = [
+        timestamp,
+        participant_id,
+        st.session_state.round,
+        st.session_state.role,
+        st.session_state.word_type,
+        ";".join(st.session_state.board),
+        ";".join(st.session_state.target_words),
+        st.session_state.bomb_word,
+        st.session_state.hint,
+        st.session_state.hint_number,
+        json.dumps(intended_targets, ensure_ascii=False),
+        ";".join(guesses),
+        json.dumps(clean_history, ensure_ascii=False),
+        st.session_state.round_interactions,
+        st.session_state.get("round_skips", 0),
+        len(st.session_state.found_targets),
+        int(correct),
+        int(bomb_hit),
+        st.session_state.round_medal,
+        score_change,
+        response_time,
+        st.session_state.perception_rating,
+        st.session_state.get("ai_round_reflection", ""),
+        st.session_state.get("human_round_feedback", ""),
+    ]
+
+    interaction_rows = []
+    for item in clean_history:
+        interaction_rows.append(
             [
                 timestamp,
                 participant_id,
                 st.session_state.round,
                 st.session_state.role,
                 st.session_state.word_type,
-                ";".join(st.session_state.board),
-                ";".join(st.session_state.target_words),
-                st.session_state.bomb_word,
-                st.session_state.hint,
-                st.session_state.hint_number,
-                json.dumps(intended_targets, ensure_ascii=False),
-                ";".join(guesses),
-                json.dumps(clean_history, ensure_ascii=False),
-                st.session_state.round_interactions,
-                len(st.session_state.found_targets),
-                int(correct),
-                int(bomb_hit),
+                item["turn"],
+                item["clue_giver"],
+                item["guesser"],
+                item["hint"],
+                item["hint_number"],
+                ";".join(item["intended_targets"]),
+                ";".join(item["guesses"]),
+                ";".join(item["correct_guesses"]),
+                ";".join(item["missed_intended_targets"]),
+                ";".join(item["extra_correct_guesses"]),
+                ";".join(item["neutral_guesses"]),
+                item["bomb_guess"] or "",
+                item["outcome"],
+                int(item["skipped"]),
+                item["skipped_by"],
+                int(item["bomb_hit"]),
                 st.session_state.round_medal,
-                score_change,
-                response_time,
+                int(st.session_state.round_success),
                 st.session_state.perception_rating,
+                item["ai_understanding_rating_before"] or "",
+                item["ai_understanding_rating_after"] or "",
             ]
         )
 
+    with data_file.open("a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(round_row)
+
     with interaction_data_file.open("a", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        for item in clean_history:
-            writer.writerow(
-                [
-                    timestamp,
-                    participant_id,
-                    st.session_state.round,
-                    st.session_state.role,
-                    st.session_state.word_type,
-                    item["turn"],
-                    item["clue_giver"],
-                    item["guesser"],
-                    item["hint"],
-                    item["hint_number"],
-                    ";".join(item["intended_targets"]),
-                    ";".join(item["guesses"]),
-                    ";".join(item["correct_guesses"]),
-                    ";".join(item["missed_intended_targets"]),
-                    ";".join(item["extra_correct_guesses"]),
-                    ";".join(item["neutral_guesses"]),
-                    item["bomb_guess"] or "",
-                    item["outcome"],
-                    int(item["bomb_hit"]),
-                    st.session_state.round_medal,
-                    int(st.session_state.round_success),
-                    st.session_state.perception_rating,
-                ]
-            )
+        writer.writerows(interaction_rows)
+
+    append_remote_csv(round_row, interaction_rows)
 
     st.session_state.last_score_change = score_change
     st.session_state.score += score_change

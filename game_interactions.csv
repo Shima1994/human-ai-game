@@ -22,3 +22,16 @@ timestamp,participant_id,round,role,word_type,turn,clue_giver,guesser,hint,hint_
 2026-05-02T09:24:12.733187,Shima,1,human_clue,abstract,2,human,ai,mather,1,respect,memory,,respect,,memory,,wrong,0,none,0,3
 2026-05-02T09:24:12.733187,Shima,1,human_clue,abstract,3,human,ai,hope,2,wish;respect,wish;surprise,wish,respect,,surprise,,correct,0,none,0,3
 2026-05-02T09:24:12.733187,Shima,1,human_clue,abstract,4,human,ai,eltern,1,respect,hide,,respect,,hide,,wrong,0,none,0,3
+2026-05-19T17:14:32.742273,Test,1,human_clue,abstract,1,human,ai,investment,3,capital;price;time,capital;price;luck,capital;price;luck,time,luck,,,correct,0,gold,1,5,4,4
+2026-05-19T17:14:32.742273,Test,1,human_clue,abstract,2,human,ai,anniversary,2,love;time,time;love,time;love,,,,,correct,0,gold,1,5,4,5
+2026-05-19T17:21:34.464047,Test,2,ai_clue,abstract,1,ai,human,signal,2,melody;luck,light;secret,light,melody;luck,light,secret,,correct,0,bronze,1,3,,
+2026-05-19T17:21:34.464047,Test,2,ai_clue,abstract,2,ai,human,harmony,2,melody;luck,melody;strike,melody,luck,,strike,,correct,0,bronze,1,3,,
+2026-05-19T17:21:34.464047,Test,2,ai_clue,abstract,3,ai,human,fate,3,luck;birth;memory,luck;love;game,luck,birth;memory,,love;game,,correct,0,bronze,1,3,,
+2026-05-19T17:21:34.464047,Test,2,ai_clue,abstract,4,ai,human,remember,2,birth;memory,memory;birth,memory;birth,,,,,correct,0,bronze,1,3,,
+2026-05-19T17:28:12.784170,Test,3,human_clue,concrete,1,human,ai,hobby,2,ball;book,baby;cat,cat,ball;book,cat,baby,,correct,0,silver,1,5,4,3
+2026-05-19T17:28:12.784170,Test,3,human_clue,concrete,2,human,ai,leisuretime,2,book;ball,book;ball,book;ball,,,,,correct,0,silver,1,5,4,5
+2026-05-19T17:28:12.784170,Test,3,human_clue,concrete,3,human,ai,expensive,2,purse;leather,leather;purse,leather;purse,,,,,correct,0,silver,1,5,4,5
+2026-05-19T17:34:38.722453,Test,4,ai_clue,concrete,1,ai,human,snack,2,popcorn;ball,popcorn;kiwi,popcorn,ball,,kiwi,,correct,0,bronze,1,3,,
+2026-05-19T17:34:38.722453,Test,4,ai_clue,concrete,2,ai,human,play,3,ball;sword;cat,ball;sword;water,ball;sword,cat,,water,,correct,0,bronze,1,3,,
+2026-05-19T17:34:38.722453,Test,4,ai_clue,concrete,3,ai,human,pattern,2,towel;cat,soup;cotton,,towel;cat,,soup;cotton,,wrong,0,bronze,1,3,,
+2026-05-19T17:34:38.722453,Test,4,ai_clue,concrete,4,ai,human,textile,2,towel;cat,towel;cat,towel;cat,,,,,correct,0,bronze,1,3,,
