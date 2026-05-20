@@ -1,8 +1,0 @@
-timestamp,participant_id,round,role,word_type,turn,clue_giver,guesser,hint,hint_number,intended_targets,guesses,correct_guesses,missed_intended_targets,extra_correct_guesses,neutral_guesses,bomb_guess,outcome,skipped,skipped_by,bomb_hit,round_medal,round_success,perception_rating,ai_understanding_rating_before,ai_understanding_rating_after
-2026-05-19T18:15:49.323676,1,1,human_clue,abstract,1,human,ai,joy,3,surprise;birth;wish,surprise;light;birth,surprise;light;birth,wish,light,,,correct,0,,0,silver,1,5,4,4
-2026-05-19T18:15:49.323676,1,1,human_clue,abstract,2,human,ai,heart,2,link;wish,wish;hide,wish,link,,hide,,correct,0,,0,silver,1,5,3,3
-2026-05-19T18:15:49.323676,1,1,human_clue,abstract,3,human,ai,connect,1,link,link,link,,,,,correct,0,,0,silver,1,5,5,5
-2026-05-19T18:18:54.178043,1,2,ai_clue,abstract,1,ai,human,hint,3,light;melody;smile,,,light;melody;smile,,,,skip,1,human,0,none,0,3,,
-2026-05-19T18:18:54.178043,1,2,ai_clue,abstract,2,ai,human,radiance,3,light;melody;smile,light;secret;shadow,light;shadow,melody;smile,shadow,secret,,correct,0,,0,none,0,3,,
-2026-05-19T18:18:54.178043,1,2,ai_clue,abstract,3,ai,human,harmony,3,melody;smile;link,melody;ghost;hero,melody,smile;link,,ghost;hero,,correct,0,,0,none,0,3,,
-2026-05-19T18:18:54.178043,1,2,ai_clue,abstract,4,ai,human,cheer,2,smile;link,respect;smile,smile,link,,respect,,correct,0,,0,none,0,3,,

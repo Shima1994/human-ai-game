@@ -47,7 +47,7 @@ def screen_welcome():
             </div>
             <div class="guide-grid">
                 <div class="guide-card guide-goal">
-                    <h3>The Goal:</h3>
+                    <h3>The Goal</h3>
                     <p>There are 4 rounds in total: abstract words with human clue-giver, abstract words with AI clue-giver, concrete words with human clue-giver, and concrete words with AI clue-giver. In each round, you will see 15 cards on the screen:</p>
                     <ul>
                         <li>5 Target Cards (The ones you need to find!)</li>
@@ -56,7 +56,7 @@ def screen_welcome():
                     </ul>
                 </div>
                 <div class="guide-card">
-                    <h3>How to Play:</h3>
+                    <h3>How to Play</h3>
                     <ol>
                         <li><strong>Take Turns:</strong> In one round, you give the hint and the AI guesses. In the next round, the AI gives the hint and you guess.</li>
                         <li><strong>Give a Clue:</strong> A clue is just one word and one number.</li>
@@ -69,7 +69,7 @@ def screen_welcome():
                     </ol>
                 </div>
                 <div class="guide-card guide-medals">
-                    <h3>Win Medals & Points:</h3>
+                    <h3>Win Medals &amp; Points</h3>
                     <p>The faster you find the 5 targets, the better your medal:</p>
                     <ul>
                         <li>&#129351; Gold (5 pts): Finish in 1 or 2 turns.</li>
@@ -79,7 +79,7 @@ def screen_welcome():
                     <p>Pro Tip: Try to think like your AI partner! The better you "connect," the more points you'll earn.</p>
                 </div>
                 <div class="guide-card guide-research">
-                    <h3>Important: Help Our Research! &#128300;</h3>
+                    <h3>Help Our Research &#128300;</h3>
                     <p>Since this is a research project, please pay attention to these 3 extra steps. They help us understand how humans and AI connect:</p>
                     <ol>
                         <li><strong>Read the Round Reflection:</strong><br>After each round, read the AI reflection and write back what you meant. It helps you and the AI understand each other's logic better for the next rounds.</li>
@@ -129,8 +129,10 @@ def _clear_current_clue():
     st.session_state.hint = ""
     st.session_state.hint_number = 1
     st.session_state.hint_targets = []
+    st.session_state.hint_explanation = ""
     st.session_state.pending_guesses = []
     st.session_state.pending_ai_guess_review = None
+    st.session_state.pending_hint_meta = None
 
 
 def _word_count(text):
@@ -143,7 +145,6 @@ def screen_human_clue():
         return
 
     render_top_status()
-   
 
     with st.container(border=True):
         st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
@@ -187,8 +188,11 @@ def screen_human_clue():
                 pending_review.get("hint_number", 1),
                 pending_review.get("guesses", []),
                 pending_review.get("intended_targets", []),
-                pending_review.get("rating_before"),
-                rating_after,
+                hint_explanation=pending_review.get("hint_explanation", ""),
+                ai_understanding_rating_before=pending_review.get("rating_before"),
+                ai_understanding_rating_after=rating_after,
+                guess_raw_response=pending_review.get("guess_raw_response", ""),
+                guess_response_time_sec=pending_review.get("guess_response_time_sec"),
             )
             st.session_state.perception_rating = rating_after
             st.session_state.pending_ai_guess_review = None
@@ -197,6 +201,7 @@ def screen_human_clue():
                 st.session_state.hint = ""
                 st.session_state.hint_number = 1
                 st.session_state.hint_targets = []
+                st.session_state.hint_explanation = ""
             st.rerun()
         render_interaction_history(st.session_state.interaction_history)
         return
@@ -289,7 +294,7 @@ def screen_human_clue():
             st.session_state.hint_number = int(hint_number)
             intended_targets = st.session_state.hint_targets[:]
             with st.spinner("AI is thinking..."):
-                ai_guesses = ai_guess(
+                guess_result = ai_guess(
                     st.session_state.board,
                     st.session_state.hint,
                     st.session_state.hint_number,
@@ -301,18 +306,22 @@ def screen_human_clue():
                     can_skip_current_clue(),
                 )
 
-            if ai_guesses == ["__REROLL_HINT__"]:
+            action = guess_result.get("action", "guess")
+            if action == "reroll":
                 if st.session_state.ai_rerolls > 0:
                     st.session_state.ai_rerolls -= 1
                     st.warning("The AI asked for another clue.")
                 else:
                     st.warning("No AI rerolls remain. Please adjust the clue.")
-            elif ai_guesses == ["__SKIP_CLUE__"]:
+            elif action == "skip":
                 record_skip(
                     st.session_state.hint,
                     st.session_state.hint_number,
                     intended_targets,
+                    st.session_state.get("hint_explanation", ""),
                     skipped_by="ai",
+                    guess_raw_response=guess_result.get("raw_response", ""),
+                    guess_response_time_sec=guess_result.get("response_time_sec"),
                 )
                 _clear_current_clue()
                 st.info("AI chose not to risk this clue. One turn was used; please give the next clue.")
@@ -321,9 +330,12 @@ def screen_human_clue():
                 st.session_state.pending_ai_guess_review = {
                     "hint": st.session_state.hint,
                     "hint_number": st.session_state.hint_number,
-                    "guesses": ai_guesses,
+                    "guesses": guess_result.get("guesses", []),
                     "intended_targets": intended_targets,
+                    "hint_explanation": "",
                     "rating_before": rating_before,
+                    "guess_raw_response": guess_result.get("raw_response", ""),
+                    "guess_response_time_sec": guess_result.get("response_time_sec"),
                 }
                 st.rerun()
 
@@ -336,7 +348,6 @@ def screen_human_guesser():
         return
 
     render_top_status()
-  
 
     with st.container(border=True):
         st.markdown('<div class="panel-title">Board</div>', unsafe_allow_html=True)
@@ -364,11 +375,17 @@ def screen_human_guesser():
                     role == "bomb"
                     or len(st.session_state.pending_guesses) >= st.session_state.hint_number
                 ):
+                    pending_meta = st.session_state.get("pending_hint_meta") or {}
                     record_interaction(
                         st.session_state.hint,
                         st.session_state.hint_number,
                         st.session_state.pending_guesses,
                         st.session_state.hint_targets,
+                        hint_explanation=st.session_state.get("hint_explanation", ""),
+                        hint_raw_response=pending_meta.get("raw_response", ""),
+                        hint_response_time_sec=pending_meta.get("response_time_sec"),
+                        hint_attempts=pending_meta.get("attempts"),
+                        hint_used_fallback=pending_meta.get("used_fallback", False),
                     )
                     st.session_state.pending_guesses = []
                     if not st.session_state.round_finished:
@@ -376,6 +393,8 @@ def screen_human_guesser():
                         st.session_state.hint = ""
                         st.session_state.hint_number = 1
                         st.session_state.hint_targets = []
+                        st.session_state.hint_explanation = ""
+                    st.session_state.pending_hint_meta = None
                 st.rerun()
 
     if not st.session_state.hint:
@@ -390,7 +409,7 @@ def screen_human_guesser():
         )
         if st.button("Ask AI for a clue", type="primary", use_container_width=True):
             with st.spinner("AI is generating a clue..."):
-                hint, hint_number, intended_targets = generate_ai_hint(
+                hint_result = generate_ai_hint(
                     st.session_state.target_words,
                     st.session_state.bomb_word,
                     st.session_state.neutral_words,
@@ -399,9 +418,16 @@ def screen_human_guesser():
                     st.session_state.used_hints,
                     st.session_state.ai_round_summaries,
                 )
-            st.session_state.hint = hint
-            st.session_state.hint_number = hint_number
-            st.session_state.hint_targets = intended_targets
+            st.session_state.hint = hint_result.get("hint", "")
+            st.session_state.hint_number = hint_result.get("hint_number", 1)
+            st.session_state.hint_targets = hint_result.get("intended_targets", [])
+            st.session_state.hint_explanation = hint_result.get("explanation", "")
+            st.session_state.pending_hint_meta = {
+                "raw_response": hint_result.get("raw_response", ""),
+                "response_time_sec": hint_result.get("response_time_sec"),
+                "attempts": hint_result.get("attempts"),
+                "used_fallback": hint_result.get("used_fallback", False),
+            }
             st.rerun()
     else:
         render_hint_panel(
@@ -415,11 +441,17 @@ def screen_human_guesser():
             use_container_width=True,
             disabled=not can_skip_current_clue() or bool(st.session_state.pending_guesses),
         ):
+            pending_meta = st.session_state.get("pending_hint_meta") or {}
             record_skip(
                 st.session_state.hint,
                 st.session_state.hint_number,
                 st.session_state.hint_targets,
+                st.session_state.get("hint_explanation", ""),
                 skipped_by="human",
+                hint_raw_response=pending_meta.get("raw_response", ""),
+                hint_response_time_sec=pending_meta.get("response_time_sec"),
+                hint_attempts=pending_meta.get("attempts"),
+                hint_used_fallback=pending_meta.get("used_fallback", False),
             )
             _clear_current_clue()
             st.rerun()
@@ -520,10 +552,12 @@ def screen_round_summary():
                 st.session_state.hint = ""
                 st.session_state.hint_number = 1
                 st.session_state.hint_targets = []
+                st.session_state.hint_explanation = ""
                 st.session_state.previous_hint = None
                 st.session_state.last_ai_guesses = []
                 st.session_state.last_ai_hint = ""
                 st.session_state.pending_ai_guess_review = None
+                st.session_state.pending_hint_meta = None
                 st.session_state.ai_round_reflection = ""
                 st.session_state.human_round_feedback = ""
 
@@ -580,7 +614,16 @@ def screen_game_over():
         f"<div class='summary-stat'><strong>&#129353; Bronze</strong><br>{medal_counts.get('bronze', 0)}</div>",
         unsafe_allow_html=True,
     )
-    st.info(f"The run has been saved correctly, {player_name}.")
+    remote_status = st.session_state.get("remote_log_status")
+    remote_error = st.session_state.get("remote_log_error", "")
+    if remote_status == "github_saved":
+        st.info(f"The run has been saved to GitHub, {player_name}.")
+    elif remote_status == "github_failed":
+        st.warning(f"The run was saved locally, but GitHub logging failed: {remote_error}")
+    elif remote_status == "local_only":
+        st.warning(f"The run was saved locally only. {remote_error}")
+    else:
+        st.info(f"The run has been saved locally, {player_name}.")
 
     st.markdown('<div class="center-actions">', unsafe_allow_html=True)
     if st.button("Play again", type="primary", use_container_width=True):

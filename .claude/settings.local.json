@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import py_compile, sys; files=['core/ai_service.py','core/constants.py','core/state.py','core/game_logic.py','core/storage.py','ui/components.py','ui/screens.py','ui/styles.py','app.py']; [py_compile.compile\\(f, doraise=True\\) for f in files]; print\\('all compiled OK'\\)\")",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

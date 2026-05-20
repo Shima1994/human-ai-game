@@ -1,24 +1,18 @@
+import uuid
 from datetime import datetime
 
 import streamlit as st
 
 from core.constants import AI_REROLLS_PER_GAME, HUMAN_REROLLS_PER_GAME
-from core.words import ABSTRACT_CATEGORIES, CONCRETE_CATEGORIES
 
 
-def _fresh_pools():
-    return {
-        "abstract_pools": {
-            category: words.copy() for category, words in ABSTRACT_CATEGORIES.items()
-        },
-        "concrete_pools": {
-            category: words.copy() for category, words in CONCRETE_CATEGORIES.items()
-        },
-    }
+def _new_session_id():
+    return str(uuid.uuid4())
 
 
 def init_session_state():
     defaults = {
+        "session_id": _new_session_id(),
         "started": False,
         "participant_id": None,
         "round": 1,
@@ -33,6 +27,7 @@ def init_session_state():
         "hint": "",
         "hint_number": 1,
         "hint_targets": [],
+        "hint_explanation": "",
         "used_hints": [],
         "guesses": [],
         "pending_guesses": [],
@@ -60,9 +55,10 @@ def init_session_state():
         "round_success": False,
         "round_bomb_hit": False,
         "medal_counts": {"gold": 0, "silver": 0, "bronze": 0, "none": 0},
+        "remote_log_status": "",
+        "remote_log_error": "",
+        "pending_hint_meta": None,
     }
-    defaults.update(_fresh_pools())
-
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
@@ -79,6 +75,7 @@ def reset_round_state():
     st.session_state.hint = ""
     st.session_state.hint_number = 1
     st.session_state.hint_targets = []
+    st.session_state.hint_explanation = ""
     st.session_state.guesses = []
     st.session_state.pending_guesses = []
     st.session_state.found_targets = []
@@ -100,6 +97,7 @@ def reset_round_state():
     st.session_state.round_medal = "none"
     st.session_state.round_success = False
     st.session_state.round_bomb_hit = False
+    st.session_state.pending_hint_meta = None
 
 
 def restart_game(keep_participant=False):
@@ -108,6 +106,7 @@ def restart_game(keep_participant=False):
         del st.session_state[key]
 
     init_session_state()
+    st.session_state.session_id = _new_session_id()
     if participant_id:
         st.session_state.started = True
         st.session_state.participant_id = participant_id
@@ -120,4 +119,6 @@ def restart_game(keep_participant=False):
     st.session_state.medal_counts = {"gold": 0, "silver": 0, "bronze": 0, "none": 0}
     st.session_state.used_hints = []
     st.session_state.ai_round_summaries = []
+    st.session_state.remote_log_status = ""
+    st.session_state.remote_log_error = ""
     st.session_state.start_time = datetime.utcnow()

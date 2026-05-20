@@ -8,11 +8,13 @@ from urllib.request import Request, urlopen
 
 import streamlit as st
 
-from core.constants import DATA_FILE
+from core.constants import DATA_FILE, INTERACTION_DATA_FILE
 from core.game_logic import compute_score_change
 
+
 ROUND_LOG_FIELDS = [
-    "timestamp",
+    "session_id",
+    "timestamp_utc",
     "participant_id",
     "round",
     "role",
@@ -20,26 +22,27 @@ ROUND_LOG_FIELDS = [
     "board",
     "targets",
     "bomb",
-    "hint",
-    "hint_number",
-    "intended_targets",
+    "neutral_words",
+    "clues_used",
     "guesses",
-    "interaction_history",
     "turns",
     "skips",
     "targets_found",
-    "correct",
+    "any_target_correct",
+    "all_targets_found",
     "bomb_hit",
     "medal",
     "score_change",
-    "response_time_sec",
-    "perception_rating",
+    "round_duration_sec",
+    "perception_rating_end",
     "ai_round_reflection",
     "human_round_feedback",
 ]
 
+
 INTERACTION_LOG_FIELDS = [
-    "timestamp",
+    "session_id",
+    "timestamp_utc",
     "participant_id",
     "round",
     "role",
@@ -50,6 +53,7 @@ INTERACTION_LOG_FIELDS = [
     "hint",
     "hint_number",
     "intended_targets",
+    "hint_explanation",
     "guesses",
     "correct_guesses",
     "missed_intended_targets",
@@ -62,45 +66,36 @@ INTERACTION_LOG_FIELDS = [
     "bomb_hit",
     "round_medal",
     "round_success",
-    "perception_rating",
     "ai_understanding_rating_before",
     "ai_understanding_rating_after",
+    "hint_response_time_sec",
+    "hint_attempts",
+    "hint_used_fallback",
+    "guess_response_time_sec",
+    "hint_raw_response",
+    "guess_raw_response",
+    "interaction_recorded_at",
 ]
 
 
 def get_data_file():
-    if not DATA_FILE.exists():
-        return DATA_FILE
+    return DATA_FILE
 
-    with DATA_FILE.open("r", newline="", encoding="utf-8") as file:
-        reader = csv.reader(file)
-        header = next(reader, [])
 
-    if header == ROUND_LOG_FIELDS:
-        return DATA_FILE
-
-    multi_round_file = DATA_FILE.with_name("game_data_multi_round.csv")
-    if multi_round_file.exists():
-        with multi_round_file.open("r", newline="", encoding="utf-8") as file:
+def _header_matches(data_file, expected_fields):
+    try:
+        with data_file.open("r", newline="", encoding="utf-8") as file:
             reader = csv.reader(file)
-            multi_round_header = next(reader, [])
-        if multi_round_header == ROUND_LOG_FIELDS:
-            return multi_round_file
-        intended_file = DATA_FILE.with_name("game_data_multi_round_intended.csv")
-        if intended_file.exists():
-            with intended_file.open("r", newline="", encoding="utf-8") as file:
-                reader = csv.reader(file)
-                intended_header = next(reader, [])
-            if intended_header == ROUND_LOG_FIELDS:
-                return intended_file
-        return DATA_FILE.with_name("game_data_multi_round_skip_reflection.csv")
-
-    return multi_round_file
+            existing = next(reader, [])
+    except (FileNotFoundError, StopIteration):
+        return False
+    return list(existing) == list(expected_fields)
 
 
 def ensure_data_file():
     data_file = get_data_file()
-    if not data_file.exists():
+    data_file.parent.mkdir(parents=True, exist_ok=True)
+    if not data_file.exists() or not _header_matches(data_file, ROUND_LOG_FIELDS):
         with data_file.open("w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             writer.writerow(ROUND_LOG_FIELDS)
@@ -108,21 +103,13 @@ def ensure_data_file():
 
 
 def get_interaction_data_file():
-    interaction_file = DATA_FILE.with_name("game_interactions.csv")
-    if not interaction_file.exists():
-        return interaction_file
-
-    with interaction_file.open("r", newline="", encoding="utf-8") as file:
-        reader = csv.reader(file)
-        header = next(reader, [])
-    if header == INTERACTION_LOG_FIELDS:
-        return interaction_file
-    return DATA_FILE.with_name("game_interactions_skip_reflection.csv")
+    return INTERACTION_DATA_FILE
 
 
 def ensure_interaction_data_file():
     data_file = get_interaction_data_file()
-    if not data_file.exists():
+    data_file.parent.mkdir(parents=True, exist_ok=True)
+    if not data_file.exists() or not _header_matches(data_file, INTERACTION_LOG_FIELDS):
         with data_file.open("w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             writer.writerow(INTERACTION_LOG_FIELDS)
@@ -155,7 +142,7 @@ def _github_storage_config():
         "branch": branch,
         "round_path": _secret_value(
             "GITHUB_ROUND_CSV_PATH",
-            "data/game_data_rounds.csv",
+            "data/game_rounds.csv",
         ),
         "interaction_path": _secret_value(
             "GITHUB_INTERACTION_CSV_PATH",
@@ -235,6 +222,11 @@ def append_remote_csv(round_row, interaction_rows):
     try:
         config = _github_storage_config()
         if not config:
+            st.session_state.remote_log_status = "local_only"
+            st.session_state.remote_log_error = (
+                "GitHub logging is not configured. Add GITHUB_TOKEN and GITHUB_REPO "
+                "to Streamlit secrets to save public runs durably."
+            )
             return
         _append_to_github_csv(
             config["round_path"],
@@ -249,7 +241,10 @@ def append_remote_csv(round_row, interaction_rows):
                 interaction_rows,
                 "Append word game interaction data",
             )
+        st.session_state.remote_log_status = "github_saved"
+        st.session_state.remote_log_error = ""
     except (HTTPError, URLError, TimeoutError, OSError) as error:
+        st.session_state.remote_log_status = "github_failed"
         st.session_state.remote_log_error = str(error)
 
 
@@ -267,6 +262,7 @@ def clean_interaction_history(history):
                 "hint": item.get("hint", ""),
                 "hint_number": int(item.get("hint_number", 0) or 0),
                 "intended_targets": intended_targets,
+                "hint_explanation": item.get("hint_explanation", ""),
                 "guesses": guesses,
                 "correct_guesses": correct_guesses,
                 "missed_intended_targets": [
@@ -283,9 +279,25 @@ def clean_interaction_history(history):
                 "bomb_hit": bool(item.get("bomb_hit", False)),
                 "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
                 "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
+                "hint_raw_response": item.get("hint_raw_response", ""),
+                "hint_response_time_sec": item.get("hint_response_time_sec"),
+                "hint_attempts": item.get("hint_attempts"),
+                "hint_used_fallback": bool(item.get("hint_used_fallback", False)),
+                "guess_raw_response": item.get("guess_raw_response", ""),
+                "guess_response_time_sec": item.get("guess_response_time_sec"),
+                "recorded_at": item.get("recorded_at", ""),
             }
         )
     return clean_items
+
+
+def _format_optional_float(value):
+    if value is None or value == "":
+        return ""
+    try:
+        return f"{float(value):.3f}"
+    except (TypeError, ValueError):
+        return ""
 
 
 def log_round(participant_id):
@@ -302,17 +314,20 @@ def log_round(participant_id):
         st.session_state.bomb_word,
         st.session_state.round_interactions,
     )
-    intended_targets = [
-        item.get("intended_targets", [])
-        for item in st.session_state.interaction_history
-    ]
     clean_history = clean_interaction_history(st.session_state.interaction_history)
 
     response_time = None
     if st.session_state.start_time is not None:
         response_time = (datetime.utcnow() - st.session_state.start_time).total_seconds()
 
+    clues_used = ";".join(
+        item.get("hint", "") for item in clean_history if item.get("hint")
+    )
+
+    session_id = st.session_state.get("session_id", "")
+
     round_row = [
+        session_id,
         timestamp,
         participant_id,
         st.session_state.round,
@@ -321,19 +336,18 @@ def log_round(participant_id):
         ";".join(st.session_state.board),
         ";".join(st.session_state.target_words),
         st.session_state.bomb_word,
-        st.session_state.hint,
-        st.session_state.hint_number,
-        json.dumps(intended_targets, ensure_ascii=False),
+        ";".join(st.session_state.neutral_words),
+        clues_used,
         ";".join(guesses),
-        json.dumps(clean_history, ensure_ascii=False),
         st.session_state.round_interactions,
         st.session_state.get("round_skips", 0),
         len(st.session_state.found_targets),
         int(correct),
+        int(st.session_state.round_success),
         int(bomb_hit),
         st.session_state.round_medal,
         score_change,
-        response_time,
+        _format_optional_float(response_time),
         st.session_state.perception_rating,
         st.session_state.get("ai_round_reflection", ""),
         st.session_state.get("human_round_feedback", ""),
@@ -343,6 +357,7 @@ def log_round(participant_id):
     for item in clean_history:
         interaction_rows.append(
             [
+                session_id,
                 timestamp,
                 participant_id,
                 st.session_state.round,
@@ -354,6 +369,7 @@ def log_round(participant_id):
                 item["hint"],
                 item["hint_number"],
                 ";".join(item["intended_targets"]),
+                item["hint_explanation"],
                 ";".join(item["guesses"]),
                 ";".join(item["correct_guesses"]),
                 ";".join(item["missed_intended_targets"]),
@@ -366,9 +382,15 @@ def log_round(participant_id):
                 int(item["bomb_hit"]),
                 st.session_state.round_medal,
                 int(st.session_state.round_success),
-                st.session_state.perception_rating,
-                item["ai_understanding_rating_before"] or "",
-                item["ai_understanding_rating_after"] or "",
+                item["ai_understanding_rating_before"] if item["ai_understanding_rating_before"] is not None else "",
+                item["ai_understanding_rating_after"] if item["ai_understanding_rating_after"] is not None else "",
+                _format_optional_float(item["hint_response_time_sec"]),
+                item["hint_attempts"] if item["hint_attempts"] is not None else "",
+                int(item["hint_used_fallback"]),
+                _format_optional_float(item["guess_response_time_sec"]),
+                item["hint_raw_response"] or "",
+                item["guess_raw_response"] or "",
+                item["recorded_at"],
             ]
         )
 

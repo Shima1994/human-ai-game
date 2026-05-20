@@ -11,64 +11,29 @@ from core.constants import (
     MEDAL_POINTS,
     TARGET_COUNT,
 )
-from core.words import ABSTRACT_CATEGORIES, CONCRETE_CATEGORIES
+from core.words import FIXED_ROUND_BOARDS
 
 
 def get_word_type_for_round(round_number):
-    return "abstract" if ((round_number - 1) // 2) % 2 == 0 else "concrete"
+    return FIXED_ROUND_BOARDS[round_number]["word_type"]
 
 
 def get_role_for_round(round_number):
     return "human_clue" if round_number % 2 else "ai_clue"
 
 
-def _reset_word_pool(word_type):
-    if word_type == "abstract":
-        st.session_state.abstract_pools = {
-            category: words.copy() for category, words in ABSTRACT_CATEGORIES.items()
-        }
-    else:
-        st.session_state.concrete_pools = {
-            category: words.copy() for category, words in CONCRETE_CATEGORIES.items()
-        }
+def sample_fixed_round_words(round_number):
+    board_words = FIXED_ROUND_BOARDS[round_number]["words"].copy()
+    if len(board_words) != BOARD_SIZE:
+        raise ValueError(f"Round {round_number} must contain exactly {BOARD_SIZE} words.")
+    if len(set(word.lower() for word in board_words)) != BOARD_SIZE:
+        raise ValueError(f"Round {round_number} contains duplicate board words.")
 
-
-def _remove_selected_words_from_pool(pools, selected_pairs):
-    selected_words = {word for word, _ in selected_pairs}
-    for category, words in pools.items():
-        pools[category] = [word for word in words if word not in selected_words]
-
-
-def sample_words_no_replacement(word_type):
-    pools = (
-        st.session_state.abstract_pools
-        if word_type == "abstract"
-        else st.session_state.concrete_pools
-    )
-    available_pairs = [
-        (word, category)
-        for category, words in pools.items()
-        for word in words
-    ]
-    if len(available_pairs) < BOARD_SIZE:
-        _reset_word_pool(word_type)
-        pools = (
-            st.session_state.abstract_pools
-            if word_type == "abstract"
-            else st.session_state.concrete_pools
-        )
-        available_pairs = [
-            (word, category)
-            for category, words in pools.items()
-            for word in words
-        ]
-        if len(available_pairs) < BOARD_SIZE:
-            raise ValueError(f"Not enough words for a {BOARD_SIZE}-card {word_type} board.")
-
-    selected_pairs = random.sample(available_pairs, BOARD_SIZE)
-    _remove_selected_words_from_pool(pools, selected_pairs)
-    board_words = [word for word, _ in selected_pairs]
-    targets, neutrals, bomb = _assign_balanced_roles(selected_pairs)
+    shuffled_roles = board_words[:]
+    random.shuffle(shuffled_roles)
+    targets = shuffled_roles[:TARGET_COUNT]
+    bomb = shuffled_roles[TARGET_COUNT]
+    neutrals = shuffled_roles[TARGET_COUNT + BOMB_COUNT:]
 
     word_roles = {word: "target" for word in targets}
     word_roles.update({word: "neutral" for word in neutrals})
@@ -78,41 +43,12 @@ def sample_words_no_replacement(word_type):
     return board_words, targets, neutrals, bomb, word_roles
 
 
-def _category_count(words_with_categories):
-    counts = {}
-    for _, category in words_with_categories:
-        counts[category] = counts.get(category, 0) + 1
-    return counts
-
-
-def _is_balanced_group(words_with_categories, max_per_category):
-    counts = _category_count(words_with_categories)
-    return all(count <= max_per_category for count in counts.values())
-
-
-def _assign_balanced_roles(selected_pairs):
-    shuffled = selected_pairs[:]
-    for _ in range(250):
-        random.shuffle(shuffled)
-        target_pairs = shuffled[:TARGET_COUNT]
-        bomb_pair = shuffled[TARGET_COUNT]
-        neutral_pairs = shuffled[TARGET_COUNT + BOMB_COUNT:]
-
-        if _is_balanced_group(target_pairs, 2) and _is_balanced_group(neutral_pairs, 4):
-            targets = [word for word, _ in target_pairs]
-            neutrals = [word for word, _ in neutral_pairs]
-            return targets, neutrals, bomb_pair[0]
-
-    targets = [word for word, _ in shuffled[:TARGET_COUNT]]
-    bomb = shuffled[TARGET_COUNT][0]
-    neutrals = [word for word, _ in shuffled[TARGET_COUNT + BOMB_COUNT:]]
-    return targets, neutrals, bomb
-
-
 def setup_new_round():
     word_type = get_word_type_for_round(st.session_state.round)
     role = get_role_for_round(st.session_state.round)
-    board, targets, neutrals, bomb, word_roles = sample_words_no_replacement(word_type)
+    board, targets, neutrals, bomb, word_roles = sample_fixed_round_words(
+        st.session_state.round
+    )
 
     st.session_state.word_type = word_type
     st.session_state.role = role
@@ -131,6 +67,7 @@ def setup_new_round():
     st.session_state.hint = ""
     st.session_state.hint_number = 1
     st.session_state.hint_targets = []
+    st.session_state.hint_explanation = ""
     st.session_state.last_ai_guesses = []
     st.session_state.last_ai_hint = ""
     st.session_state.perception_rating = 3
@@ -145,6 +82,7 @@ def setup_new_round():
     st.session_state.round_bomb_hit = False
     st.session_state.ai_round_reflection = ""
     st.session_state.human_round_feedback = ""
+    st.session_state.pending_hint_meta = None
 
 
 def get_medal_for_round(interactions, success, bomb_hit):
@@ -174,8 +112,15 @@ def record_interaction(
     hint_number,
     guesses,
     intended_targets=None,
+    hint_explanation="",
     ai_understanding_rating_before=None,
     ai_understanding_rating_after=None,
+    hint_raw_response="",
+    hint_response_time_sec=None,
+    hint_attempts=None,
+    hint_used_fallback=False,
+    guess_raw_response="",
+    guess_response_time_sec=None,
 ):
     intended_targets = intended_targets or []
     normalized_hint = hint.strip().lower()
@@ -212,6 +157,7 @@ def record_interaction(
             "hint": normalized_hint,
             "hint_number": hint_number,
             "intended_targets": intended_targets,
+            "hint_explanation": hint_explanation,
             "guesses": guesses,
             "correct": bool(correct_guesses),
             "correct_guesses": correct_guesses,
@@ -221,6 +167,13 @@ def record_interaction(
             "outcome": outcome,
             "ai_understanding_rating_before": ai_understanding_rating_before,
             "ai_understanding_rating_after": ai_understanding_rating_after,
+            "hint_raw_response": hint_raw_response,
+            "hint_response_time_sec": hint_response_time_sec,
+            "hint_attempts": hint_attempts,
+            "hint_used_fallback": bool(hint_used_fallback),
+            "guess_raw_response": guess_raw_response,
+            "guess_response_time_sec": guess_response_time_sec,
+            "recorded_at": datetime.utcnow().isoformat(),
         }
     )
 
@@ -239,7 +192,19 @@ def can_skip_current_clue():
     )
 
 
-def record_skip(hint, hint_number, intended_targets=None, skipped_by=None):
+def record_skip(
+    hint,
+    hint_number,
+    intended_targets=None,
+    hint_explanation="",
+    skipped_by=None,
+    hint_raw_response="",
+    hint_response_time_sec=None,
+    hint_attempts=None,
+    hint_used_fallback=False,
+    guess_raw_response="",
+    guess_response_time_sec=None,
+):
     intended_targets = intended_targets or []
     normalized_hint = hint.strip().lower()
     clue_giver = "human" if st.session_state.role == "human_clue" else "ai"
@@ -258,6 +223,7 @@ def record_skip(hint, hint_number, intended_targets=None, skipped_by=None):
             "hint": normalized_hint,
             "hint_number": hint_number,
             "intended_targets": intended_targets,
+            "hint_explanation": hint_explanation,
             "guesses": [],
             "correct": False,
             "correct_guesses": [],
@@ -269,6 +235,13 @@ def record_skip(hint, hint_number, intended_targets=None, skipped_by=None):
             "skipped_by": skipped_by,
             "ai_understanding_rating_before": None,
             "ai_understanding_rating_after": None,
+            "hint_raw_response": hint_raw_response,
+            "hint_response_time_sec": hint_response_time_sec,
+            "hint_attempts": hint_attempts,
+            "hint_used_fallback": bool(hint_used_fallback),
+            "guess_raw_response": guess_raw_response,
+            "guess_response_time_sec": guess_response_time_sec,
+            "recorded_at": datetime.utcnow().isoformat(),
         }
     )
 
@@ -319,6 +292,7 @@ def append_ai_round_summary():
                     "hint": item.get("hint"),
                     "hint_number": item.get("hint_number"),
                     "intended_targets": list(item.get("intended_targets", [])),
+                    "hint_explanation": item.get("hint_explanation", ""),
                     "guesses": list(item.get("guesses", [])),
                     "correct_guesses": list(item.get("correct_guesses", [])),
                     "neutral_guesses": list(item.get("neutral_guesses", [])),

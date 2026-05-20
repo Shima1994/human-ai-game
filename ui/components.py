@@ -41,9 +41,9 @@ def render_app_header():
     st.markdown(
         """
         <div class="hero">
-                <div class="hero-title">Human-AI Cooperative Word Game</div>
-                <p class="hero-subtitle">Give smart clues, connect as many safe target cards as you can, and avoid the bomb card.</p>
-                <div class="hero-badge-row">
+            <div class="hero-title">Human-AI Cooperative Word Game</div>
+            <p class="hero-subtitle">Give smart clues, connect as many safe target cards as you can, and avoid the bomb card.</p>
+            <div class="hero-badge-row">
                 <div class="hero-badge">4 rounds</div>
                 <div class="hero-badge">Alternating turns</div>
                 <div class="hero-badge">Medals</div>
@@ -66,7 +66,7 @@ def render_top_status():
         f"""
         <div class="top-status-shell">
             <div class="top-status">
-                <div class="status-pill"><div class="status-label">Player</div><div class="status-value">{player_name}</div></div>
+                <div class="status-pill"><div class="status-label">Player</div><div class="status-value">{escape(str(player_name))}</div></div>
                 <div class="status-pill"><div class="status-label">Round</div><div class="status-value">{st.session_state.round} / {N_ROUNDS}</div></div>
                 <div class="status-pill medal-pill"><div class="status-label">Medals</div><div class="status-value medal-row"><span class="medal gold">&#129351; {medals.get("gold", 0)}</span><span class="medal silver">&#129352; {medals.get("silver", 0)}</span><span class="medal bronze">&#129353; {medals.get("bronze", 0)}</span></div></div>
                 <div class="status-pill"><div class="status-label">Target words</div><div class="status-value">{found} / {TARGET_COUNT}</div></div>
@@ -82,7 +82,7 @@ def render_top_status():
 
 def render_round_chip(text):
     st.markdown(
-        f"<div class='round-chip'>{text}</div>",
+        f"<div class='round-chip'>{escape(text)}</div>",
         unsafe_allow_html=True,
     )
 
@@ -99,7 +99,7 @@ def _render_static_card(word, role, revealed, guessed=False):
         mark = f"<div class='card-mark'>{ROLE_MARK.get(role, '')}</div>"
 
     st.markdown(
-        f"<div class='word-card {css_class}{selected_class}'><div>{word}</div>{mark}</div>",
+        f"<div class='word-card {css_class}{selected_class}'><div>{escape(str(word))}</div>{mark}</div>",
         unsafe_allow_html=True,
     )
 
@@ -147,15 +147,14 @@ def render_board_legend():
 
 
 def render_hint_panel(current_hint, hint_number, previous_hint=None):
-    chips = [f"<div class='hint-chip'>{hint_number} guesses</div>"]
-    chips_html = "".join(chips)
-    chips_section = f"<div class=\"hint-chip-row\">{chips_html}</div>" if chips_html else ""
+    chips_html = f"<div class='hint-chip'>{hint_number} guesses</div>"
+    chips_section = f"<div class=\"hint-chip-row\">{chips_html}</div>"
 
     st.markdown(
         f"""
         <div class="hint-card">
             <div class="hint-label">AI clue</div>
-            <div class="hint-main">{current_hint.upper()}</div>
+            <div class="hint-main">{escape(current_hint.upper())}</div>
             {chips_section}
         </div>
         """,

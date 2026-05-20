@@ -1,0 +1,19 @@
+session_id,timestamp_utc,participant_id,round,role,word_type,board,targets,bomb,neutral_words,clues_used,guesses,turns,skips,targets_found,any_target_correct,all_targets_found,bomb_hit,medal,score_change,round_duration_sec,perception_rating_end,ai_round_reflection,human_round_feedback
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,Shoe;Tower;Ship;Fork;Theater;Shell;Chair;Elevator;Police;Chocolate;Ball;Sea;King;Ice;Penguin,Tower;Chocolate;Ship;Police;Elevator,Shell,Penguin;Ball;Fork;Sea;Ice;Shoe;Theater;King;Chair,high;pirate;pirates;boat,Tower;Elevator;Shoe;Ice;Theater;Penguin;Police,4,0,3,1,0,0,none,0,239.216,1,"In this round, I noticed that your first clue ""high"" perfectly led me to guess both Tower and Elevator, as both are commonly associated with height. That was a great start!
+
+However, I struggled with the ""pirate"" and ""pirates"" clues. I didn't connect these to Ship and Police. Instead, I mistakenly guessed Shoe, Ice, Theater, and Penguin. The association with pirates might have been too broad for me, as I didn't link pirates directly to ships or law enforcement (police). I was likely distracted by thematic or narrative elements that felt pirate-like, such as a theater setting or penguin (thinking of animated pirate movies).
+
+When you shifted to ""boat,"" I correctly guessed Police, which was unexpected. This might have been due to thinking of police boats, but it wasn't the intended target.
+
+For the next round, let's try to use more direct or specific associations for each word, especially when dealing with broad themes like ""pirate."" This can help me make clearer connections to the intended targets. Looking forward to our next game!",
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,Relocation;Year;Customs;Point;Blue;Intent;Illness;Means;Bond;Resolution;Source;Association;Time;Good;Game,Means;Source;Customs;Association;Point,Year,Time;Illness;Blue;Resolution;Relocation;Game;Bond;Intent;Good,connection;origin;tradition;purpose,Association;Intent;Source;Good;Customs;Relocation;Means;Bond,4,0,4,1,0,0,none,0,127.142,3,"This round was a bit challenging, but we managed to avoid the bomb, which is great! Here's a breakdown of the clues:
+
+1. **Connection**: I aimed for ""Association"" and ""Source,"" thinking of how connections can be both relationships and origins. You picked ""Association"" correctly, but ""Intent"" was a bit of a stretch. Perhaps ""Intent"" felt like a connection in terms of purpose.
+
+2. **Origin**: I intended this for ""Means"" and ""Source,"" as both relate to beginnings or causes. You got ""Source,"" but ""Good"" might have seemed like a positive origin.
+
+3. **Tradition**: This was meant for ""Means"" and ""Customs,"" thinking of traditional practices. You correctly chose ""Customs,"" but ""Relocation"" might have seemed like a tradition of moving or migration.
+
+4. **Purpose**: I aimed for ""Means"" and ""Point,"" as both relate to reasons or goals. You got ""Means,"" but ""Bond"" might have seemed like a purpose in terms of relationships.
+
+Next time, let's focus on using more specific or unique clues to avoid overlaps with neutral words. This might help us pinpoint targets more accurately. Looking forward to our next round!",

@@ -1,0 +1,47 @@
+session_id,timestamp_utc,participant_id,round,role,word_type,turn,clue_giver,guesser,hint,hint_number,intended_targets,hint_explanation,guesses,correct_guesses,missed_intended_targets,extra_correct_guesses,neutral_guesses,bomb_guess,outcome,skipped,skipped_by,bomb_hit,round_medal,round_success,ai_understanding_rating_before,ai_understanding_rating_after,hint_response_time_sec,hint_attempts,hint_used_fallback,guess_response_time_sec,hint_raw_response,guess_raw_response,interaction_recorded_at
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,1,human,ai,high,2,Tower;Elevator,,Tower;Elevator,Tower;Elevator,,,,,correct,0,,0,none,0,5,5,,,0,2.782,,"{
+  ""reasoning"": ""The word 'high' is commonly associated with 'Tower' as towers are tall structures. 'Elevator' is also linked to 'high' because elevators are used to reach high floors in buildings."",
+  ""guesses"": [""Tower"", ""Elevator""]
+}",2026-05-20T22:28:25.689589
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,2,human,ai,pirate,2,Ship;Police,,Shoe;Ice,,Ship;Police,,Shoe;Ice,,wrong,0,,0,none,0,4,1,,,0,1.935,,"```json
+{
+  ""reasoning"": ""Pirates are commonly associated with the sea, as they are known for sailing and raiding ships. Additionally, pirates are often depicted on ships, making 'Ship' a strong association with the clue."",
+  ""guesses"": [""Sea"", ""Ship""]
+}
+```",2026-05-20T22:29:26.141510
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,3,human,ai,pirates,2,Ship;Police,,Theater;Penguin,,Ship;Police,,Theater;Penguin,,wrong,0,,0,none,0,4,1,,,0,1.415,,"```json
+{
+  ""reasoning"": ""Pirates are commonly associated with ships, as they are known for sailing and attacking other vessels. Police could be linked to pirates as they represent law enforcement, which would pursue pirates."",
+  ""guesses"": [""Ship"", ""Police""]
+}
+```",2026-05-20T22:30:28.797823
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,4,human,ai,boat,1,Ship,,Police,Police,Ship,Police,,,correct,0,,0,none,0,4,1,,,0,1.428,,"```json
+{
+  ""reasoning"": ""The clue 'boat' directly relates to 'Ship' as boats and ships are both watercraft. This is a strong, everyday association."",
+  ""guesses"": [""Ship""]
+}
+```",2026-05-20T22:30:46.770907
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,1,ai,human,connection,2,Association;Source,"The clue 'connection' links 'Association' and 'Source' as both can involve connections in different contexts. 'Association' is directly related to forming connections between entities or ideas, while 'Source' can be the origin or connection point of information or resources. The bomb word 'Year' is not connected to 'connection' as it doesn't imply a linkage or origin point. Neutrals such as",Association;Intent,Association,Source,,Intent,,correct,0,,0,none,0,,,2.817,1,0,,"{
+  ""reasoning"": ""The clue 'connection' links 'Association' and 'Source' as both can involve connections in different contexts. 'Association' is directly related to forming connections between entities or ideas, while 'Source' can be the origin or connection point of information or resources. The bomb word 'Year' is not connected to 'connection' as it doesn't imply a linkage or origin point. Neutrals such as 'Time', 'Illness', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', and 'Good' don't fit well with 'connection' as they do not primarily signify a linking or origin concept."",
+  ""clue"": ""connection"",
+  ""number"": 2,
+  ""targets"": [""Association"", ""Source""]
+}",,2026-05-20T22:31:58.786936
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,2,ai,human,origin,2,Means;Source,"The clue 'origin' connects 'Means' and 'Source' as both can be understood as starting points or origins of something. 'Origin' does not relate to any neutral words like 'Time', 'Illness', 'Blue', etc., and it is not associated with 'Year', which is the bomb.",Source;Good,Source,Means,,Good,,correct,0,,0,none,0,,,1.397,1,0,,"{
+  ""reasoning"": ""The clue 'origin' connects 'Means' and 'Source' as both can be understood as starting points or origins of something. 'Origin' does not relate to any neutral words like 'Time', 'Illness', 'Blue', etc., and it is not associated with 'Year', which is the bomb."",
+  ""clue"": ""origin"",
+  ""number"": 2,
+  ""targets"": [""Means"", ""Source""]
+}",,2026-05-20T22:32:14.771943
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,3,ai,human,tradition,2,Means;Customs,"The clue 'tradition' links 'Means' and 'Customs' as both relate to established ways of doing things and cultural practices. 'Tradition' does not connect to 'Point', which is more about specific locations or arguments. The bomb word 'Year' is not directly associated with 'tradition', as traditions are not bound to specific years. Neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond',",Customs;Relocation,Customs,Means,,Relocation,,correct,0,,0,none,0,,,3.064,1,0,,"{
+  ""reasoning"": ""The clue 'tradition' links 'Means' and 'Customs' as both relate to established ways of doing things and cultural practices. 'Tradition' does not connect to 'Point', which is more about specific locations or arguments. The bomb word 'Year' is not directly associated with 'tradition', as traditions are not bound to specific years. Neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', and 'Good' do not have a strong association with 'tradition', ensuring safe guesses."",
+  ""clue"": ""tradition"",
+  ""number"": 2,
+  ""targets"": [""Means"", ""Customs""]
+}",,2026-05-20T22:32:36.946871
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,4,ai,human,purpose,2,Means;Point,"The clue 'purpose' links the targets 'Means' and 'Point' as both refer to the reason or intention behind an action or concept. None of the neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', or 'Good', nor the bomb 'Year', directly connect to 'purpose' as they do not specifically denote a reason or intention in the same abstract sense.",Means;Bond,Means,Point,,Bond,,correct,0,,0,none,0,,,1.931,1,0,,"{
+  ""reasoning"": ""The clue 'purpose' links the targets 'Means' and 'Point' as both refer to the reason or intention behind an action or concept. None of the neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', or 'Good', nor the bomb 'Year', directly connect to 'purpose' as they do not specifically denote a reason or intention in the same abstract sense."",
+  ""clue"": ""purpose"",
+  ""number"": 2,
+  ""targets"": [""Means"", ""Point""]
+}",,2026-05-20T22:33:15.314422

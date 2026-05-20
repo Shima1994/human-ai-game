@@ -1,11 +1,18 @@
-import random
 import json
+import random
 import re
+import time
 
 import streamlit as st
 from openai import OpenAI
 
-from core.constants import MAX_HINT_NUMBER, MODEL_NAME, TARGET_COUNT
+from core.constants import (
+    GUESS_MODEL_NAME,
+    HINT_MODEL_NAME,
+    MAX_HINT_NUMBER,
+    REFLECTION_MODEL_NAME,
+    TARGET_COUNT,
+)
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
@@ -45,16 +52,30 @@ FALLBACK_HINTS = [
 ]
 
 
-def call_openai_chat(system_prompt, user_prompt, temperature=0.4):
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
+def call_openai_chat(
+    system_prompt,
+    user_prompt,
+    *,
+    temperature=0.4,
+    model=None,
+    json_mode=False,
+):
+    kwargs = {
+        "model": model or HINT_MODEL_NAME,
+        "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=temperature,
-    )
-    return response.choices[0].message.content.strip()
+        "temperature": temperature,
+    }
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
+
+    start = time.perf_counter()
+    response = client.chat.completions.create(**kwargs)
+    elapsed = time.perf_counter() - start
+    text = (response.choices[0].message.content or "").strip()
+    return text, elapsed
 
 
 def limit_words(text, max_words=200):
@@ -95,51 +116,6 @@ def is_hint_too_close_to_board(hint, board_words):
     return False
 
 
-def parse_hint(raw_text, fallback_n):
-    cleaned = raw_text.strip()
-    if "|" in cleaned:
-        hint, raw_number = cleaned.split("|", 1)
-    else:
-        return "", fallback_n
-
-    hint = hint.strip().lower()
-    if not re.fullmatch(r"[a-z-]+", hint):
-        hint = ""
-    hint = re.sub(r"[^A-Za-z-]", "", hint).lower()
-    if not hint:
-        hint = "bridge"
-
-    try:
-        hint_number = int(re.findall(r"\d+", raw_number)[0])
-    except IndexError:
-        hint_number = fallback_n
-    except ValueError:
-        hint_number = fallback_n
-
-    hint_number = max(1, min(MAX_HINT_NUMBER, hint_number))
-    return hint, hint_number
-
-
-def parse_hint_with_targets(raw_text, fallback_n, remaining_targets):
-    cleaned = raw_text.strip()
-    parts = [part.strip() for part in cleaned.split("|")]
-    if len(parts) < 3:
-        hint, hint_number = parse_hint(cleaned, fallback_n)
-        return hint, hint_number, []
-
-    hint, hint_number = parse_hint("|".join(parts[:2]), fallback_n)
-    lookup = {word.lower(): word for word in remaining_targets}
-    intended_targets = []
-    seen = set()
-    for raw_word in parts[2].split(","):
-        word_key = raw_word.strip().lower()
-        if word_key in lookup and word_key not in seen:
-            intended_targets.append(lookup[word_key])
-            seen.add(word_key)
-
-    return hint, hint_number, intended_targets[:hint_number]
-
-
 def remaining_target_count(target_words, history):
     found_targets = {
         guess
@@ -158,30 +134,43 @@ def format_interaction_history(history):
         guesses = ", ".join(item.get("guesses", [])) or "none"
         correct_guesses = ", ".join(item.get("correct_guesses", [])) or "none"
         if item.get("bomb_hit"):
-            outcome = "bomb hit"
+            outcome = "BOMB HIT"
         elif item.get("outcome") == "skip" or item.get("skipped"):
             outcome = f"skipped by {item.get('skipped_by') or item.get('guesser') or 'guesser'}"
         elif item.get("correct"):
-            outcome = "correct"
+            outcome = "at least one target correct"
         else:
-            outcome = "incorrect"
+            outcome = "no targets found"
         lines.append(
-            f"{index}. hint={item.get('hint', '')} | number={item.get('hint_number', '')} | "
-            f"intended={', '.join(item.get('intended_targets', [])) or 'none'} | guesses={guesses} | "
-            f"correct={correct_guesses} | outcome={outcome}"
+            f"Turn {index} | clue_giver={item.get('clue_giver', '')} | guesser={item.get('guesser', '')} | "
+            f"clue=\"{item.get('hint', '')}\" N={item.get('hint_number', '')} | "
+            f"intended=[{', '.join(item.get('intended_targets', [])) or 'none'}] | "
+            f"guessed=[{guesses}] | correct=[{correct_guesses}] | outcome={outcome}"
         )
     return "\n".join(lines)
 
 
 def format_round_memory(round_summaries):
     if not round_summaries:
-        return "No previous round summaries yet."
+        return "No previous rounds yet."
 
     lines = []
     for summary in round_summaries:
-        interactions = []
-        for item in summary.get("interactions", []):
-            interactions.append(
+        compact = {
+            "round": summary.get("round"),
+            "role": summary.get("role"),
+            "word_type": summary.get("word_type"),
+            "medal": summary.get("medal"),
+            "success": summary.get("success"),
+            "bomb_hit": summary.get("bomb_hit"),
+            "turns": summary.get("turns"),
+            "targets": summary.get("targets", []),
+            "bomb": summary.get("bomb"),
+            "found_targets": summary.get("found_targets", []),
+            "skips": summary.get("skips", 0),
+            "ai_reflection": summary.get("ai_reflection", ""),
+            "human_feedback": summary.get("human_feedback", ""),
+            "interactions": [
                 {
                     "turn": item.get("turn"),
                     "clue_giver": item.get("clue_giver"),
@@ -195,32 +184,11 @@ def format_round_memory(round_summaries):
                     "bomb_guess": item.get("bomb_guess"),
                     "outcome": item.get("outcome"),
                     "skipped": item.get("skipped", False),
-                    "skipped_by": item.get("skipped_by"),
-                    "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
-                    "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
                 }
-            )
-        lines.append(
-            json.dumps(
-                {
-                    "round": summary.get("round"),
-                    "role": summary.get("role"),
-                    "word_type": summary.get("word_type"),
-                    "medal": summary.get("medal"),
-                    "success": summary.get("success"),
-                    "bomb_hit": summary.get("bomb_hit"),
-                    "turns": summary.get("turns"),
-                    "targets": summary.get("targets", []),
-                    "bomb": summary.get("bomb"),
-                    "found_targets": summary.get("found_targets", []),
-                    "skips": summary.get("skips", 0),
-                    "ai_reflection": summary.get("ai_reflection", ""),
-                    "human_feedback": summary.get("human_feedback", ""),
-                    "interactions": interactions,
-                },
-                ensure_ascii=False,
-            )
-        )
+                for item in summary.get("interactions", [])
+            ],
+        }
+        lines.append(json.dumps(compact, ensure_ascii=False))
     return "\n".join(lines)
 
 
@@ -232,37 +200,39 @@ def previous_hints(history):
     ]
 
 
-def build_hint_system_prompt(history=None, used_hints=None):
-    history = history or []
-    used_hints = sorted(set(previous_hints(history) + (used_hints or [])))
-    used_hints_clause = ""
-    if used_hints:
-        used_hints_clause = (
-            f"9) Do not repeat any previous clue: {', '.join(used_hints)}.\n"
-            "10) If a previous clue failed, avoid that association and choose a clearer one.\n"
-        )
+HINT_SYSTEM_PROMPT = """You are an expert clue-giver in a cooperative Codenames-style word game. You are partnered with one human teammate. Your shared goal is to find all target words quickly without picking the bomb.
 
-    return (
-        "You are the AI clue-giver in a cooperative Codenames-like word game.\n"
-        "You are trying to help your human teammate earn the best possible medal.\n"
-        f"There are {TARGET_COUNT} target words and one bomb word.\n"
-        "Your job is to act like a thoughtful human teammate: give one natural clue word that "
-        "points toward the largest safe cluster of remaining target words.\n"
-        "Before choosing the clue, inspect every board word: all remaining targets, every neutral, "
-        "and the bomb. Prefer a clue that is far from the bomb and does not directly suggest any "
-        "neutral word, so the human can score more safely.\n\n"
-        "Hard rules:\n"
-        "1) Output exactly in the format HINT|N|target1,target2.\n"
-        "2) HINT must be exactly one single English word.\n"
-        "3) Never use any board word or any obvious morphological form of a board word.\n"
-        "4) N must match the number of intended target words after the second pipe.\n"
-        "5) The intended target words must be remaining target words only.\n"
-        "6) Avoid clues that are semantically close to the bomb or that strongly fit a neutral word.\n"
-        "7) Choose a clue that is helpful, human-like, and not too obscure.\n"
-        "8) Use the interaction history. Avoid repeating failed associations and build on successful ones.\n"
-        f"{used_hints_clause}"
-        "Do not explain. Do not add extra text outside the required pipe-separated format."
-    )
+GAME RULES
+- The board has 15 cards. Hidden roles: 5 targets (good), 1 bomb (round-ending), 9 neutrals (safe but wrong).
+- You output one English clue word and a number N. Your teammate then guesses N words from the board.
+- The clue word must NOT appear on the board and must NOT be a morphological variant (no plural / verb-form / spelling trick).
+- A great clue links 2 or 3 targets through one vivid, everyday association that any literate adult would recognize instantly.
+
+HOW TO PICK A GREAT CLUE (think like a thoughtful human teammate)
+1. Scan the remaining targets and group them into candidate clusters. Look for shared categories (animals, sports, kitchen), idioms ("breaking the ice"), famous pairings ("salt and pepper"), sensory imagery, or cultural archetypes.
+2. For each candidate clue, mentally test it against EVERY neutral and the BOMB.
+   - If the clue could reasonably point at a neutral, the teammate will probably pick that neutral. Lower N or pick a safer clue.
+   - If the clue has ANY plausible link to the bomb, throw it away.
+3. Prefer concrete, common, mainstream associations over clever or obscure ones. Your teammate is human and short on time.
+4. Aim for the largest safe cluster. But a confident N=2 always beats a shaky N=4.
+5. Avoid being a simple synonym of a single target. Reach for a richer concept that bridges multiple targets.
+6. Use the round history. If a previous clue confused the teammate, do not reuse the same association style; switch angle. If a clue worked well, build on what they understood.
+7. Never use the same clue word twice in a round.
+
+OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
+{
+  "reasoning": "<one or two short sentences: which targets you chose, what the link is, and why the bomb and neutrals are not at risk>",
+  "clue": "<one lowercase English word, letters only; a hyphen is allowed only in idiomatic compounds>",
+  "number": <integer between 1 and 5>,
+  "targets": ["<exact remaining target word as spelled in the input>", "..."]
+}
+
+CONSTRAINTS
+- "number" must equal the length of "targets".
+- "targets" must be a subset of the remaining target words listed in the user message.
+- "clue" must not appear on the board nor be a morphological variant.
+- "reasoning" is logged for research analysis and is NEVER shown to the player during gameplay.
+"""
 
 
 def build_hint_user_prompt(
@@ -272,6 +242,8 @@ def build_hint_user_prompt(
     word_type,
     history,
     round_summaries=None,
+    used_hints=None,
+    forbidden_hint=None,
 ):
     found_targets = {
         guess
@@ -279,30 +251,168 @@ def build_hint_user_prompt(
         for guess in item.get("correct_guesses", [])
     }
     remaining_targets = [word for word in target_words if word not in found_targets]
+    all_used = sorted(set(previous_hints(history) + (used_hints or [])))
+    if forbidden_hint:
+        all_used = sorted(set(all_used + [forbidden_hint.lower()]))
+
+    forbidden_block = ", ".join(all_used) if all_used else "(none)"
     return (
-        f"Word type: {word_type}\n"
-        f"Remaining target words: {', '.join(remaining_targets)}\n"
-        f"Already found targets: {', '.join(found_targets) or 'none'}\n"
-        f"Neutral words: {', '.join(neutral_words)}\n"
-        f"Bomb word: {bomb_word}\n\n"
-        "Safety check before answering: compare your candidate clue against each neutral word and the bomb. "
-        "If the clue also points strongly to a neutral or the bomb, choose a safer clue or a smaller N.\n\n"
-        f"Previous round summaries for learning:\n{format_round_memory(round_summaries or [])}\n\n"
-        f"Interaction history this round:\n{format_interaction_history(history)}\n\n"
-        "Based on previous hints, guesses, successes, and failures, give a better clue for the "
-        "remaining targets."
+        f"Word type for this round: {word_type}\n"
+        f"Remaining target words (you must aim only at these): {', '.join(remaining_targets) or '(none)'}\n"
+        f"Targets already found this round: {', '.join(found_targets) or '(none)'}\n"
+        f"Neutral words (AVOID — your clue must not fit these): {', '.join(neutral_words)}\n"
+        f"BOMB word (NEVER let your clue fit this): {bomb_word}\n\n"
+        f"Forbidden clue words (already used this round, do not repeat): {forbidden_block}\n\n"
+        "Interaction history so far this round (use it to learn what your teammate understood and what they missed):\n"
+        f"{format_interaction_history(history)}\n\n"
+        "Memory from previous rounds in this game:\n"
+        f"{format_round_memory(round_summaries or [])}\n\n"
+        "Produce the best one-word clue you can, then explain (in the reasoning field) the link and why each neutral and the bomb are safe. Respond with the JSON object only."
     )
 
 
-def choose_fallback_hint(used_hints):
+def parse_hint_json(raw_text, fallback_n, remaining_targets):
+    try:
+        data = json.loads(raw_text)
+    except (json.JSONDecodeError, TypeError):
+        return "", fallback_n, [], ""
+
+    if not isinstance(data, dict):
+        return "", fallback_n, [], ""
+
+    clue_raw = str(data.get("clue", "") or "").strip().lower()
+    clue = re.sub(r"[^a-z-]", "", clue_raw)
+    if clue and not re.fullmatch(r"[a-z]+(-[a-z]+)*", clue):
+        clue = ""
+
+    try:
+        hint_number = int(data.get("number", fallback_n))
+    except (TypeError, ValueError):
+        hint_number = fallback_n
+    hint_number = max(1, min(MAX_HINT_NUMBER, hint_number))
+
+    target_lookup = {word.lower(): word for word in remaining_targets}
+    raw_targets = data.get("targets", []) or []
+    if not isinstance(raw_targets, list):
+        raw_targets = []
+
+    intended_targets = []
+    seen = set()
+    for value in raw_targets:
+        key = str(value).strip().lower()
+        if key in target_lookup and key not in seen:
+            intended_targets.append(target_lookup[key])
+            seen.add(key)
+
+    explanation = str(data.get("reasoning", "") or "").strip()
+    explanation = limit_words(explanation, 60)
+
+    return clue, hint_number, intended_targets, explanation
+
+
+def choose_fallback_hint(used_hints, board_words=None):
     used_hint_set = set(used_hints or [])
+    board_words = board_words or []
     for hint in FALLBACK_HINTS:
-        if hint not in used_hint_set:
+        if hint not in used_hint_set and not is_hint_too_close_to_board(hint, board_words):
             return hint
     for hint in ["marker", "north", "south", "east", "west"]:
-        if hint not in used_hint_set:
+        if hint not in used_hint_set and not is_hint_too_close_to_board(hint, board_words):
             return hint
     return "signal"
+
+
+def _empty_ai_call_meta():
+    return {"raw_response": "", "response_time_sec": 0.0, "attempts": 0}
+
+
+def _generate_hint_with_forbidden(
+    target_words,
+    bomb_word,
+    neutral_words,
+    word_type,
+    history,
+    used_hints,
+    round_summaries,
+    forbidden_hint=None,
+    fallback_size_cap=2,
+):
+    used_hint_set = set(previous_hints(history) + (used_hints or []))
+    if forbidden_hint:
+        used_hint_set.add(forbidden_hint.lower())
+    board_words = target_words + neutral_words + [bomb_word]
+    fallback_number = remaining_target_count(target_words, history)
+    found_targets = {
+        guess
+        for item in history
+        for guess in item.get("correct_guesses", [])
+    }
+    remaining_targets = [word for word in target_words if word not in found_targets]
+
+    last_raw = ""
+    total_time = 0.0
+    attempts = 0
+    for _ in range(3):
+        attempts += 1
+        try:
+            raw, elapsed = call_openai_chat(
+                HINT_SYSTEM_PROMPT,
+                build_hint_user_prompt(
+                    target_words,
+                    bomb_word,
+                    neutral_words,
+                    word_type,
+                    history,
+                    round_summaries,
+                    used_hints,
+                    forbidden_hint,
+                ),
+                temperature=0.55,
+                model=HINT_MODEL_NAME,
+                json_mode=True,
+            )
+        except Exception as error:
+            last_raw = f"<api_error: {error}>"
+            total_time += 0.0
+            continue
+
+        last_raw = raw
+        total_time += elapsed
+        hint, hint_number, intended_targets, explanation = parse_hint_json(
+            raw, fallback_number, remaining_targets
+        )
+        if not intended_targets:
+            intended_targets = remaining_targets[:hint_number]
+        hint_number = min(hint_number, len(intended_targets), fallback_number)
+        intended_targets = intended_targets[:hint_number]
+        if (
+            hint
+            and hint not in used_hint_set
+            and not is_hint_too_close_to_board(hint, board_words)
+            and intended_targets
+        ):
+            return {
+                "hint": hint,
+                "hint_number": hint_number,
+                "intended_targets": intended_targets,
+                "explanation": explanation,
+                "raw_response": last_raw,
+                "response_time_sec": round(total_time, 3),
+                "attempts": attempts,
+                "used_fallback": False,
+            }
+
+    fallback_targets = remaining_targets[: min(fallback_size_cap, fallback_number)]
+    return {
+        "hint": choose_fallback_hint(used_hint_set, board_words),
+        "hint_number": max(1, len(fallback_targets)),
+        "intended_targets": fallback_targets,
+        "explanation": "Fallback clue selected because the model did not return a usable JSON clue after retries.",
+        "raw_response": last_raw,
+        "response_time_sec": round(total_time, 3),
+        "attempts": attempts,
+        "used_fallback": True,
+    }
 
 
 def generate_ai_hint(
@@ -314,46 +424,17 @@ def generate_ai_hint(
     used_hints=None,
     round_summaries=None,
 ):
-    history = history or []
-    used_hints = used_hints or []
-    used_hint_set = set(previous_hints(history) + used_hints)
-    board_words = target_words + neutral_words + [bomb_word]
-    fallback_number = remaining_target_count(target_words, history)
-    found_targets = {
-        guess
-        for item in history
-        for guess in item.get("correct_guesses", [])
-    }
-    remaining_targets = [word for word in target_words if word not in found_targets]
-
-    for _ in range(3):
-        raw = call_openai_chat(
-            build_hint_system_prompt(history, used_hints),
-            build_hint_user_prompt(
-                target_words,
-                bomb_word,
-                neutral_words,
-                word_type,
-                history,
-                round_summaries,
-            ),
-        )
-        hint, hint_number, intended_targets = parse_hint_with_targets(
-            raw, fallback_number, remaining_targets
-        )
-        if not intended_targets:
-            intended_targets = remaining_targets[:hint_number]
-        hint_number = min(hint_number, len(intended_targets), fallback_number)
-        intended_targets = intended_targets[:hint_number]
-        if (
-            hint
-            and hint not in used_hint_set
-            and not is_hint_too_close_to_board(hint, board_words)
-        ):
-            return hint, hint_number, intended_targets
-
-    fallback_targets = remaining_targets[: min(2, fallback_number)]
-    return choose_fallback_hint(used_hint_set), len(fallback_targets), fallback_targets
+    return _generate_hint_with_forbidden(
+        target_words,
+        bomb_word,
+        neutral_words,
+        word_type,
+        history or [],
+        used_hints or [],
+        round_summaries or [],
+        forbidden_hint=None,
+        fallback_size_cap=2,
+    )
 
 
 def generate_ai_hint_reroll(
@@ -366,46 +447,131 @@ def generate_ai_hint_reroll(
     used_hints=None,
     round_summaries=None,
 ):
-    history = history or []
-    used_hints = used_hints or []
-    used_hint_set = set(previous_hints(history) + used_hints + [previous_hint])
-    board_words = target_words + neutral_words + [bomb_word]
-    fallback_number = remaining_target_count(target_words, history)
-    found_targets = {
-        guess
-        for item in history
-        for guess in item.get("correct_guesses", [])
-    }
-    remaining_targets = [word for word in target_words if word not in found_targets]
+    return _generate_hint_with_forbidden(
+        target_words,
+        bomb_word,
+        neutral_words,
+        word_type,
+        history or [],
+        used_hints or [],
+        round_summaries or [],
+        forbidden_hint=previous_hint,
+        fallback_size_cap=1,
+    )
 
-    for _ in range(3):
-        raw = call_openai_chat(
-            build_hint_system_prompt(history + [{"hint": previous_hint}], used_hints),
-            build_hint_user_prompt(
-                target_words,
-                bomb_word,
-                neutral_words,
-                word_type,
-                history,
-                round_summaries,
-            ),
-        )
-        hint, hint_number, intended_targets = parse_hint_with_targets(
-            raw, fallback_number, remaining_targets
-        )
-        if not intended_targets:
-            intended_targets = remaining_targets[:hint_number]
-        hint_number = min(hint_number, len(intended_targets), fallback_number)
-        intended_targets = intended_targets[:hint_number]
-        if (
-            hint
-            and hint not in used_hint_set
-            and not is_hint_too_close_to_board(hint, board_words)
-        ):
-            return hint, hint_number, intended_targets
 
-    fallback_targets = remaining_targets[: min(1, fallback_number)]
-    return choose_fallback_hint(used_hint_set), len(fallback_targets), fallback_targets
+GUESS_SYSTEM_PROMPT = """You are an expert semantic guesser in a cooperative Codenames-style word game. Your human teammate just gave you a clue word and a number N. Your job: pick exactly N words from the available board that a normal human would most likely mean.
+
+GAME RULES
+- The board has 15 words. Some are good targets, some are neutral (safe but wrong), one is a bomb (round-ending).
+- You only see the clue and the words — never the hidden roles.
+- Hitting the bomb ends the round with zero points.
+
+HOW TO PICK GREAT GUESSES
+1. First translate the clue into its most ordinary meaning, including common non-English clues if obvious. For example, Persian "دزد دریایی" means pirate.
+2. For EVERY available board word, mentally score the association from 0 to 5:
+   - 5 = direct, iconic, or definitional link (pirate -> Ship, treasure -> Gold)
+   - 4 = strong everyday category, setting, tool, role, or famous pairing
+   - 3 = plausible but secondary link
+   - 0-2 = weak, punny, obscure, spelling-based, or only connected by a forced story
+3. Pick exactly N words with the highest scores. Order them strongest first.
+4. Prefer direct object/setting/category links over abstract vibes. If the clue is "pirate", Ship beats Shoe, Crown, or Paper.
+5. Never pick a word just because you can invent a clever explanation. If a normal human would not immediately understand the link, downgrade it.
+6. If two words are close, pick the more concrete and mainstream association.
+7. Use the round history. Avoid repeating any word that was already guessed; learn from what your teammate intended last time.
+
+WHEN TO REFUSE
+- Output exactly REROLL_HINT only if the clue is genuinely meaningless or unrelated to every available board word. Last resort.
+- Output exactly SKIP_CLUE only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort.
+
+OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
+{
+  "reasoning": "<one or two short sentences explaining the direct everyday link for each guess; logged for research, hidden from the player>",
+  "guesses": ["<exact board word>", "..."]
+}
+
+OR, instead of JSON, exactly one of these two literal tokens on a single line:
+REROLL_HINT
+SKIP_CLUE
+"""
+
+
+def build_guess_user_prompt(
+    board,
+    hint,
+    max_guesses,
+    remaining_rerolls,
+    history,
+    previous_guesses,
+    round_summaries,
+    remaining_skips,
+    can_skip,
+):
+    available_board = [word for word in board if word not in previous_guesses]
+    return (
+        f"Available board words (only choose from these): {', '.join(available_board)}\n"
+        f"Words already guessed this round (do NOT repeat): {', '.join(previous_guesses) or '(none)'}\n\n"
+        f"Your teammate's clue: \"{hint}\"\n"
+        f"Number of guesses to produce (N): {max_guesses}\n\n"
+        "Before answering, internally rank every available board word by direct semantic association to the clue. "
+        "Your final guesses must be the top N exact board words, not random filler.\n\n"
+        f"Skipping allowed right now: {'yes' if can_skip else 'no'}\n"
+        f"Remaining skips this round: {remaining_skips}\n"
+        f"Remaining clue rerolls: {remaining_rerolls}\n\n"
+        "Interaction history so far this round:\n"
+        f"{format_interaction_history(history)}\n\n"
+        "Memory from previous rounds:\n"
+        f"{format_round_memory(round_summaries or [])}\n\n"
+        "Default to guessing. REROLL_HINT and SKIP_CLUE are last resorts. "
+        "Respond with the JSON object OR a single literal token."
+    )
+
+
+def build_guess_repair_prompt(
+    board,
+    hint,
+    max_guesses,
+    previous_guesses,
+    previous_response,
+):
+    available_board = [word for word in board if word not in previous_guesses]
+    return (
+        f"Available board words (choose only exact words from this list): {', '.join(available_board)}\n"
+        f"Words already guessed and forbidden: {', '.join(previous_guesses) or '(none)'}\n"
+        f"Clue: \"{hint}\"\n"
+        f"N: {max_guesses}\n\n"
+        "Your previous response was unusable or did not contain enough exact board words:\n"
+        f"{previous_response}\n\n"
+        "Return strict JSON only. Pick the top N exact board words by direct, everyday semantic association. "
+        "Do not add unrelated filler. Schema: "
+        '{"reasoning":"short reason","guesses":["Exact board word"]}'
+    )
+
+
+def parse_guess_json(raw_text, available_board, max_guesses):
+    try:
+        data = json.loads(raw_text)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+    if not isinstance(data, dict):
+        return []
+
+    raw_guesses = data.get("guesses", []) or []
+    if not isinstance(raw_guesses, list):
+        return []
+
+    board_lookup = {word.lower(): word for word in available_board}
+    valid = []
+    seen = set()
+    for value in raw_guesses:
+        key = str(value).strip().lower()
+        if key in board_lookup and key not in seen:
+            valid.append(board_lookup[key])
+            seen.add(key)
+        if len(valid) >= max_guesses:
+            break
+    return valid
 
 
 def ai_guess(
@@ -422,57 +588,109 @@ def ai_guess(
     history = history or []
     previous_guesses = previous_guesses or []
     available_board = [word for word in board if word not in previous_guesses]
-    system_prompt = (
-        "You are the AI guesser in a cooperative Codenames-like word game.\n"
-        f"Your job is to help the team find all {TARGET_COUNT} targets while avoiding the bomb.\n\n"
-        "Decision policy:\n"
-        "1) Default behavior is to guess. Do not ask for a new clue just because a clue is imperfect.\n"
-        "2) Only output REROLL_HINT if the clue is genuinely unusable: for example meaningless, unrelated to every board word, "
-        "or so ambiguous that any guess would be close to random.\n"
-        "3) If the clue plausibly points to one or more board words, you must guess.\n"
-        "4) If skipping is allowed and the clue feels unsafe, output exactly SKIP_CLUE to request the next clue. "
-        "Skipping consumes one of the round's four turns, so use it only when guessing would be too risky.\n"
-        "5) Output exactly either REROLL_HINT, SKIP_CLUE, or exactly N comma-separated board words.\n"
-        "6) Use the interaction history to avoid repeating previous guesses.\n"
-        "7) Never explain your reasoning."
-    )
 
-    user_prompt = (
-        f"Available board words: {', '.join(available_board)}\n"
-        f"Previous guesses: {', '.join(previous_guesses) or 'none'}\n"
-        f"Hint: {hint}\n"
-        f"Maximum guesses (N): {max_guesses}\n"
-        f"Remaining clue rerolls: {remaining_rerolls}\n\n"
-        f"Skipping allowed now: {'yes' if can_skip else 'no'}\n"
-        f"Remaining skips this round: {remaining_skips}\n\n"
-        f"Previous round summaries for learning:\n{format_round_memory(round_summaries or [])}\n\n"
-        f"Interaction history this round:\n{format_interaction_history(history)}\n\n"
-        "Remember: reroll is a last resort. If there is any plausible interpretation, guess."
-    )
+    meta = _empty_ai_call_meta()
+    raw = ""
+    try:
+        raw, elapsed = call_openai_chat(
+            GUESS_SYSTEM_PROMPT,
+            build_guess_user_prompt(
+                board,
+                hint,
+                max_guesses,
+                remaining_rerolls,
+                history,
+                previous_guesses,
+                round_summaries,
+                remaining_skips,
+                can_skip,
+            ),
+            temperature=0.2,
+            model=GUESS_MODEL_NAME,
+            json_mode=False,
+        )
+        meta["raw_response"] = raw
+        meta["response_time_sec"] = round(elapsed, 3)
+        meta["attempts"] = 1
+    except Exception as error:
+        meta["raw_response"] = f"<api_error: {error}>"
+        meta["response_time_sec"] = 0.0
+        meta["attempts"] = 1
+        raw = ""
 
-    raw = call_openai_chat(system_prompt, user_prompt, temperature=0.2).strip()
-    if raw.upper() == "REROLL_HINT" and remaining_rerolls > 0:
-        return ["__REROLL_HINT__"]
-    if raw.upper() == "SKIP_CLUE" and can_skip and remaining_skips > 0:
-        return ["__SKIP_CLUE__"]
+    if raw:
+        upper = raw.strip().upper()
+        if upper == "REROLL_HINT" and remaining_rerolls > 0:
+            return {"action": "reroll", "guesses": [], **meta}
+        if upper == "SKIP_CLUE" and can_skip and remaining_skips > 0:
+            return {"action": "skip", "guesses": [], **meta}
 
-    model_words = [part.strip().lower() for part in raw.split(",") if part.strip()]
-    valid_words = []
-    seen = set()
-    board_lookup = {word.lower(): word for word in available_board}
+        valid_guesses = parse_guess_json(raw, available_board, max_guesses)
 
-    for word in model_words:
-        if word in board_lookup and word not in seen:
-            valid_words.append(board_lookup[word])
-            seen.add(word)
+        if not valid_guesses:
+            tokens = [
+                token.strip().lower()
+                for token in re.split(r"[,\n]", raw)
+                if token.strip()
+            ]
+            board_lookup = {word.lower(): word for word in available_board}
+            seen = set()
+            for token in tokens:
+                if token in board_lookup and token not in seen:
+                    valid_guesses.append(board_lookup[token])
+                    seen.add(token)
+                if len(valid_guesses) >= max_guesses:
+                    break
 
-    if len(valid_words) < max_guesses:
-        remaining_choices = [word for word in available_board if word not in valid_words]
-        needed = min(max_guesses - len(valid_words), len(remaining_choices))
-        if needed > 0:
-            valid_words.extend(random.sample(remaining_choices, needed))
+        if len(valid_guesses) < min(max_guesses, len(available_board)):
+            try:
+                repair_raw, repair_elapsed = call_openai_chat(
+                    GUESS_SYSTEM_PROMPT,
+                    build_guess_repair_prompt(
+                        board,
+                        hint,
+                        max_guesses,
+                        previous_guesses,
+                        raw,
+                    ),
+                    temperature=0.0,
+                    model=GUESS_MODEL_NAME,
+                    json_mode=True,
+                )
+                repaired_guesses = parse_guess_json(
+                    repair_raw, available_board, max_guesses
+                )
+                meta["raw_response"] = f"{raw}\n\n<repair_response>\n{repair_raw}"
+                meta["response_time_sec"] = round(
+                    (meta["response_time_sec"] or 0.0) + repair_elapsed, 3
+                )
+                meta["attempts"] = 2
+                if len(repaired_guesses) > len(valid_guesses):
+                    valid_guesses = repaired_guesses
+            except Exception as error:
+                meta["raw_response"] = (
+                    f"{meta['raw_response']}\n\n<repair_error: {error}>"
+                )
 
-    return valid_words[:max_guesses]
+        if valid_guesses:
+            return {"action": "guess", "guesses": valid_guesses[:max_guesses], **meta}
+
+    if can_skip and remaining_skips > 0:
+        return {"action": "skip", "guesses": [], **meta}
+    if remaining_rerolls > 0:
+        return {"action": "reroll", "guesses": [], **meta}
+    return {"action": "guess", "guesses": [], **meta}
+
+
+REFLECTION_SYSTEM_PROMPT = """You are an AI teammate writing a short reflection at the end of one round of a cooperative word game. Your reader is the human player.
+
+Your reflection should:
+1. If you gave the clues, explain plainly why each clue was meant for which targets, what link you used (category, metaphor, idiom, image), and how you tried to keep the bomb and neutrals safe. Acknowledge any guess that went wrong.
+2. If the human gave the clues, compare their marked intended targets to your guesses. Where you misread, say what association pulled you the wrong way. Where you guessed right, say what clicked.
+3. Mention any skips and what made the clue feel risky.
+4. End with one specific, actionable suggestion the team can apply in the next round.
+5. Be warm, plain, and concrete. No empty praise. Maximum 180 words.
+"""
 
 
 def generate_ai_round_reflection(
@@ -486,35 +704,32 @@ def generate_ai_round_reflection(
     round_bomb_hit,
     round_medal,
 ):
-    system_prompt = (
-        "You are an AI teammate reflecting after one round of a cooperative word game.\n"
-        "Write a useful reflection for the human teammate. If you gave clues, explain exactly "
-        "why each clue was related to its intended target words and how you tried to avoid the "
-        "neutral words and bomb. If the human gave clues, inspect the intended targets they marked, "
-        "explain how you interpreted those clues, and compare your guesses with their intended words. "
-        "Mention skips if they happened and what made the clue feel risky. Also add any broader "
-        "advice you have about the round flow, communication pattern, or how the team can play the "
-        "next round better.\n"
-        "Be concrete, kind, and concise. Do not exceed 200 words."
-    )
     user_prompt = (
         f"Round role: {role}\n"
         f"Word type: {word_type}\n"
         f"Targets: {', '.join(target_words)}\n"
         f"Neutral words: {', '.join(neutral_words)}\n"
         f"Bomb: {bomb_word}\n"
-        f"Success: {round_success}\n"
+        f"All targets found: {round_success}\n"
         f"Bomb hit: {round_bomb_hit}\n"
         f"Medal: {round_medal}\n\n"
-        f"Interaction history:\n{format_interaction_history(history)}\n"
+        "Interaction history with intended targets and explanations:\n"
+        f"{format_interaction_history(history)}\n"
     )
     try:
-        return limit_words(call_openai_chat(system_prompt, user_prompt, temperature=0.3), 200)
+        text, _ = call_openai_chat(
+            REFLECTION_SYSTEM_PROMPT,
+            user_prompt,
+            temperature=0.4,
+            model=REFLECTION_MODEL_NAME,
+            json_mode=False,
+        )
+        return limit_words(text, 200)
     except Exception:
         return (
-            "I could not generate a detailed reflection this time. Review the history above: "
-            "compare each clue with its intended targets and guesses, then note what association "
-            "should be clearer in the next round."
+            "I could not generate a reflection this time. Look back at the history above: "
+            "compare each clue with its intended targets and the actual guesses, and note "
+            "what association should be clearer in the next round."
         )
 
 
