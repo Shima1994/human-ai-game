@@ -97,3 +97,42 @@ ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,ab
   ""targets"": [""Illness"", ""Blue""]
 }",,2026-05-26T11:22:10.746215
 91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,2,ai_clue,abstract,4,ai,human,calendar,2,Year;Blue,"The clue 'calendar' links 'Year' and 'Blue' through the concept of a 'blue moon,' which is a rare event in a calendar year. This clue avoids the bomb 'Bond' as there is no direct or indirect connection to 'calendar.' Neutrals like 'Resolution,' 'Customs,' 'Good,' 'Point,' 'Intent,' 'Source,' 'Game,' 'Time,' and 'Relocation' are not typically associated with 'calendar' in a way",Time;Year,Year,Blue,,Time,,correct,0,,0,none,0,,,2.824,1,0,,"{""reasoning"": ""The clue 'calendar' links 'Year' and 'Blue' through the concept of a 'blue moon,' which is a rare event in a calendar year. This clue avoids the bomb 'Bond' as there is no direct or indirect connection to 'calendar.' Neutrals like 'Resolution,' 'Customs,' 'Good,' 'Point,' 'Intent,' 'Source,' 'Game,' 'Time,' and 'Relocation' are not typically associated with 'calendar' in a way that would prompt guessing them."", ""clue"": ""calendar"", ""number"": 2, ""targets"": [""Year"", ""Blue""]}",,2026-05-26T11:22:20.314837
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,1,human,ai,birthday,3,Association;Day;Spirit,,Day;Life;Spirit,Day;Spirit,Association,,Life,,correct,0,,0,bronze,1,2,4,,,0,3.458,,"```json
+{
+  ""reasoning"": ""A birthday is commonly associated with 'Day' as it is a specific day of celebration. 'Life' is relevant because birthdays mark the anniversary of one's birth, a key life event. 'Spirit' can be linked to the celebratory and joyful spirit often present at birthday parties."",
+  ""guesses"": [""Day"", ""Life"", ""Spirit""]
+}
+```
+
+<repair_response>
+{""reasoning"":""A birthday is commonly associated with 'Day' as it is a specific day of celebration. 'Life' is relevant because birthdays mark the anniversary of one's birth, a key life event. 'Spirit' can be linked to the celebratory and joyful spirit often present at birthday parties."",""guesses"":[""Day"",""Life"",""Spirit""]}",2026-05-26T11:25:40.902274
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,2,human,ai,picnic,2,Air;Association,,Air;Fire,Air,Association,,Fire,,correct,0,,0,bronze,1,4,3,,,0,2.842,,"```json
+{
+  ""reasoning"": ""Picnics are often associated with being outdoors and enjoying nature, which relates to Air. Additionally, picnics can involve cooking or grilling, which involves Fire."",
+  ""guesses"": [""Air"", ""Fire""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Picnics are often held outdoors, which involves Air. Additionally, picnics can involve cooking or grilling, which involves Fire."",
+  ""guesses"": [""Air"", ""Fire""]
+}",2026-05-26T11:26:23.350450
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,3,human,ai,meeting,2,Association;Reason,,Association;Economy,Association,Reason,,Economy,,correct,0,,0,bronze,1,3,3,,,0,2.714,,"```json
+{
+  ""reasoning"": ""The word 'Association' is directly linked to 'meeting' as meetings often involve associations or groups. 'Reason' is also linked as meetings are typically held to discuss or resolve reasons or issues."",
+  ""guesses"": [""Association"", ""Reason""]
+}
+```
+
+<repair_response>
+{""reasoning"":""'Association' is directly linked to 'meeting' as meetings often involve associations or groups. 'Economy' is linked because meetings are frequently held to discuss economic matters or business strategies."",""guesses"":[""Association"", ""Economy""]}",2026-05-26T11:27:18.820321
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,4,human,ai,aim,1,Reason,,Reason,Reason,,,,,correct,0,,0,bronze,1,3,3,,,0,2.448,,"```json
+{
+  ""reasoning"": ""The word 'aim' is most directly associated with 'Reason' as it implies a purpose or goal, which aligns with the concept of having a reason for doing something."",
+  ""guesses"": [""Reason""]
+}
+```
+
+<repair_response>
+{""reasoning"":""The word 'aim' is most directly associated with 'Reason' as it implies a purpose or goal, which aligns with the concept of having a reason for doing something."",""guesses"":[""Reason""]}",2026-05-26T11:28:24.688623
