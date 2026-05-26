@@ -59,3 +59,22 @@ ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,ab
 2026-05-21T06:48:43.655544,Shimaaa,4,ai_clue,concrete,2,ai,human,shine,2,sun;ice,sun;baby,sun,ice,,baby,,correct,0,,0,none,0,3,,
 2026-05-21T06:48:43.655544,Shimaaa,4,ai_clue,concrete,3,ai,human,frozen,2,ice;sword,towel;sugar,,ice;sword,,towel;sugar,,wrong,0,,0,none,0,3,,
 2026-05-21T06:48:43.655544,Shimaaa,4,ai_clue,concrete,4,ai,human,signal,2,lemon;sword,ice;lemon,ice;lemon,sword,ice,,,correct,0,,0,none,0,3,,
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:20:45.297640,Test33,1,human_clue,concrete,1,human,ai,haki,3,Ball;Ice;Shoe,,Ship;Sea;King,,Ball;Ice;Shoe,,Ship;Sea;King,,wrong,0,,0,none,0,4,1,,,0,7.406,,"REROLL_HINT
+
+<repair_response>
+{
+  ""reasoning"": ""Haki is a concept from the anime One Piece, which involves pirates and the sea. 'Ship' and 'Sea' are directly related to the pirate theme. 'King' is relevant as the series involves the quest to become the Pirate King."",
+  ""guesses"": [""Ship"", ""Sea"", ""King""]
+}",2026-05-26T11:19:05.508416
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:20:45.297640,Test33,1,human_clue,concrete,2,human,ai,hockey,3,Shoe;Ice;Ball,,Ice;Ball;Penguin,Ice;Ball,Shoe,,,Penguin,bomb,0,,1,none,0,4,1,,,0,3.160,,"```json
+{
+  ""reasoning"": ""Ice is directly associated with hockey as the game is played on an ice rink. Penguin is a strong association as penguins are often found in icy environments, similar to where hockey is played. Ball is a plausible link as hockey involves a puck, which is similar to a ball in terms of being a game object."",
+  ""guesses"": [""Ice"", ""Penguin"", ""Ball""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Ice is directly associated with hockey as the game is played on an ice rink. Ball is a plausible link as hockey involves a puck, which is similar to a ball in terms of being a game object. Penguin is a secondary association as penguins are often found in icy environments, similar to where hockey is played."",
+  ""guesses"": [""Ice"", ""Ball"", ""Penguin""]
+}",2026-05-26T11:19:49.030714
