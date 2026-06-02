@@ -278,3 +278,15 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
 }",2026-06-02T13:10:02.891129
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:17:06.773073,bibeg,2,ai_clue,abstract,1,ai,human,transition,2,Relocation;Point,"The clue 'transition' connects 'Relocation' and 'Point' as both involve change or movement from one state to another. 'Relocation' is a transition of place, while 'Point' can refer to a transition in an argument or direction. None of the neutrals like 'Source', 'Bond', 'Customs', 'Memory', 'Time', 'Year', 'Game', 'Association', or 'Resolution' are directly linked to this concept of transition, and",Year;Relocation,Relocation,Point,,Year,,correct,0,,0,none,0,,,1.754,1,0,,"{
+  ""reasoning"": ""The clue 'transition' connects 'Relocation' and 'Point' as both involve change or movement from one state to another. 'Relocation' is a transition of place, while 'Point' can refer to a transition in an argument or direction. None of the neutrals like 'Source', 'Bond', 'Customs', 'Memory', 'Time', 'Year', 'Game', 'Association', or 'Resolution' are directly linked to this concept of transition, and the bombs 'Intent' and 'Means' are more about purpose and method rather than the process of change."",
+  ""clue"": ""transition"",
+  ""number"": 2,
+  ""targets"": [""Relocation"", ""Point""]
+}",,2026-06-02T13:14:58.990501
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:17:06.773073,bibeg,2,ai_clue,abstract,2,ai,human,emotion,2,Good;Blue,"The clue 'emotion' connects the target words 'Good' and 'Blue' through their association with feelings and emotional states. 'Good' can refer to positive emotions, and 'Blue' is often linked to sadness or feeling down. The neutral words do not specifically relate to emotions as a category, and neither do the bomb words 'Intent' and 'Means', which are more about purpose",Bond;Intent,,Good;Blue,,Bond,Intent,bomb,0,,1,none,0,,,1.829,1,0,,"{
+  ""reasoning"": ""The clue 'emotion' connects the target words 'Good' and 'Blue' through their association with feelings and emotional states. 'Good' can refer to positive emotions, and 'Blue' is often linked to sadness or feeling down. The neutral words do not specifically relate to emotions as a category, and neither do the bomb words 'Intent' and 'Means', which are more about purpose and methods rather than emotional states."",
+  ""clue"": ""emotion"",
+  ""number"": 2,
+  ""targets"": [""Good"", ""Blue""]
+}",,2026-06-02T13:15:58.708062
