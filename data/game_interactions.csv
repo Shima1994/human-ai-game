@@ -215,3 +215,24 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
 }",2026-06-02T13:10:02.891129
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:24.884697,bibeg,1,human_clue,concrete,1,human,ai,pirate,2,Sea;Police,,Sea;Ship,Sea,Police,,Ship,,correct,0,,0,none,0,2,3,,,0,4.085,,"```json
+{
+  ""reasoning"": ""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",
+  ""guesses"": [""Sea"", ""Ship""]
+}
+```
+
+<repair_response>
+{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",2026-06-02T13:01:09.850153
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:24.884697,bibeg,1,human_clue,concrete,2,human,ai,gun,2,Police;Shell,,Police;King,Police,Shell,,,King,bomb,0,,1,none,0,4,1,,,0,3.461,,"```json
+{
+  ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
+  ""guesses"": [""Police"", ""King""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
+  ""guesses"": [""Police"", ""King""]
+}",2026-06-02T13:10:02.891129
