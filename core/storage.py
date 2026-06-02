@@ -272,6 +272,7 @@ def clean_interaction_history(history):
                     word for word in correct_guesses if word not in intended_targets
                 ],
                 "neutral_guesses": list(item.get("neutral_guesses", [])),
+                "bomb_guesses": list(item.get("bomb_guesses", [])),
                 "bomb_guess": item.get("bomb_guess"),
                 "outcome": item.get("outcome", "correct" if correct_guesses else "wrong"),
                 "skipped": bool(item.get("skipped", False)),
@@ -307,11 +308,12 @@ def log_round(participant_id):
 
     guesses = st.session_state.guesses
     correct = any(guess in st.session_state.target_words for guess in guesses)
-    bomb_hit = any(guess == st.session_state.bomb_word for guess in guesses)
+    bomb_words = st.session_state.get("bomb_words") or [st.session_state.bomb_word]
+    bomb_hit = any(guess in bomb_words for guess in guesses)
     score_change = compute_score_change(
         guesses,
         st.session_state.target_words,
-        st.session_state.bomb_word,
+        bomb_words,
         st.session_state.round_interactions,
     )
     clean_history = clean_interaction_history(st.session_state.interaction_history)
@@ -335,7 +337,7 @@ def log_round(participant_id):
         st.session_state.word_type,
         ";".join(st.session_state.board),
         ";".join(st.session_state.target_words),
-        st.session_state.bomb_word,
+        ";".join(bomb_words),
         ";".join(st.session_state.neutral_words),
         clues_used,
         ";".join(guesses),

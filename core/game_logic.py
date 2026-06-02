@@ -32,21 +32,21 @@ def sample_fixed_round_words(round_number):
     shuffled_roles = board_words[:]
     random.shuffle(shuffled_roles)
     targets = shuffled_roles[:TARGET_COUNT]
-    bomb = shuffled_roles[TARGET_COUNT]
+    bombs = shuffled_roles[TARGET_COUNT : TARGET_COUNT + BOMB_COUNT]
     neutrals = shuffled_roles[TARGET_COUNT + BOMB_COUNT:]
 
     word_roles = {word: "target" for word in targets}
     word_roles.update({word: "neutral" for word in neutrals})
-    word_roles[bomb] = "bomb"
+    word_roles.update({word: "bomb" for word in bombs})
 
     random.shuffle(board_words)
-    return board_words, targets, neutrals, bomb, word_roles
+    return board_words, targets, neutrals, bombs, word_roles
 
 
 def setup_new_round():
     word_type = get_word_type_for_round(st.session_state.round)
     role = get_role_for_round(st.session_state.round)
-    board, targets, neutrals, bomb, word_roles = sample_fixed_round_words(
+    board, targets, neutrals, bombs, word_roles = sample_fixed_round_words(
         st.session_state.round
     )
 
@@ -54,8 +54,9 @@ def setup_new_round():
     st.session_state.role = role
     st.session_state.board = board
     st.session_state.target_words = targets
+    st.session_state.bomb_words = bombs
     st.session_state.neutral_words = neutrals
-    st.session_state.bomb_word = bomb
+    st.session_state.bomb_word = bombs[0] if bombs else None
     st.session_state.word_roles = word_roles
     st.session_state.guesses = []
     st.session_state.pending_guesses = []
@@ -97,8 +98,10 @@ def get_medal_for_round(interactions, success, bomb_hit):
     return "none"
 
 
-def compute_score_change(guesses, target_words, bomb_word, interactions=None):
-    bomb_hit = bomb_word in guesses
+def compute_score_change(guesses, target_words, bomb_words, interactions=None):
+    if isinstance(bomb_words, str) or bomb_words is None:
+        bomb_words = [bomb_words] if bomb_words else []
+    bomb_hit = any(guess in bomb_words for guess in guesses)
     found_targets = {guess for guess in guesses if guess in target_words}
     success = len(found_targets) == len(target_words)
     if interactions is None:
@@ -126,8 +129,10 @@ def record_interaction(
     normalized_hint = hint.strip().lower()
     correct_guesses = [guess for guess in guesses if guess in st.session_state.target_words]
     neutral_guesses = [guess for guess in guesses if guess in st.session_state.neutral_words]
-    bomb_hit = st.session_state.bomb_word in guesses
-    bomb_guess = st.session_state.bomb_word if bomb_hit else None
+    bomb_words = st.session_state.get("bomb_words") or [st.session_state.bomb_word]
+    bomb_guesses = [guess for guess in guesses if guess in bomb_words]
+    bomb_hit = bool(bomb_guesses)
+    bomb_guess = ";".join(bomb_guesses) if bomb_guesses else None
     new_targets = [
         guess
         for guess in correct_guesses
@@ -162,6 +167,7 @@ def record_interaction(
             "correct": bool(correct_guesses),
             "correct_guesses": correct_guesses,
             "neutral_guesses": neutral_guesses,
+            "bomb_guesses": bomb_guesses,
             "bomb_guess": bomb_guess,
             "bomb_hit": bomb_hit,
             "outcome": outcome,
@@ -228,6 +234,7 @@ def record_skip(
             "correct": False,
             "correct_guesses": [],
             "neutral_guesses": [],
+            "bomb_guesses": [],
             "bomb_guess": None,
             "bomb_hit": False,
             "outcome": "skip",
@@ -251,7 +258,10 @@ def record_skip(
 
 def finish_round():
     st.session_state.round_finished = True
-    st.session_state.round_bomb_hit = st.session_state.bomb_word in st.session_state.guesses
+    bomb_words = st.session_state.get("bomb_words") or [st.session_state.bomb_word]
+    st.session_state.round_bomb_hit = any(
+        guess in bomb_words for guess in st.session_state.guesses
+    )
     st.session_state.round_success = (
         len(st.session_state.found_targets) == len(st.session_state.target_words)
     )
@@ -277,7 +287,7 @@ def append_ai_round_summary():
             "role": st.session_state.role,
             "word_type": st.session_state.word_type,
             "targets": list(st.session_state.target_words),
-            "bomb": st.session_state.bomb_word,
+            "bomb": list(st.session_state.get("bomb_words", [])),
             "success": bool(st.session_state.round_success),
             "bomb_hit": bool(st.session_state.round_bomb_hit),
             "medal": st.session_state.round_medal,
@@ -296,6 +306,7 @@ def append_ai_round_summary():
                     "guesses": list(item.get("guesses", [])),
                     "correct_guesses": list(item.get("correct_guesses", [])),
                     "neutral_guesses": list(item.get("neutral_guesses", [])),
+                    "bomb_guesses": list(item.get("bomb_guesses", [])),
                     "bomb_guess": item.get("bomb_guess"),
                     "outcome": item.get("outcome"),
                     "skipped": bool(item.get("skipped", False)),

@@ -3,6 +3,8 @@ from html import escape
 import streamlit as st
 
 from core.constants import (
+    BOARD_SIZE,
+    BOMB_COUNT,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
     N_ROUNDS,
@@ -42,7 +44,7 @@ def render_app_header():
         """
         <div class="hero">
             <div class="hero-title">Human-AI Cooperative Word Game</div>
-            <p class="hero-subtitle">Give smart clues, connect as many safe target cards as you can, and avoid the bomb card.</p>
+            <p class="hero-subtitle">Give smart clues, connect as many safe target cards as you can, and avoid the bomb cards.</p>
             <div class="hero-badge-row">
                 <div class="hero-badge">4 rounds</div>
                 <div class="hero-badge">Alternating turns</div>
@@ -106,7 +108,7 @@ def _render_static_card(word, role, revealed, guessed=False):
 
 def render_board(board, word_roles, guesses=None, reveal_all=False, clickable=False, max_clicks=0):
     guesses = guesses or []
-    column_count = 5 if len(board) >= 15 else 4
+    column_count = 4 if len(board) == BOARD_SIZE else min(4, max(1, len(board)))
     cols = st.columns(column_count)
     guess_set = set(guesses)
     clicked_word = None
@@ -134,12 +136,12 @@ def render_board(board, word_roles, guesses=None, reveal_all=False, clickable=Fa
 
 def render_board_legend():
     st.markdown(
-        """
+        f"""
         <div class="legend">
             <div class="legend-pill legend-target">Green target</div>
             <div class="legend-pill legend-neutral">Gray neutral</div>
             <div class="legend-pill legend-neutral-miss">Blue wrong neutral</div>
-            <div class="legend-pill legend-bomb">Red bomb</div>
+            <div class="legend-pill legend-bomb">Red bombs ({BOMB_COUNT})</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -246,10 +248,12 @@ def render_interaction_history(history, show_ai_intended=False):
         intended_row = chip_row(intended_label, intended_targets)
         correct_set = set(correct_guesses)
         neutral_set = set(item.get("neutral_guesses", []))
-        bomb_guess = item.get("bomb_guess")
+        bomb_guesses = set(item.get("bomb_guesses", []))
+        if not bomb_guesses and item.get("bomb_guess"):
+            bomb_guesses = set(str(item.get("bomb_guess")).split(";"))
 
         def guess_class(value):
-            if value == bomb_guess:
+            if value in bomb_guesses:
                 return "bomb"
             if value in correct_set:
                 return "correct"

@@ -17,6 +17,7 @@ FIXED_ROUND_BOARDS = {
             "Tower",
             "Ice",
             "Ball",
+            "Map",
         ],
     },
     2: {
@@ -37,6 +38,7 @@ FIXED_ROUND_BOARDS = {
             "Resolution",
             "Customs",
             "Relocation",
+            "Memory",
         ],
     },
     3: {
@@ -57,6 +59,7 @@ FIXED_ROUND_BOARDS = {
             "War",
             "Economy",
             "Association",
+            "Freedom",
         ],
     },
     4: {
@@ -77,6 +80,7 @@ FIXED_ROUND_BOARDS = {
             "Moon",
             "Castle",
             "Car",
+            "Clock",
         ],
     },
 }

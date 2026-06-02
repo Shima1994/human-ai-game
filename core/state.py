@@ -21,6 +21,7 @@ def init_session_state():
         "role": None,
         "word_type": None,
         "target_words": [],
+        "bomb_words": [],
         "bomb_word": None,
         "neutral_words": [],
         "word_roles": {},
@@ -69,6 +70,7 @@ def reset_round_state():
     st.session_state.role = None
     st.session_state.word_type = None
     st.session_state.target_words = []
+    st.session_state.bomb_words = []
     st.session_state.bomb_word = None
     st.session_state.neutral_words = []
     st.session_state.word_roles = {}

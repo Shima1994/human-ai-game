@@ -10,6 +10,8 @@ from core.ai_service import (
     validate_human_hint_with_history,
 )
 from core.constants import (
+    BOARD_SIZE,
+    BOMB_COUNT,
     MAX_SKIPS_PER_ROUND,
     MAX_TEAM_SCORE,
     N_ROUNDS,
@@ -48,11 +50,11 @@ def screen_welcome():
             <div class="guide-grid">
                 <div class="guide-card guide-goal">
                     <h3>The Goal</h3>
-                    <p>There are 4 rounds in total: abstract words with human clue-giver, abstract words with AI clue-giver, concrete words with human clue-giver, and concrete words with AI clue-giver. In each round, you will see 15 cards on the screen:</p>
+                    <p>There are 4 rounds in total: abstract words with human clue-giver, abstract words with AI clue-giver, concrete words with human clue-giver, and concrete words with AI clue-giver. In each round, you will see {BOARD_SIZE} cards on the screen:</p>
                     <ul>
-                        <li>5 Target Cards (The ones you need to find!)</li>
-                        <li>1 Bomb Card (Avoid this at all costs!)</li>
-                        <li>9 Neutral Cards (Wrong, but safe.)</li>
+                        <li>{TARGET_COUNT} Target Cards (The ones you need to find!)</li>
+                        <li>{BOMB_COUNT} Bomb Cards (Avoid these at all costs!)</li>
+                        <li>{BOARD_SIZE - TARGET_COUNT - BOMB_COUNT} Neutral Cards (Wrong, but safe.)</li>
                     </ul>
                 </div>
                 <div class="guide-card">
@@ -63,14 +65,14 @@ def screen_welcome():
                     </ol>
                     <p class="guide-example">Example: If the target words are "Apple" and "Banana," you could say: "Fruit, 2".</p>
                     <ol start="3">
-                        <li><strong>Don't Hit the Bomb:</strong> If anyone picks the Red Bomb, the round ends immediately, and you lose all points for that round.</li>
-                        <li><strong>4 Tries Only:</strong> You have a maximum of 4 turns per round to find all 5 targets.</li>
+                        <li><strong>Don't Hit the Bombs:</strong> If anyone picks a Red Bomb, the round ends immediately, and you lose all points for that round.</li>
+                        <li><strong>4 Tries Only:</strong> You have a maximum of 4 turns per round to find all {TARGET_COUNT} targets.</li>
                         <li><strong>Next Clue:</strong> If a clue feels too risky, the guesser can skip it and ask for the next clue. This burns one turn, works at most twice per round, and is unavailable on the final turn.</li>
                     </ol>
                 </div>
                 <div class="guide-card guide-medals">
                     <h3>Win Medals &amp; Points</h3>
-                    <p>The faster you find the 5 targets, the better your medal:</p>
+                    <p>The faster you find the {TARGET_COUNT} targets, the better your medal:</p>
                     <ul>
                         <li>&#129351; Gold (5 pts): Finish in 1 or 2 turns.</li>
                         <li>&#129352; Silver (4 pts): Finish in 3 turns.</li>
@@ -411,7 +413,7 @@ def screen_human_guesser():
             with st.spinner("AI is generating a clue..."):
                 hint_result = generate_ai_hint(
                     st.session_state.target_words,
-                    st.session_state.bomb_word,
+                    st.session_state.bomb_words,
                     st.session_state.neutral_words,
                     st.session_state.word_type,
                     st.session_state.interaction_history,
@@ -501,7 +503,7 @@ def screen_round_summary():
             with st.spinner("AI is reflecting on this round..."):
                 st.session_state.ai_round_reflection = generate_ai_round_reflection(
                     st.session_state.target_words,
-                    st.session_state.bomb_word,
+                    st.session_state.bomb_words,
                     st.session_state.neutral_words,
                     st.session_state.word_type,
                     st.session_state.role,
@@ -621,7 +623,7 @@ def screen_game_over():
     elif remote_status == "github_failed":
         st.warning(f"The run was saved locally, but GitHub logging failed: {remote_error}")
     elif remote_status == "local_only":
-        st.warning(f"The run was saved locally only. {remote_error}")
+        st.info(f"The run has been saved locally, {player_name}.")
     else:
         st.info(f"The run has been saved locally, {player_name}.")
 

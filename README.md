@@ -4,7 +4,7 @@ This project implements a cooperative word association game where a human player
 
 ## 🎮 Game features
 
-- Four fixed 15-word boards, with targets, bomb, and neutral cards randomized each run
+- Four fixed 16-word boards, with 5 targets, 2 bombs, and 9 neutral cards randomized each run
 - Two gameplay modes: **abstract words** and **concrete words**
 - Turn-taking between human and AI
 - AI-generated clues using OpenAI's API (JSON-mode prompts with chain-of-thought reasoning saved for analysis only)
@@ -52,7 +52,7 @@ ai_understanding_rating_after, hint_response_time_sec, hint_attempts, hint_used_
 guess_response_time_sec, hint_raw_response, guess_raw_response, interaction_recorded_at
 ```
 
-List-valued columns (`board`, `targets`, `neutral_words`, `intended_targets`, `guesses`, etc.) are stored as `;`-separated strings, which loads cleanly with `pandas`:
+List-valued columns (`board`, `targets`, `bomb`, `neutral_words`, `intended_targets`, `guesses`, etc.) are stored as `;`-separated strings, which loads cleanly with `pandas`:
 
 ```python
 import pandas as pd
