@@ -290,3 +290,33 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
   ""number"": 2,
   ""targets"": [""Good"", ""Blue""]
 }",,2026-06-02T13:15:58.708062
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,3,human_clue,abstract,1,human,ai,partying,3,Spirit;Dance;Life,,Dance;Spirit;Luck,Dance;Spirit,Life,,Luck,,correct,0,,0,silver,1,2,4,,,0,2.722,,"```json
+{
+  ""reasoning"": ""Dance is directly associated with partying as a common activity at parties. Spirit is often linked to the mood or energy of a party, as in 'party spirit.' Luck can be associated with partying through games of chance or the idea of having a lucky night out."",
+  ""guesses"": [""Dance"", ""Spirit"", ""Luck""]
+}
+```
+
+<repair_response>
+{""reasoning"":""Dance is directly associated with partying as a common activity at parties. Spirit is often linked to the mood or energy of a party, as in 'party spirit.' Luck can be associated with partying through games of chance or the idea of having a lucky night out."",""guesses"":[""Dance"", ""Spirit"", ""Luck""]}",2026-06-02T13:18:33.370287
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,3,human_clue,abstract,2,human,ai,routine,2,Day;Life,,Day;Life,Day;Life,,,,,correct,0,,0,silver,1,2,4,,,0,2.272,,"```json
+{
+  ""reasoning"": ""Routine is commonly associated with daily activities, making 'Day' a strong link. 'Life' also fits as routines are a part of everyday life."",
+  ""guesses"": [""Day"", ""Life""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""'Day' is strongly linked to routine as routines are often daily activities. 'Life' is also associated because routines are integral parts of everyday life."",
+  ""guesses"": [""Day"", ""Life""]
+}",2026-06-02T13:19:47.458437
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,3,human_clue,abstract,3,human,ai,cause,1,Reason,,Reason,Reason,,,,,correct,0,,0,silver,1,2,4,,,0,1.936,,"```json
+{
+  ""reasoning"": ""The word 'Reason' is directly associated with 'cause' as it represents the explanation or justification for an event or action."",
+  ""guesses"": [""Reason""]
+}
+```
+
+<repair_response>
+{""reasoning"":""The word 'Reason' is directly associated with 'cause' as it represents the explanation or justification for an event or action."",""guesses"":[""Reason""]}",2026-06-02T13:20:30.760777
