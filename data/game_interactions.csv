@@ -320,3 +320,45 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 
 <repair_response>
 {""reasoning"":""The word 'Reason' is directly associated with 'cause' as it represents the explanation or justification for an event or action."",""guesses"":[""Reason""]}",2026-06-02T13:20:30.760777
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,1,human,ai,rule,2,Map;King,,King;Police,King,Map,,Police,,correct,0,,0,bronze,1,3,4,,,0,2.293,,"```json
+{
+  ""reasoning"": ""King is directly associated with rule as kings are rulers. Police is associated with rule as they enforce laws and rules."",
+  ""guesses"": [""King"", ""Police""]
+}
+```
+
+<repair_response>
+{""reasoning"":""King is directly associated with rule as kings are rulers. Police is associated with rule as they enforce laws and rules."",""guesses"":[""King"", ""Police""]}",2026-06-07T09:06:55.934133
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,2,human,ai,backpacker,2,Map;Shoe,,Map;Sea,Map,Shoe,,Sea,,correct,0,,0,bronze,1,3,3,,,0,1.383,,"```json
+{
+  ""reasoning"": ""Backpackers often use a Map for navigation during their travels. They may also travel by Sea, especially if they are exploring coastal or island destinations."",
+  ""guesses"": [""Map"", ""Sea""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Backpackers often use a Map for navigation during their travels. They may also travel by Sea, especially if they are exploring coastal or island destinations."",
+  ""guesses"": [""Map"", ""Sea""]
+}",2026-06-07T09:07:50.781696
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,3,human,ai,sport,2,Shoe;Ball,,Ball;Shoe,Ball;Shoe,,,,,correct,0,,0,bronze,1,3,3,,,0,1.930,,"```json
+{
+  ""reasoning"": ""Ball is directly associated with many sports like basketball, soccer, and tennis. Shoe is strongly linked to sports as athletic shoes are essential for most sports activities."",
+  ""guesses"": [""Ball"", ""Shoe""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Ball is directly associated with many sports like basketball, soccer, and tennis. Shoe is strongly linked to sports as athletic shoes are essential for most sports activities."",
+  ""guesses"": [""Ball"", ""Shoe""]
+}",2026-06-07T09:08:44.580896
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,4,human,ai,dinner,1,Fork,,Fork,Fork,,,,,correct,0,,0,bronze,1,3,3,,,0,1.248,,"```json
+{
+  ""reasoning"": ""Fork is directly associated with dinner as it is a common utensil used during meals."",
+  ""guesses"": [""Fork""]
+}
+```
+
+<repair_response>
+{""reasoning"":""Fork is directly associated with dinner as it is a common utensil used during meals."",""guesses"":[""Fork""]}",2026-06-07T09:09:10.451327
