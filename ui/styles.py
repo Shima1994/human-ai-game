@@ -625,14 +625,126 @@ def inject_css():
             margin: 0.95rem auto 0 auto;
         }
 
+        /* Reflection / explanation panel */
+        .st-key-reflection_panel,
+        .st-key-reflection_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            background: #F8F8F8 !important;
+            border: 1px solid #E5E5E5 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 18px rgba(18, 34, 54, 0.06) !important;
+        }
+        .st-key-reflection_panel {
+            padding: 0 !important;
+        }
+        .st-key-reflection_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 1rem 1.05rem !important;
+        }
+        .st-key-reflection_panel [data-testid="stVerticalBlock"] {
+            gap: 0.95rem !important;
+        }
+        .reflection-header {
+            margin-bottom: 0.2rem;
+        }
+        .reflection-title {
+            color: var(--color-heading);
+            font-size: 1.02rem;
+            font-weight: 850;
+            line-height: 1.2;
+            margin-bottom: 0.22rem;
+        }
+        .reflection-subtitle {
+            color: var(--color-text-soft);
+            font-size: 0.9rem;
+            line-height: 1.35;
+        }
+        .st-key-reflection_panel .subtle-text,
+        .st-key-reflection_panel [data-testid="stCaptionContainer"],
+        .st-key-reflection_panel [data-testid="stMarkdownContainer"] p {
+            color: var(--color-text-soft) !important;
+        }
+        .st-key-reflection_panel label,
+        .st-key-reflection_panel .stRadio label,
+        .st-key-reflection_panel [data-testid="stWidgetLabel"],
+        .st-key-reflection_panel [data-testid="stWidgetLabel"] p {
+            color: var(--color-heading) !important;
+            font-weight: 650;
+        }
+        .st-key-reflection_panel .reflection-ai-explanation {
+            background: #FFFFFF !important;
+            border: 1px solid #E5E5E5 !important;
+            border-radius: 12px !important;
+            padding: 0.85rem 0.95rem !important;
+            box-shadow: 0 4px 12px rgba(18, 34, 54, 0.05) !important;
+        }
+        .st-key-reflection_panel .reflection-ai-explanation .panel-title {
+            color: var(--color-text-muted);
+        }
+        .st-key-reflection_panel .stRadio [role="radiogroup"] {
+            margin-top: 0.45rem;
+        }
+        .st-key-reflection_panel .stRadio label {
+            background: #FFFFFF !important;
+            border: 1px solid #E5E5E5 !important;
+            color: var(--color-heading) !important;
+        }
+        .st-key-reflection_panel .stRadio label:hover {
+            border-color: rgba(29, 94, 168, 0.32) !important;
+            background: #F3F7FC !important;
+        }
+        .st-key-reflection_panel .stSelectbox [data-baseweb="select"] > div {
+            background: #FFFFFF !important;
+            color: var(--color-heading) !important;
+            border: 1px solid #E0E0E0 !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+        }
+        .st-key-reflection_panel .stTextArea textarea {
+            background: #EEF0F3 !important;
+            color: #111827 !important;
+            border: 1px solid #D5DAE1 !important;
+            border-radius: 10px !important;
+            min-height: 112px;
+            padding: 0.85rem 0.95rem;
+            box-shadow: none !important;
+        }
+        .st-key-reflection_panel .stTextArea textarea::placeholder {
+            color: #6B7280 !important;
+        }
+        .st-key-reflection_panel .stTextArea textarea:focus {
+            border-color: rgba(29, 94, 168, 0.42) !important;
+            box-shadow: 0 0 0 3px rgba(29, 94, 168, 0.14) !important;
+            background: #EEF0F3 !important;
+            color: #111827 !important;
+        }
+        .st-key-reflection_panel .stSelectbox [data-baseweb="select"] > div:focus-within {
+            border-color: rgba(29, 94, 168, 0.34) !important;
+            box-shadow: 0 0 0 3px rgba(29, 94, 168, 0.12) !important;
+            background: #FFFFFF !important;
+        }
+        .st-key-reflection_panel .stSelectbox [data-baseweb="select"] * {
+            color: var(--color-heading) !important;
+        }
+        div[data-baseweb="popover"] [role="listbox"] {
+            background: #FFFFFF !important;
+            border: 1px solid #E0E0E0 !important;
+            color: var(--color-heading) !important;
+        }
+        div[data-baseweb="popover"] [role="option"] {
+            background: #FFFFFF !important;
+            color: var(--color-heading) !important;
+        }
+        div[data-baseweb="popover"] [role="option"]:hover {
+            background: #F3F7FC !important;
+        }
+
         /* Inputs */
         .stTextInput input,
         .stSelectbox [data-baseweb="select"] > div,
         .stTextArea textarea {
             border-radius: var(--radius-md);
-            background: var(--color-heading);
-            color: #fffdf8;
-            border: 1px solid rgba(18, 34, 54, 0.18);
+            background: #EEF0F3;
+            color: #111827;
+            border: 1px solid #D5DAE1;
             font-family: var(--font-sans);
         }
         .stTextArea textarea {
@@ -651,17 +763,18 @@ def inject_css():
         }
         .stTextInput input::placeholder,
         .stTextArea textarea::placeholder {
-            color: rgba(255, 253, 248, 0.62);
+            color: #6B7280;
         }
         .stTextInput input:focus,
         .stTextArea textarea:focus {
-            color: #fffdf8;
-            background: var(--color-heading);
-            box-shadow: 0 0 0 3px rgba(45, 111, 180, 0.25);
+            color: #111827;
+            background: #EEF0F3;
+            border-color: rgba(29, 94, 168, 0.42);
+            box-shadow: 0 0 0 3px rgba(29, 94, 168, 0.14);
             outline: none;
         }
         .stSelectbox [data-baseweb="select"] * {
-            color: #fffdf8;
+            color: #111827;
         }
         .stSelectbox [data-baseweb="select"] {
             min-width: 110px;
@@ -679,11 +792,18 @@ def inject_css():
             font-weight: 700;
             font-size: 0.96rem;
             background: linear-gradient(135deg, var(--color-primary-strong), var(--color-primary));
-            color: #fff;
+            color: #FFFFFF !important;
             box-shadow: 0 8px 18px rgba(29, 94, 168, 0.14);
             transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
             font-family: var(--font-sans);
             letter-spacing: 0.01em;
+        }
+        .stButton > button *,
+        .stButton button *,
+        [data-testid="stButton"] > button *,
+        [data-testid="stButton"] button *,
+        button[data-baseweb="button"] * {
+            color: #FFFFFF !important;
         }
         .stButton > button:hover,
         .stButton button:hover,

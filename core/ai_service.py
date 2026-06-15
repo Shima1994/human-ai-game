@@ -13,6 +13,7 @@ from core.constants import (
     REFLECTION_MODEL_NAME,
     TARGET_COUNT,
 )
+from core.validation import mentions_board_word
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
@@ -150,6 +151,93 @@ def format_interaction_history(history):
     return "\n".join(lines)
 
 
+def format_word_type_per_card(words, word_type_per_card):
+    if not word_type_per_card:
+        return "Not provided."
+    missing = [word for word in words if not word_type_per_card.get(word)]
+    if missing:
+        return f"Missing word_type for: {', '.join(missing)}"
+    return ", ".join(
+        f"{word}: {word_type_per_card[word]}" for word in words
+    )
+
+
+def format_participant_feedback(history):
+    feedback_lines = []
+    for item in history:
+        clue_giver = item.get("clue_giver", "")
+        if clue_giver == "human":
+            if not item.get("human_explanation_is_valid"):
+                continue
+            rating = item.get("human_understanding_rating")
+            relationship_type = item.get("human_relationship_type", "")
+            explanation = str(item.get("human_explanation_sanitized", "") or "").strip()
+            if not rating and not relationship_type and not explanation:
+                continue
+        elif clue_giver == "ai":
+            rating = item.get("human_understanding_rating")
+            if not rating:
+                continue
+            relationship_type = ""
+            explanation = ""
+        else:
+            continue
+
+        line_parts = [
+            f"- Perceived understanding: {rating}/5" if rating else "- Perceived understanding: not provided",
+            f"  Relationship type: {relationship_type or 'not provided'}",
+        ]
+        if explanation:
+            line_parts.append(f'  Explanation: "{explanation}"')
+        feedback_lines.append("\n".join(line_parts))
+
+    if not feedback_lines:
+        return "No valid participant feedback yet."
+    return "\n".join(feedback_lines)
+
+
+def format_round_participant_feedback(round_summaries):
+    feedback_lines = []
+    for summary in round_summaries or []:
+        round_number = summary.get("round", "")
+        for item in summary.get("interactions", []):
+            clue_giver = item.get("clue_giver", "")
+            if clue_giver == "human":
+                if not item.get("human_explanation_is_valid"):
+                    continue
+                rating = item.get("human_understanding_rating")
+                relationship_type = item.get("human_relationship_type", "")
+                explanation = str(item.get("human_explanation_sanitized", "") or "").strip()
+                if not rating and not relationship_type and not explanation:
+                    continue
+            elif clue_giver == "ai":
+                rating = item.get("human_understanding_rating")
+                if not rating:
+                    continue
+                relationship_type = ""
+                explanation = ""
+            else:
+                continue
+            parts = [
+                f"- Round {round_number}, turn {item.get('turn', '')}",
+                f"  Perceived understanding: {rating}/5" if rating else "  Perceived understanding: not provided",
+                f"  Relationship type: {relationship_type or 'not provided'}",
+            ]
+            if explanation:
+                parts.append(f'  Explanation: "{explanation}"')
+            feedback_lines.append("\n".join(parts))
+    return "\n".join(feedback_lines)
+
+
+def format_all_participant_feedback(history, round_summaries):
+    chunks = [
+        format_round_participant_feedback(round_summaries),
+        format_participant_feedback(history),
+    ]
+    text = "\n".join(chunk for chunk in chunks if chunk and "No valid" not in chunk)
+    return text or "No valid participant feedback yet."
+
+
 def format_round_memory(round_summaries):
     if not round_summaries:
         return "No previous rounds yet."
@@ -244,6 +332,7 @@ def build_hint_user_prompt(
     round_summaries=None,
     used_hints=None,
     forbidden_hint=None,
+    condition="baseline",
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []
@@ -258,8 +347,18 @@ def build_hint_user_prompt(
         all_used = sorted(set(all_used + [forbidden_hint.lower()]))
 
     forbidden_block = ", ".join(all_used) if all_used else "(none)"
+    word_type_per_card = st.session_state.get("word_type_per_card", {})
+    board_words = target_words + neutral_words + list(bomb_words)
+    feedback_block = ""
+    if condition == "adaptive":
+        feedback_block = (
+            "\n\nPrevious participant feedback:\n"
+            f"{format_all_participant_feedback(history, round_summaries or [])}"
+        )
+
     return (
         f"Word type for this round: {word_type}\n"
+        f"Word type per card: {format_word_type_per_card(board_words, word_type_per_card)}\n"
         f"Remaining target words (you must aim only at these): {', '.join(remaining_targets) or '(none)'}\n"
         f"Targets already found this round: {', '.join(found_targets) or '(none)'}\n"
         f"Neutral words (AVOID — your clue must not fit these): {', '.join(neutral_words)}\n"
@@ -269,6 +368,7 @@ def build_hint_user_prompt(
         f"{format_interaction_history(history)}\n\n"
         "Memory from previous rounds in this game:\n"
         f"{format_round_memory(round_summaries or [])}\n\n"
+        f"{feedback_block}\n\n"
         "Produce the best one-word clue you can, then explain (in the reasoning field) the link and why each neutral and both bombs are safe. Respond with the JSON object only."
     )
 
@@ -324,6 +424,101 @@ def choose_fallback_hint(used_hints, board_words=None):
     return "signal"
 
 
+AI_TURN_EXPLANATION_SYSTEM_PROMPT = """You explain your own clue in a cooperative word association game after the human has already guessed.
+
+Write a short, general explanation of the relationship behind the clue.
+Do not mention any exact card words from the board. Do not mention target words.
+Explain only the general relationship or concept behind the clue.
+Return strict JSON only:
+{
+  "relationship_type": "Category / shared type" | "Theme / shared situation" | "Function / use or purpose" | "Other",
+  "explanation": "<one sentence, max 25 words, no card names>"
+}
+"""
+
+
+SAFE_AI_EXPLANATION_FALLBACK = (
+    "The clue was based on a general semantic association between the intended concepts."
+)
+
+
+def _empty_ai_explanation_result(relationship_type="Other", raw="", reason="generation_failed"):
+    return {
+        "ai_relationship_type": relationship_type or "Other",
+        "ai_explanation_raw": raw or "",
+        "ai_explanation_sanitized": SAFE_AI_EXPLANATION_FALLBACK,
+        "ai_explanation": SAFE_AI_EXPLANATION_FALLBACK,
+        "ai_explanation_is_valid": False,
+        "ai_explanation_blocked_reason": reason,
+    }
+
+
+def generate_ai_turn_explanation(
+    clue,
+    hint_number,
+    intended_targets,
+    guesses,
+    board_words,
+    existing_reasoning="",
+):
+    base_user_prompt = (
+        f"Clue: {clue}\n"
+        f"Number: {hint_number}\n"
+        f"Intended cards: {', '.join(intended_targets)}\n"
+        f"Human guesses: {', '.join(guesses) or '(none)'}\n"
+        f"Forbidden exact board/card words: {', '.join(board_words or [])}\n"
+        f"Your hidden reasoning from clue generation: {existing_reasoning}\n\n"
+        "Explain the general relationship behind the clue without naming any board cards. "
+        "Do not mention any exact card words from the board. Do not mention target words."
+    )
+    strict_suffix = (
+        "\n\nPrevious explanation was invalid because it named a board/card word. "
+        "Regenerate once. Use only abstract/general concepts, categories, or relationships. "
+        "Do not include any visible board word, target word, neutral word, bomb word, or simple plural/singular variant."
+    )
+
+    last_raw_explanation = ""
+    last_relationship_type = "Other"
+    for attempt in range(2):
+        try:
+            raw, _ = call_openai_chat(
+                AI_TURN_EXPLANATION_SYSTEM_PROMPT,
+                base_user_prompt + (strict_suffix if attempt else ""),
+                temperature=0.2 if attempt == 0 else 0.0,
+                model=REFLECTION_MODEL_NAME,
+                json_mode=True,
+            )
+            data = json.loads(raw)
+            relationship_type = str(data.get("relationship_type", "") or "").strip()
+            if relationship_type not in {
+                "Category / shared type",
+                "Theme / shared situation",
+                "Function / use or purpose",
+                "Other",
+            }:
+                relationship_type = "Other"
+            explanation = limit_words(str(data.get("explanation", "") or "").strip(), 25)
+            last_raw_explanation = explanation
+            last_relationship_type = relationship_type
+            if not explanation:
+                continue
+            if mentions_board_word(explanation, board_words):
+                continue
+            return {
+                "ai_relationship_type": relationship_type,
+                "ai_explanation_raw": explanation,
+                "ai_explanation_sanitized": explanation,
+                "ai_explanation": explanation,
+                "ai_explanation_is_valid": True,
+                "ai_explanation_blocked_reason": "",
+            }
+        except Exception:
+            continue
+
+    reason = "board_word" if last_raw_explanation else "generation_failed"
+    return _empty_ai_explanation_result(last_relationship_type, last_raw_explanation, reason)
+
+
 def _empty_ai_call_meta():
     return {"raw_response": "", "response_time_sec": 0.0, "attempts": 0}
 
@@ -338,6 +533,7 @@ def _generate_hint_with_forbidden(
     round_summaries,
     forbidden_hint=None,
     fallback_size_cap=2,
+    condition="baseline",
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []
@@ -370,6 +566,7 @@ def _generate_hint_with_forbidden(
                     round_summaries,
                     used_hints,
                     forbidden_hint,
+                    condition,
                 ),
                 temperature=0.55,
                 model=HINT_MODEL_NAME,
@@ -427,6 +624,7 @@ def generate_ai_hint(
     history=None,
     used_hints=None,
     round_summaries=None,
+    condition="baseline",
 ):
     return _generate_hint_with_forbidden(
         target_words,
@@ -438,6 +636,7 @@ def generate_ai_hint(
         round_summaries or [],
         forbidden_hint=None,
         fallback_size_cap=2,
+        condition=condition,
     )
 
 
@@ -450,6 +649,7 @@ def generate_ai_hint_reroll(
     history=None,
     used_hints=None,
     round_summaries=None,
+    condition="baseline",
 ):
     return _generate_hint_with_forbidden(
         target_words,
@@ -461,6 +661,7 @@ def generate_ai_hint_reroll(
         round_summaries or [],
         forbidden_hint=previous_hint,
         fallback_size_cap=1,
+        condition=condition,
     )
 
 
@@ -510,10 +711,19 @@ def build_guess_user_prompt(
     round_summaries,
     remaining_skips,
     can_skip,
+    condition="baseline",
 ):
     available_board = [word for word in board if word not in previous_guesses]
+    word_type_per_card = st.session_state.get("word_type_per_card", {})
+    feedback_block = ""
+    if condition == "adaptive":
+        feedback_block = (
+            "\n\nPrevious participant feedback:\n"
+            f"{format_all_participant_feedback(history, round_summaries or [])}"
+        )
     return (
         f"Available board words (only choose from these): {', '.join(available_board)}\n"
+        f"Word type per available card: {format_word_type_per_card(available_board, word_type_per_card)}\n"
         f"Words already guessed this round (do NOT repeat): {', '.join(previous_guesses) or '(none)'}\n\n"
         f"Your teammate's clue: \"{hint}\"\n"
         f"Number of guesses to produce (N): {max_guesses}\n\n"
@@ -526,6 +736,7 @@ def build_guess_user_prompt(
         f"{format_interaction_history(history)}\n\n"
         "Memory from previous rounds:\n"
         f"{format_round_memory(round_summaries or [])}\n\n"
+        f"{feedback_block}\n\n"
         "Default to guessing. REROLL_HINT and SKIP_CLUE are last resorts. "
         "Respond with the JSON object OR a single literal token."
     )
@@ -588,6 +799,7 @@ def ai_guess(
     round_summaries=None,
     remaining_skips=0,
     can_skip=False,
+    condition="baseline",
 ):
     history = history or []
     previous_guesses = previous_guesses or []
@@ -608,6 +820,7 @@ def ai_guess(
                 round_summaries,
                 remaining_skips,
                 can_skip,
+                condition,
             ),
             temperature=0.2,
             model=GUESS_MODEL_NAME,
