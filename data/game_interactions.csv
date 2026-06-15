@@ -1,72 +1,72 @@
-session_id,timestamp_utc,participant_id,round,role,word_type,turn,clue_giver,guesser,hint,hint_number,intended_targets,hint_explanation,guesses,correct_guesses,missed_intended_targets,extra_correct_guesses,neutral_guesses,bomb_guess,outcome,skipped,skipped_by,bomb_hit,round_medal,round_success,ai_understanding_rating_before,ai_understanding_rating_after,hint_response_time_sec,hint_attempts,hint_used_fallback,guess_response_time_sec,hint_raw_response,guess_raw_response,interaction_recorded_at
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,1,human,ai,high,2,Tower;Elevator,,Tower;Elevator,Tower;Elevator,,,,,correct,0,,0,none,0,5,5,,,0,2.782,,"{
+session_id,timestamp_utc,participant_id,condition,starting_role,round,round_number,round_role,role,word_type,board_template_type,word_type_per_card,target_word_types,neutral_word_types,bomb_word_types,turn,turn_number,clue_giver,guesser,hint,clue,hint_number,clue_number,intended_targets,intended_cards,hint_explanation,guesses,guessed_cards,guessed_word_types,correct_guesses,correct_guess_word_types,incorrect_guesses,incorrect_guess_word_types,missed_intended_targets,extra_correct_guesses,neutral_guesses,bomb_guess,outcome,alignment_status,error_type,skipped,skipped_by,bomb_hit,round_medal,round_success,ai_understanding_rating_before,ai_understanding_rating_after,hint_response_time_sec,hint_attempts,hint_used_fallback,guess_response_time_sec,hint_raw_response,guess_raw_response,human_understanding_rating,human_relationship_type,human_explanation_raw,human_explanation_is_valid,human_explanation_blocked_reason,ai_relationship_type,ai_explanation_raw,ai_explanation_sanitized,ai_explanation_is_valid,ai_explanation_blocked_reason,ai_explanation,reflection_source,reflection_rating,reflection_relationship_type,reflection_explanation_raw,reflection_explanation_is_valid,reflection_blocked_reason,interaction_recorded_at
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,,,1,,,human_clue,concrete,,,,,,1,,human,ai,high,,2,,Tower;Elevator,,,Tower;Elevator,,,Tower;Elevator,,,,,,,,correct,,,0,,0,none,0,5,5,,,0,2.782,,"{
   ""reasoning"": ""The word 'high' is commonly associated with 'Tower' as towers are tall structures. 'Elevator' is also linked to 'high' because elevators are used to reach high floors in buildings."",
   ""guesses"": [""Tower"", ""Elevator""]
-}",2026-05-20T22:28:25.689589
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,2,human,ai,pirate,2,Ship;Police,,Shoe;Ice,,Ship;Police,,Shoe;Ice,,wrong,0,,0,none,0,4,1,,,0,1.935,,"```json
+}",,,,,,,,,,,,,,,,,,2026-05-20T22:28:25.689589
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,,,1,,,human_clue,concrete,,,,,,2,,human,ai,pirate,,2,,Ship;Police,,,Shoe;Ice,,,,,,,Ship;Police,,Shoe;Ice,,wrong,,,0,,0,none,0,4,1,,,0,1.935,,"```json
 {
   ""reasoning"": ""Pirates are commonly associated with the sea, as they are known for sailing and raiding ships. Additionally, pirates are often depicted on ships, making 'Ship' a strong association with the clue."",
   ""guesses"": [""Sea"", ""Ship""]
 }
-```",2026-05-20T22:29:26.141510
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,3,human,ai,pirates,2,Ship;Police,,Theater;Penguin,,Ship;Police,,Theater;Penguin,,wrong,0,,0,none,0,4,1,,,0,1.415,,"```json
+```",,,,,,,,,,,,,,,,,,2026-05-20T22:29:26.141510
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,,,1,,,human_clue,concrete,,,,,,3,,human,ai,pirates,,2,,Ship;Police,,,Theater;Penguin,,,,,,,Ship;Police,,Theater;Penguin,,wrong,,,0,,0,none,0,4,1,,,0,1.415,,"```json
 {
   ""reasoning"": ""Pirates are commonly associated with ships, as they are known for sailing and attacking other vessels. Police could be linked to pirates as they represent law enforcement, which would pursue pirates."",
   ""guesses"": [""Ship"", ""Police""]
 }
-```",2026-05-20T22:30:28.797823
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,1,human_clue,concrete,4,human,ai,boat,1,Ship,,Police,Police,Ship,Police,,,correct,0,,0,none,0,4,1,,,0,1.428,,"```json
+```",,,,,,,,,,,,,,,,,,2026-05-20T22:30:28.797823
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:31:41.001023,SAG,,,1,,,human_clue,concrete,,,,,,4,,human,ai,boat,,1,,Ship,,,Police,,,Police,,,,Ship,Police,,,correct,,,0,,0,none,0,4,1,,,0,1.428,,"```json
 {
   ""reasoning"": ""The clue 'boat' directly relates to 'Ship' as boats and ships are both watercraft. This is a strong, everyday association."",
   ""guesses"": [""Ship""]
 }
-```",2026-05-20T22:30:46.770907
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,1,ai,human,connection,2,Association;Source,"The clue 'connection' links 'Association' and 'Source' as both can involve connections in different contexts. 'Association' is directly related to forming connections between entities or ideas, while 'Source' can be the origin or connection point of information or resources. The bomb word 'Year' is not connected to 'connection' as it doesn't imply a linkage or origin point. Neutrals such as",Association;Intent,Association,Source,,Intent,,correct,0,,0,none,0,,,2.817,1,0,,"{
+```",,,,,,,,,,,,,,,,,,2026-05-20T22:30:46.770907
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,,,2,,,ai_clue,abstract,,,,,,1,,ai,human,connection,,2,,Association;Source,,"The clue 'connection' links 'Association' and 'Source' as both can involve connections in different contexts. 'Association' is directly related to forming connections between entities or ideas, while 'Source' can be the origin or connection point of information or resources. The bomb word 'Year' is not connected to 'connection' as it doesn't imply a linkage or origin point. Neutrals such as",Association;Intent,,,Association,,,,Source,,Intent,,correct,,,0,,0,none,0,,,2.817,1,0,,"{
   ""reasoning"": ""The clue 'connection' links 'Association' and 'Source' as both can involve connections in different contexts. 'Association' is directly related to forming connections between entities or ideas, while 'Source' can be the origin or connection point of information or resources. The bomb word 'Year' is not connected to 'connection' as it doesn't imply a linkage or origin point. Neutrals such as 'Time', 'Illness', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', and 'Good' don't fit well with 'connection' as they do not primarily signify a linking or origin concept."",
   ""clue"": ""connection"",
   ""number"": 2,
   ""targets"": [""Association"", ""Source""]
-}",,2026-05-20T22:31:58.786936
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,2,ai,human,origin,2,Means;Source,"The clue 'origin' connects 'Means' and 'Source' as both can be understood as starting points or origins of something. 'Origin' does not relate to any neutral words like 'Time', 'Illness', 'Blue', etc., and it is not associated with 'Year', which is the bomb.",Source;Good,Source,Means,,Good,,correct,0,,0,none,0,,,1.397,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-20T22:31:58.786936
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,,,2,,,ai_clue,abstract,,,,,,2,,ai,human,origin,,2,,Means;Source,,"The clue 'origin' connects 'Means' and 'Source' as both can be understood as starting points or origins of something. 'Origin' does not relate to any neutral words like 'Time', 'Illness', 'Blue', etc., and it is not associated with 'Year', which is the bomb.",Source;Good,,,Source,,,,Means,,Good,,correct,,,0,,0,none,0,,,1.397,1,0,,"{
   ""reasoning"": ""The clue 'origin' connects 'Means' and 'Source' as both can be understood as starting points or origins of something. 'Origin' does not relate to any neutral words like 'Time', 'Illness', 'Blue', etc., and it is not associated with 'Year', which is the bomb."",
   ""clue"": ""origin"",
   ""number"": 2,
   ""targets"": [""Means"", ""Source""]
-}",,2026-05-20T22:32:14.771943
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,3,ai,human,tradition,2,Means;Customs,"The clue 'tradition' links 'Means' and 'Customs' as both relate to established ways of doing things and cultural practices. 'Tradition' does not connect to 'Point', which is more about specific locations or arguments. The bomb word 'Year' is not directly associated with 'tradition', as traditions are not bound to specific years. Neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond',",Customs;Relocation,Customs,Means,,Relocation,,correct,0,,0,none,0,,,3.064,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-20T22:32:14.771943
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,,,2,,,ai_clue,abstract,,,,,,3,,ai,human,tradition,,2,,Means;Customs,,"The clue 'tradition' links 'Means' and 'Customs' as both relate to established ways of doing things and cultural practices. 'Tradition' does not connect to 'Point', which is more about specific locations or arguments. The bomb word 'Year' is not directly associated with 'tradition', as traditions are not bound to specific years. Neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond',",Customs;Relocation,,,Customs,,,,Means,,Relocation,,correct,,,0,,0,none,0,,,3.064,1,0,,"{
   ""reasoning"": ""The clue 'tradition' links 'Means' and 'Customs' as both relate to established ways of doing things and cultural practices. 'Tradition' does not connect to 'Point', which is more about specific locations or arguments. The bomb word 'Year' is not directly associated with 'tradition', as traditions are not bound to specific years. Neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', and 'Good' do not have a strong association with 'tradition', ensuring safe guesses."",
   ""clue"": ""tradition"",
   ""number"": 2,
   ""targets"": [""Means"", ""Customs""]
-}",,2026-05-20T22:32:36.946871
-ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,abstract,4,ai,human,purpose,2,Means;Point,"The clue 'purpose' links the targets 'Means' and 'Point' as both refer to the reason or intention behind an action or concept. None of the neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', or 'Good', nor the bomb 'Year', directly connect to 'purpose' as they do not specifically denote a reason or intention in the same abstract sense.",Means;Bond,Means,Point,,Bond,,correct,0,,0,none,0,,,1.931,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-20T22:32:36.946871
+ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,,,2,,,ai_clue,abstract,,,,,,4,,ai,human,purpose,,2,,Means;Point,,"The clue 'purpose' links the targets 'Means' and 'Point' as both refer to the reason or intention behind an action or concept. None of the neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', or 'Good', nor the bomb 'Year', directly connect to 'purpose' as they do not specifically denote a reason or intention in the same abstract sense.",Means;Bond,,,Means,,,,Point,,Bond,,correct,,,0,,0,none,0,,,1.931,1,0,,"{
   ""reasoning"": ""The clue 'purpose' links the targets 'Means' and 'Point' as both refer to the reason or intention behind an action or concept. None of the neutrals like 'Time', 'Illness', 'Blue', 'Resolution', 'Relocation', 'Game', 'Bond', 'Intent', or 'Good', nor the bomb 'Year', directly connect to 'purpose' as they do not specifically denote a reason or intention in the same abstract sense."",
   ""clue"": ""purpose"",
   ""number"": 2,
   ""targets"": [""Means"", ""Point""]
-}",,2026-05-20T22:33:15.314422
-2026-05-21T06:44:39.916111,Shimaaa,1,human_clue,abstract,1,human,ai,treel,3,light;luck;link,,,light;luck;link,,,,skip,1,ai,0,none,0,1,,
-2026-05-21T06:44:39.916111,Shimaaa,1,human_clue,abstract,2,human,ai,star,3,light;luck;link,,,light;luck;link,,,,skip,1,ai,0,none,0,1,,
-2026-05-21T06:44:39.916111,Shimaaa,1,human_clue,abstract,3,human,ai,starts,3,link;luck;light,light;link;luck,light;link;luck,,,,,correct,0,,0,none,0,1,4,5
-2026-05-21T06:44:39.916111,Shimaaa,1,human_clue,abstract,4,human,ai,time,1,memory,wake,,memory,,wake,,wrong,0,,0,none,0,1,4,1
-2026-05-21T06:45:44.854791,Shimaaa,2,ai_clue,abstract,1,ai,human,hint,3,shadow;soul;melody,luck;link;hide,luck,shadow;soul;melody,luck,link;hide,,correct,0,,0,none,0,3,,
-2026-05-21T06:45:44.854791,Shimaaa,2,ai_clue,abstract,2,ai,human,harmony,3,melody;soul;shadow,melody;light;smile,melody,soul;shadow,,light,smile,bomb,0,,1,none,0,3,,
-2026-05-21T06:47:20.582170,Shimaaa,3,human_clue,concrete,1,human,ai,material,1,sword,leather,,sword,,leather,,wrong,0,,0,none,0,1,3,1
-2026-05-21T06:47:20.582170,Shimaaa,3,human_clue,concrete,2,human,ai,tree,2,lemon;sword,,,lemon;sword,,,,skip,1,ai,0,none,0,1,,
-2026-05-21T06:47:20.582170,Shimaaa,3,human_clue,concrete,3,human,ai,treees,1,ice,,,ice,,,,skip,1,ai,0,none,0,1,,
-2026-05-21T06:47:20.582170,Shimaaa,3,human_clue,concrete,4,human,ai,blume,1,ice,ball,,ice,,ball,,wrong,0,,0,none,0,1,3,1
-2026-05-21T06:48:43.655544,Shimaaa,4,ai_clue,concrete,1,ai,human,citrus,2,lemon;sun,popcorn;wood,wood,lemon;sun,wood,popcorn,,correct,0,,0,none,0,3,,
-2026-05-21T06:48:43.655544,Shimaaa,4,ai_clue,concrete,2,ai,human,shine,2,sun;ice,sun;baby,sun,ice,,baby,,correct,0,,0,none,0,3,,
-2026-05-21T06:48:43.655544,Shimaaa,4,ai_clue,concrete,3,ai,human,frozen,2,ice;sword,towel;sugar,,ice;sword,,towel;sugar,,wrong,0,,0,none,0,3,,
-2026-05-21T06:48:43.655544,Shimaaa,4,ai_clue,concrete,4,ai,human,signal,2,lemon;sword,ice;lemon,ice;lemon,sword,ice,,,correct,0,,0,none,0,3,,
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:20:45.297640,Test33,1,human_clue,concrete,1,human,ai,haki,3,Ball;Ice;Shoe,,Ship;Sea;King,,Ball;Ice;Shoe,,Ship;Sea;King,,wrong,0,,0,none,0,4,1,,,0,7.406,,"REROLL_HINT
+}",,,,,,,,,,,,,,,,,,,2026-05-20T22:33:15.314422
+2026-05-21T06:44:39.916111,Shimaaa,1,,,human_clue,,,abstract,1,,,,,,human,,ai,treel,3,,light;luck;link,,,,,light;luck;link,,,,,,,,,skip,1,ai,,,0,none,0,1,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:44:39.916111,Shimaaa,1,,,human_clue,,,abstract,2,,,,,,human,,ai,star,3,,light;luck;link,,,,,light;luck;link,,,,,,,,,skip,1,ai,,,0,none,0,1,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:44:39.916111,Shimaaa,1,,,human_clue,,,abstract,3,,,,,,human,,ai,starts,3,,link;luck;light,,light;link;luck,,light;link;luck,,,,,,,,,,correct,0,,,,0,none,0,1,4,5,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:44:39.916111,Shimaaa,1,,,human_clue,,,abstract,4,,,,,,human,,ai,time,1,,memory,,wake,,,memory,,,,,,,wake,,wrong,0,,,,0,none,0,1,4,1,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:45:44.854791,Shimaaa,2,,,ai_clue,,,abstract,1,,,,,,ai,,human,hint,3,,shadow;soul;melody,,luck;link;hide,,luck,shadow;soul;melody,,,luck,,,,link;hide,,correct,0,,,,0,none,0,3,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:45:44.854791,Shimaaa,2,,,ai_clue,,,abstract,2,,,,,,ai,,human,harmony,3,,melody;soul;shadow,,melody;light;smile,,melody,soul;shadow,,,,,,,light,smile,bomb,0,,,,1,none,0,3,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:47:20.582170,Shimaaa,3,,,human_clue,,,concrete,1,,,,,,human,,ai,material,1,,sword,,leather,,,sword,,,,,,,leather,,wrong,0,,,,0,none,0,1,3,1,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:47:20.582170,Shimaaa,3,,,human_clue,,,concrete,2,,,,,,human,,ai,tree,2,,lemon;sword,,,,,lemon;sword,,,,,,,,,skip,1,ai,,,0,none,0,1,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:47:20.582170,Shimaaa,3,,,human_clue,,,concrete,3,,,,,,human,,ai,treees,1,,ice,,,,,ice,,,,,,,,,skip,1,ai,,,0,none,0,1,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:47:20.582170,Shimaaa,3,,,human_clue,,,concrete,4,,,,,,human,,ai,blume,1,,ice,,ball,,,ice,,,,,,,ball,,wrong,0,,,,0,none,0,1,3,1,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:48:43.655544,Shimaaa,4,,,ai_clue,,,concrete,1,,,,,,ai,,human,citrus,2,,lemon;sun,,popcorn;wood,,wood,lemon;sun,,,wood,,,,popcorn,,correct,0,,,,0,none,0,3,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:48:43.655544,Shimaaa,4,,,ai_clue,,,concrete,2,,,,,,ai,,human,shine,2,,sun;ice,,sun;baby,,sun,ice,,,,,,,baby,,correct,0,,,,0,none,0,3,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:48:43.655544,Shimaaa,4,,,ai_clue,,,concrete,3,,,,,,ai,,human,frozen,2,,ice;sword,,towel;sugar,,,ice;sword,,,,,,,towel;sugar,,wrong,0,,,,0,none,0,3,,,,,,,,,,,,,,,,,,,,,,,,,,,
+2026-05-21T06:48:43.655544,Shimaaa,4,,,ai_clue,,,concrete,4,,,,,,ai,,human,signal,2,,lemon;sword,,ice;lemon,,ice;lemon,sword,,,ice,,,,,,correct,0,,,,0,none,0,3,,,,,,,,,,,,,,,,,,,,,,,,,,,
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:20:45.297640,Test33,,,1,,,human_clue,concrete,,,,,,1,,human,ai,haki,,3,,Ball;Ice;Shoe,,,Ship;Sea;King,,,,,,,Ball;Ice;Shoe,,Ship;Sea;King,,wrong,,,0,,0,none,0,4,1,,,0,7.406,,"REROLL_HINT
 
 <repair_response>
 {
   ""reasoning"": ""Haki is a concept from the anime One Piece, which involves pirates and the sea. 'Ship' and 'Sea' are directly related to the pirate theme. 'King' is relevant as the series involves the quest to become the Pirate King."",
   ""guesses"": [""Ship"", ""Sea"", ""King""]
-}",2026-05-26T11:19:05.508416
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:20:45.297640,Test33,1,human_clue,concrete,2,human,ai,hockey,3,Shoe;Ice;Ball,,Ice;Ball;Penguin,Ice;Ball,Shoe,,,Penguin,bomb,0,,1,none,0,4,1,,,0,3.160,,"```json
+}",,,,,,,,,,,,,,,,,,2026-05-26T11:19:05.508416
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:20:45.297640,Test33,,,1,,,human_clue,concrete,,,,,,2,,human,ai,hockey,,3,,Shoe;Ice;Ball,,,Ice;Ball;Penguin,,,Ice;Ball,,,,Shoe,,,Penguin,bomb,,,0,,1,none,0,4,1,,,0,3.160,,"```json
 {
   ""reasoning"": ""Ice is directly associated with hockey as the game is played on an ice rink. Penguin is a strong association as penguins are often found in icy environments, similar to where hockey is played. Ball is a plausible link as hockey involves a puck, which is similar to a ball in terms of being a game object."",
   ""guesses"": [""Ice"", ""Penguin"", ""Ball""]
@@ -77,27 +77,27 @@ ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,ab
 {
   ""reasoning"": ""Ice is directly associated with hockey as the game is played on an ice rink. Ball is a plausible link as hockey involves a puck, which is similar to a ball in terms of being a game object. Penguin is a secondary association as penguins are often found in icy environments, similar to where hockey is played."",
   ""guesses"": [""Ice"", ""Ball"", ""Penguin""]
-}",2026-05-26T11:19:49.030714
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,2,ai_clue,abstract,1,ai,human,cause,3,Means;Association;Illness,"The targets 'Means', 'Association', and 'Illness' can be linked by the concept of 'cause'. 'Means' is often a cause for an outcome, 'Association' can refer to causes in social or professional contexts, and 'Illness' typically has causes that are studied or treated. The bomb word 'Bond' is not directly related to 'cause' as bonds are more about connections and relationships.",Source;Intent;Means,Means,Association;Illness,,Source;Intent,,correct,0,,0,none,0,,,2.724,1,0,,"{
+}",,,,,,,,,,,,,,,,,,2026-05-26T11:19:49.030714
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,,,2,,,ai_clue,abstract,,,,,,1,,ai,human,cause,,3,,Means;Association;Illness,,"The targets 'Means', 'Association', and 'Illness' can be linked by the concept of 'cause'. 'Means' is often a cause for an outcome, 'Association' can refer to causes in social or professional contexts, and 'Illness' typically has causes that are studied or treated. The bomb word 'Bond' is not directly related to 'cause' as bonds are more about connections and relationships.",Source;Intent;Means,,,Means,,,,Association;Illness,,Source;Intent,,correct,,,0,,0,none,0,,,2.724,1,0,,"{
   ""reasoning"": ""The targets 'Means', 'Association', and 'Illness' can be linked by the concept of 'cause'. 'Means' is often a cause for an outcome, 'Association' can refer to causes in social or professional contexts, and 'Illness' typically has causes that are studied or treated. The bomb word 'Bond' is not directly related to 'cause' as bonds are more about connections and relationships. The neutrals like 'Resolution', 'Customs', 'Good', 'Point', 'Intent', 'Source', 'Game', 'Time', and 'Relocation' do not directly suggest a 'cause', which is more about initiating or resulting in something."",
   ""clue"": ""cause"",
   ""number"": 3,
   ""targets"": [""Means"", ""Association"", ""Illness""]
-}",,2026-05-26T11:21:21.994427
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,2,ai_clue,abstract,2,ai,human,organization,2,Year;Association,"The targets 'Year' and 'Association' can be linked through the concept of 'organization,' as associations are often organized by year or have annual events. The bomb 'Bond' is not related to organization in this context, and the neutrals do not specifically relate to the idea of organizing by year or associations.",Association;Resolution,Association,Year,,Resolution,,correct,0,,0,none,0,,,2.247,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-26T11:21:21.994427
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,,,2,,,ai_clue,abstract,,,,,,2,,ai,human,organization,,2,,Year;Association,,"The targets 'Year' and 'Association' can be linked through the concept of 'organization,' as associations are often organized by year or have annual events. The bomb 'Bond' is not related to organization in this context, and the neutrals do not specifically relate to the idea of organizing by year or associations.",Association;Resolution,,,Association,,,,Year,,Resolution,,correct,,,0,,0,none,0,,,2.247,1,0,,"{
   ""reasoning"": ""The targets 'Year' and 'Association' can be linked through the concept of 'organization,' as associations are often organized by year or have annual events. The bomb 'Bond' is not related to organization in this context, and the neutrals do not specifically relate to the idea of organizing by year or associations."",
   ""clue"": ""organization"",
   ""number"": 2,
   ""targets"": [""Year"", ""Association""]
-}",,2026-05-26T11:21:47.628127
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,2,ai_clue,abstract,3,ai,human,depression,2,Illness;Blue,"The clue 'depression' links 'Illness' and 'Blue' through the concept of feeling down or sad, which is a common association with both words. The bomb 'Bond' and neutrals like 'Resolution', 'Intent', and others do not have a strong connection to 'depression', making this a safe choice.",Illness;Relocation,Illness,Blue,,Relocation,,correct,0,,0,none,0,,,2.743,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-26T11:21:47.628127
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,,,2,,,ai_clue,abstract,,,,,,3,,ai,human,depression,,2,,Illness;Blue,,"The clue 'depression' links 'Illness' and 'Blue' through the concept of feeling down or sad, which is a common association with both words. The bomb 'Bond' and neutrals like 'Resolution', 'Intent', and others do not have a strong connection to 'depression', making this a safe choice.",Illness;Relocation,,,Illness,,,,Blue,,Relocation,,correct,,,0,,0,none,0,,,2.743,1,0,,"{
   ""reasoning"": ""The clue 'depression' links 'Illness' and 'Blue' through the concept of feeling down or sad, which is a common association with both words. The bomb 'Bond' and neutrals like 'Resolution', 'Intent', and others do not have a strong connection to 'depression', making this a safe choice."",
   ""clue"": ""depression"",
   ""number"": 2,
   ""targets"": [""Illness"", ""Blue""]
-}",,2026-05-26T11:22:10.746215
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,2,ai_clue,abstract,4,ai,human,calendar,2,Year;Blue,"The clue 'calendar' links 'Year' and 'Blue' through the concept of a 'blue moon,' which is a rare event in a calendar year. This clue avoids the bomb 'Bond' as there is no direct or indirect connection to 'calendar.' Neutrals like 'Resolution,' 'Customs,' 'Good,' 'Point,' 'Intent,' 'Source,' 'Game,' 'Time,' and 'Relocation' are not typically associated with 'calendar' in a way",Time;Year,Year,Blue,,Time,,correct,0,,0,none,0,,,2.824,1,0,,"{""reasoning"": ""The clue 'calendar' links 'Year' and 'Blue' through the concept of a 'blue moon,' which is a rare event in a calendar year. This clue avoids the bomb 'Bond' as there is no direct or indirect connection to 'calendar.' Neutrals like 'Resolution,' 'Customs,' 'Good,' 'Point,' 'Intent,' 'Source,' 'Game,' 'Time,' and 'Relocation' are not typically associated with 'calendar' in a way that would prompt guessing them."", ""clue"": ""calendar"", ""number"": 2, ""targets"": [""Year"", ""Blue""]}",,2026-05-26T11:22:20.314837
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,1,human,ai,birthday,3,Association;Day;Spirit,,Day;Life;Spirit,Day;Spirit,Association,,Life,,correct,0,,0,bronze,1,2,4,,,0,3.458,,"```json
+}",,,,,,,,,,,,,,,,,,,2026-05-26T11:22:10.746215
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:24:09.474258,Test33,,,2,,,ai_clue,abstract,,,,,,4,,ai,human,calendar,,2,,Year;Blue,,"The clue 'calendar' links 'Year' and 'Blue' through the concept of a 'blue moon,' which is a rare event in a calendar year. This clue avoids the bomb 'Bond' as there is no direct or indirect connection to 'calendar.' Neutrals like 'Resolution,' 'Customs,' 'Good,' 'Point,' 'Intent,' 'Source,' 'Game,' 'Time,' and 'Relocation' are not typically associated with 'calendar' in a way",Time;Year,,,Year,,,,Blue,,Time,,correct,,,0,,0,none,0,,,2.824,1,0,,"{""reasoning"": ""The clue 'calendar' links 'Year' and 'Blue' through the concept of a 'blue moon,' which is a rare event in a calendar year. This clue avoids the bomb 'Bond' as there is no direct or indirect connection to 'calendar.' Neutrals like 'Resolution,' 'Customs,' 'Good,' 'Point,' 'Intent,' 'Source,' 'Game,' 'Time,' and 'Relocation' are not typically associated with 'calendar' in a way that would prompt guessing them."", ""clue"": ""calendar"", ""number"": 2, ""targets"": [""Year"", ""Blue""]}",,,,,,,,,,,,,,,,,,,2026-05-26T11:22:20.314837
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,,,3,,,human_clue,abstract,,,,,,1,,human,ai,birthday,,3,,Association;Day;Spirit,,,Day;Life;Spirit,,,Day;Spirit,,,,Association,,Life,,correct,,,0,,0,bronze,1,2,4,,,0,3.458,,"```json
 {
   ""reasoning"": ""A birthday is commonly associated with 'Day' as it is a specific day of celebration. 'Life' is relevant because birthdays mark the anniversary of one's birth, a key life event. 'Spirit' can be linked to the celebratory and joyful spirit often present at birthday parties."",
   ""guesses"": [""Day"", ""Life"", ""Spirit""]
@@ -105,8 +105,8 @@ ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,ab
 ```
 
 <repair_response>
-{""reasoning"":""A birthday is commonly associated with 'Day' as it is a specific day of celebration. 'Life' is relevant because birthdays mark the anniversary of one's birth, a key life event. 'Spirit' can be linked to the celebratory and joyful spirit often present at birthday parties."",""guesses"":[""Day"",""Life"",""Spirit""]}",2026-05-26T11:25:40.902274
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,2,human,ai,picnic,2,Air;Association,,Air;Fire,Air,Association,,Fire,,correct,0,,0,bronze,1,4,3,,,0,2.842,,"```json
+{""reasoning"":""A birthday is commonly associated with 'Day' as it is a specific day of celebration. 'Life' is relevant because birthdays mark the anniversary of one's birth, a key life event. 'Spirit' can be linked to the celebratory and joyful spirit often present at birthday parties."",""guesses"":[""Day"",""Life"",""Spirit""]}",,,,,,,,,,,,,,,,,,2026-05-26T11:25:40.902274
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,,,3,,,human_clue,abstract,,,,,,2,,human,ai,picnic,,2,,Air;Association,,,Air;Fire,,,Air,,,,Association,,Fire,,correct,,,0,,0,bronze,1,4,3,,,0,2.842,,"```json
 {
   ""reasoning"": ""Picnics are often associated with being outdoors and enjoying nature, which relates to Air. Additionally, picnics can involve cooking or grilling, which involves Fire."",
   ""guesses"": [""Air"", ""Fire""]
@@ -117,8 +117,8 @@ ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,ab
 {
   ""reasoning"": ""Picnics are often held outdoors, which involves Air. Additionally, picnics can involve cooking or grilling, which involves Fire."",
   ""guesses"": [""Air"", ""Fire""]
-}",2026-05-26T11:26:23.350450
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,3,human,ai,meeting,2,Association;Reason,,Association;Economy,Association,Reason,,Economy,,correct,0,,0,bronze,1,3,3,,,0,2.714,,"```json
+}",,,,,,,,,,,,,,,,,,2026-05-26T11:26:23.350450
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,,,3,,,human_clue,abstract,,,,,,3,,human,ai,meeting,,2,,Association;Reason,,,Association;Economy,,,Association,,,,Reason,,Economy,,correct,,,0,,0,bronze,1,3,3,,,0,2.714,,"```json
 {
   ""reasoning"": ""The word 'Association' is directly linked to 'meeting' as meetings often involve associations or groups. 'Reason' is also linked as meetings are typically held to discuss or resolve reasons or issues."",
   ""guesses"": [""Association"", ""Reason""]
@@ -126,8 +126,8 @@ ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,ab
 ```
 
 <repair_response>
-{""reasoning"":""'Association' is directly linked to 'meeting' as meetings often involve associations or groups. 'Economy' is linked because meetings are frequently held to discuss economic matters or business strategies."",""guesses"":[""Association"", ""Economy""]}",2026-05-26T11:27:18.820321
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,3,human_clue,abstract,4,human,ai,aim,1,Reason,,Reason,Reason,,,,,correct,0,,0,bronze,1,3,3,,,0,2.448,,"```json
+{""reasoning"":""'Association' is directly linked to 'meeting' as meetings often involve associations or groups. 'Economy' is linked because meetings are frequently held to discuss economic matters or business strategies."",""guesses"":[""Association"", ""Economy""]}",,,,,,,,,,,,,,,,,,2026-05-26T11:27:18.820321
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:28:47.966879,Test33,,,3,,,human_clue,abstract,,,,,,4,,human,ai,aim,,1,,Reason,,,Reason,,,Reason,,,,,,,,correct,,,0,,0,bronze,1,3,3,,,0,2.448,,"```json
 {
   ""reasoning"": ""The word 'aim' is most directly associated with 'Reason' as it implies a purpose or goal, which aligns with the concept of having a reason for doing something."",
   ""guesses"": [""Reason""]
@@ -135,36 +135,36 @@ ec5a3efa-3f02-4c44-8c82-dd481884517d,2026-05-20T22:33:48.232428,SAG,2,ai_clue,ab
 ```
 
 <repair_response>
-{""reasoning"":""The word 'aim' is most directly associated with 'Reason' as it implies a purpose or goal, which aligns with the concept of having a reason for doing something."",""guesses"":[""Reason""]}",2026-05-26T11:28:24.688623
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,4,ai_clue,concrete,1,ai,human,winter,2,Snowman;Fox,"The targets 'Snowman' and 'Fox' can be linked through the word 'winter.' Snowmen are typically associated with winter and snow, while foxes are often depicted in winter settings in popular media. The bomb word 'Car' and the neutrals do not have a strong association with 'winter,' making this clue safe.",Snowman;Castle,Snowman,Fox,,Castle,,correct,0,,0,none,0,,,2.841,1,0,,"{
+{""reasoning"":""The word 'aim' is most directly associated with 'Reason' as it implies a purpose or goal, which aligns with the concept of having a reason for doing something."",""guesses"":[""Reason""]}",,,,,,,,,,,,,,,,,,2026-05-26T11:28:24.688623
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,,,4,,,ai_clue,concrete,,,,,,1,,ai,human,winter,,2,,Snowman;Fox,,"The targets 'Snowman' and 'Fox' can be linked through the word 'winter.' Snowmen are typically associated with winter and snow, while foxes are often depicted in winter settings in popular media. The bomb word 'Car' and the neutrals do not have a strong association with 'winter,' making this clue safe.",Snowman;Castle,,,Snowman,,,,Fox,,Castle,,correct,,,0,,0,none,0,,,2.841,1,0,,"{
   ""reasoning"": ""The targets 'Snowman' and 'Fox' can be linked through the word 'winter.' Snowmen are typically associated with winter and snow, while foxes are often depicted in winter settings in popular media. The bomb word 'Car' and the neutrals do not have a strong association with 'winter,' making this clue safe."",
   ""clue"": ""winter"",
   ""number"": 2,
   ""targets"": [""Snowman"", ""Fox""]
-}",,2026-05-26T11:29:18.631635
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,4,ai_clue,concrete,2,ai,human,web,2,Spider;Pen,"The clue 'web' connects Spider and Pen. A spider spins a web, and a pen is used to write on paper, often referred to as the 'web' of a notebook. The clue does not relate to the bomb 'Car' or neutrals like Moon, Lens, Mouse, Opera, Bottle, Honey, Castle, Stadium, or Hospital.",Spider;Mouse,Spider,Pen,,Mouse,,correct,0,,0,none,0,,,2.042,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-26T11:29:18.631635
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,,,4,,,ai_clue,concrete,,,,,,2,,ai,human,web,,2,,Spider;Pen,,"The clue 'web' connects Spider and Pen. A spider spins a web, and a pen is used to write on paper, often referred to as the 'web' of a notebook. The clue does not relate to the bomb 'Car' or neutrals like Moon, Lens, Mouse, Opera, Bottle, Honey, Castle, Stadium, or Hospital.",Spider;Mouse,,,Spider,,,,Pen,,Mouse,,correct,,,0,,0,none,0,,,2.042,1,0,,"{
   ""reasoning"": ""The clue 'web' connects Spider and Pen. A spider spins a web, and a pen is used to write on paper, often referred to as the 'web' of a notebook. The clue does not relate to the bomb 'Car' or neutrals like Moon, Lens, Mouse, Opera, Bottle, Honey, Castle, Stadium, or Hospital."",
   ""clue"": ""web"",
   ""number"": 2,
   ""targets"": [""Spider"", ""Pen""]
-}",,2026-05-26T11:29:35.519494
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,4,ai_clue,concrete,3,ai,human,ink,2,Pen;Fox,"The targets 'Pen' and 'Fox' can be linked with the clue 'ink'. A pen uses ink for writing, and 'Fox' is a brand of ink. The bomb 'Car' and neutrals like 'Moon', 'Lens', 'Mouse', 'Opera', 'Bottle', 'Honey', 'Castle', 'Stadium', and 'Hospital' have no direct connection to 'ink'.",Lens;Stadium,,Pen;Fox,,Lens;Stadium,,wrong,0,,0,none,0,,,2.701,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-26T11:29:35.519494
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,,,4,,,ai_clue,concrete,,,,,,3,,ai,human,ink,,2,,Pen;Fox,,"The targets 'Pen' and 'Fox' can be linked with the clue 'ink'. A pen uses ink for writing, and 'Fox' is a brand of ink. The bomb 'Car' and neutrals like 'Moon', 'Lens', 'Mouse', 'Opera', 'Bottle', 'Honey', 'Castle', 'Stadium', and 'Hospital' have no direct connection to 'ink'.",Lens;Stadium,,,,,,,Pen;Fox,,Lens;Stadium,,wrong,,,0,,0,none,0,,,2.701,1,0,,"{
   ""reasoning"": ""The targets 'Pen' and 'Fox' can be linked with the clue 'ink'. A pen uses ink for writing, and 'Fox' is a brand of ink. The bomb 'Car' and neutrals like 'Moon', 'Lens', 'Mouse', 'Opera', 'Bottle', 'Honey', 'Castle', 'Stadium', and 'Hospital' have no direct connection to 'ink'."",
   ""clue"": ""ink"",
   ""number"": 2,
   ""targets"": [""Pen"", ""Fox""]
-}",,2026-05-26T11:29:53.101012
-91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,4,ai_clue,concrete,4,ai,human,writing,2,Pen;Fox,"The clue 'writing' links 'Pen' and 'Fox' as foxes are often depicted in writing and literature, while 'Pen' is a tool for writing. 'Cake' is not directly related to writing, nor are any of the neutrals or the bomb 'Car'.",Pen;Fox,Pen;Fox,,,,,correct,0,,0,none,0,,,2.579,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-26T11:29:53.101012
+91f80366-5605-48f8-915b-9cc019e22e75,2026-05-26T11:31:19.073540,Test33,,,4,,,ai_clue,concrete,,,,,,4,,ai,human,writing,,2,,Pen;Fox,,"The clue 'writing' links 'Pen' and 'Fox' as foxes are often depicted in writing and literature, while 'Pen' is a tool for writing. 'Cake' is not directly related to writing, nor are any of the neutrals or the bomb 'Car'.",Pen;Fox,,,Pen;Fox,,,,,,,,correct,,,0,,0,none,0,,,2.579,1,0,,"{
   ""reasoning"": ""The clue 'writing' links 'Pen' and 'Fox' as foxes are often depicted in writing and literature, while 'Pen' is a tool for writing. 'Cake' is not directly related to writing, nor are any of the neutrals or the bomb 'Car'."",
   ""clue"": ""writing"",
   ""number"": 2,
   ""targets"": [""Pen"", ""Fox""]
-}",,2026-05-26T11:30:07.503527
-c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_clue,concrete,1,human,ai,dinner,2,Chocolate;Fork,,Fork;Chair,Fork,Chocolate,,Chair,,correct,0,,0,bronze,1,2,3,,,0,3.039,,"{
+}",,,,,,,,,,,,,,,,,,,2026-05-26T11:30:07.503527
+c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,,,1,,,human_clue,concrete,,,,,,1,,human,ai,dinner,,2,,Chocolate;Fork,,,Fork;Chair,,,Fork,,,,Chocolate,,Chair,,correct,,,0,,0,bronze,1,2,3,,,0,3.039,,"{
   ""reasoning"": ""Fork is directly associated with dinner as it is a common utensil used during meals. Chair is also strongly associated with dinner as it is where people typically sit while eating."",
   ""guesses"": [""Fork"", ""Chair""]
-}",2026-05-29T09:48:56.328696
-c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_clue,concrete,2,human,ai,building,2,Elevator;Tower,,Tower;Elevator,Tower;Elevator,,,,,correct,0,,0,bronze,1,2,4,,,0,3.930,,"```json
+}",,,,,,,,,,,,,,,,,,2026-05-29T09:48:56.328696
+c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,,,1,,,human_clue,concrete,,,,,,2,,human,ai,building,,2,,Elevator;Tower,,,Tower;Elevator,,,Tower;Elevator,,,,,,,,correct,,,0,,0,bronze,1,2,4,,,0,3.930,,"```json
 {
   ""reasoning"": ""Tower is directly associated with the concept of a building as it is a type of structure. Elevator is commonly found within buildings, making it a strong association."",
   ""guesses"": [""Tower"", ""Elevator""]
@@ -175,8 +175,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""Tower is directly associated with the concept of a building as it is a type of structure. Elevator is commonly found within buildings, making it a strong association."",
   ""guesses"": [""Tower"", ""Elevator""]
-}",2026-05-29T09:49:59.632066
-c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_clue,concrete,3,human,ai,dessert,1,Chocolate,,Chocolate,Chocolate,,,,,correct,0,,0,bronze,1,2,4,,,0,1.772,,"```json
+}",,,,,,,,,,,,,,,,,,2026-05-29T09:49:59.632066
+c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,,,1,,,human_clue,concrete,,,,,,3,,human,ai,dessert,,1,,Chocolate,,,Chocolate,,,Chocolate,,,,,,,,correct,,,0,,0,bronze,1,2,4,,,0,1.772,,"```json
 {
   ""reasoning"": ""Chocolate is a common dessert item, often associated with sweets and treats."",
   ""guesses"": [""Chocolate""]
@@ -184,8 +184,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""Chocolate is a common dessert item, often associated with sweets and treats."",""guesses"":[""Chocolate""]}",2026-05-29T09:50:49.578996
-c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_clue,concrete,4,human,ai,royalty,1,King,,King,King,,,,,correct,0,,0,bronze,1,3,4,,,0,2.118,,"```json
+{""reasoning"":""Chocolate is a common dessert item, often associated with sweets and treats."",""guesses"":[""Chocolate""]}",,,,,,,,,,,,,,,,,,2026-05-29T09:50:49.578996
+c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,,,1,,,human_clue,concrete,,,,,,4,,human,ai,royalty,,1,,King,,,King,,,King,,,,,,,,correct,,,0,,0,bronze,1,3,4,,,0,2.118,,"```json
 {
   ""reasoning"": ""King is directly associated with royalty as it is a title for a male monarch, which is a central figure in royal families."",
   ""guesses"": [""King""]
@@ -193,8 +193,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""King is directly associated with royalty as it is a title for a male monarch, which is a central figure in royal families."",""guesses"":[""King""]}",2026-05-29T09:51:14.244107
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:22.680458,bibeg,1,human_clue,concrete,1,human,ai,pirate,2,Sea;Police,,Sea;Ship,Sea,Police,,Ship,,correct,0,,0,none,0,2,3,,,0,4.085,,"```json
+{""reasoning"":""King is directly associated with royalty as it is a title for a male monarch, which is a central figure in royal families."",""guesses"":[""King""]}",,,,,,,,,,,,,,,,,,2026-05-29T09:51:14.244107
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:22.680458,bibeg,,,1,,,human_clue,concrete,,,,,,1,,human,ai,pirate,,2,,Sea;Police,,,Sea;Ship,,,Sea,,,,Police,,Ship,,correct,,,0,,0,none,0,2,3,,,0,4.085,,"```json
 {
   ""reasoning"": ""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",
   ""guesses"": [""Sea"", ""Ship""]
@@ -202,8 +202,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",2026-06-02T13:01:09.850153
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:22.680458,bibeg,1,human_clue,concrete,2,human,ai,gun,2,Police;Shell,,Police;King,Police,Shell,,,King,bomb,0,,1,none,0,4,1,,,0,3.461,,"```json
+{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",,,,,,,,,,,,,,,,,,2026-06-02T13:01:09.850153
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:22.680458,bibeg,,,1,,,human_clue,concrete,,,,,,2,,human,ai,gun,,2,,Police;Shell,,,Police;King,,,Police,,,,Shell,,,King,bomb,,,0,,1,none,0,4,1,,,0,3.461,,"```json
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
@@ -214,8 +214,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
-}",2026-06-02T13:10:02.891129
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:24.884697,bibeg,1,human_clue,concrete,1,human,ai,pirate,2,Sea;Police,,Sea;Ship,Sea,Police,,Ship,,correct,0,,0,none,0,2,3,,,0,4.085,,"```json
+}",,,,,,,,,,,,,,,,,,2026-06-02T13:10:02.891129
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:24.884697,bibeg,,,1,,,human_clue,concrete,,,,,,1,,human,ai,pirate,,2,,Sea;Police,,,Sea;Ship,,,Sea,,,,Police,,Ship,,correct,,,0,,0,none,0,2,3,,,0,4.085,,"```json
 {
   ""reasoning"": ""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",
   ""guesses"": [""Sea"", ""Ship""]
@@ -223,8 +223,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",2026-06-02T13:01:09.850153
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:24.884697,bibeg,1,human_clue,concrete,2,human,ai,gun,2,Police;Shell,,Police;King,Police,Shell,,,King,bomb,0,,1,none,0,4,1,,,0,3.461,,"```json
+{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",,,,,,,,,,,,,,,,,,2026-06-02T13:01:09.850153
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:24.884697,bibeg,,,1,,,human_clue,concrete,,,,,,2,,human,ai,gun,,2,,Police;Shell,,,Police;King,,,Police,,,,Shell,,,King,bomb,,,0,,1,none,0,4,1,,,0,3.461,,"```json
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
@@ -235,8 +235,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
-}",2026-06-02T13:10:02.891129
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:25.920635,bibeg,1,human_clue,concrete,1,human,ai,pirate,2,Sea;Police,,Sea;Ship,Sea,Police,,Ship,,correct,0,,0,none,0,2,3,,,0,4.085,,"```json
+}",,,,,,,,,,,,,,,,,,2026-06-02T13:10:02.891129
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:25.920635,bibeg,,,1,,,human_clue,concrete,,,,,,1,,human,ai,pirate,,2,,Sea;Police,,,Sea;Ship,,,Sea,,,,Police,,Ship,,correct,,,0,,0,none,0,2,3,,,0,4.085,,"```json
 {
   ""reasoning"": ""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",
   ""guesses"": [""Sea"", ""Ship""]
@@ -244,8 +244,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",2026-06-02T13:01:09.850153
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:25.920635,bibeg,1,human_clue,concrete,2,human,ai,gun,2,Police;Shell,,Police;King,Police,Shell,,,King,bomb,0,,1,none,0,4,1,,,0,3.461,,"```json
+{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",,,,,,,,,,,,,,,,,,2026-06-02T13:01:09.850153
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:25.920635,bibeg,,,1,,,human_clue,concrete,,,,,,2,,human,ai,gun,,2,,Police;Shell,,,Police;King,,,Police,,,,Shell,,,King,bomb,,,0,,1,none,0,4,1,,,0,3.461,,"```json
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
@@ -256,8 +256,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
-}",2026-06-02T13:10:02.891129
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:29.432065,bibeg,1,human_clue,concrete,1,human,ai,pirate,2,Sea;Police,,Sea;Ship,Sea,Police,,Ship,,correct,0,,0,none,0,2,3,,,0,4.085,,"```json
+}",,,,,,,,,,,,,,,,,,2026-06-02T13:10:02.891129
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:29.432065,bibeg,,,1,,,human_clue,concrete,,,,,,1,,human,ai,pirate,,2,,Sea;Police,,,Sea;Ship,,,Sea,,,,Police,,Ship,,correct,,,0,,0,none,0,2,3,,,0,4.085,,"```json
 {
   ""reasoning"": ""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",
   ""guesses"": [""Sea"", ""Ship""]
@@ -265,8 +265,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",2026-06-02T13:01:09.850153
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:29.432065,bibeg,1,human_clue,concrete,2,human,ai,gun,2,Police;Shell,,Police;King,Police,Shell,,,King,bomb,0,,1,none,0,4,1,,,0,3.461,,"```json
+{""reasoning"":""Pirates are strongly associated with the Sea, as they historically sailed on the sea. Pirates also used Ships for their voyages and raids."",""guesses"":[""Sea"", ""Ship""]}",,,,,,,,,,,,,,,,,,2026-06-02T13:01:09.850153
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:13:29.432065,bibeg,,,1,,,human_clue,concrete,,,,,,2,,human,ai,gun,,2,,Police;Shell,,,Police;King,,,Police,,,,Shell,,,King,bomb,,,0,,1,none,0,4,1,,,0,3.461,,"```json
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
@@ -277,20 +277,20 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""Police are commonly associated with guns as they are standard equipment for law enforcement. King is associated with guns through historical contexts like royal guards or military forces."",
   ""guesses"": [""Police"", ""King""]
-}",2026-06-02T13:10:02.891129
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:17:06.773073,bibeg,2,ai_clue,abstract,1,ai,human,transition,2,Relocation;Point,"The clue 'transition' connects 'Relocation' and 'Point' as both involve change or movement from one state to another. 'Relocation' is a transition of place, while 'Point' can refer to a transition in an argument or direction. None of the neutrals like 'Source', 'Bond', 'Customs', 'Memory', 'Time', 'Year', 'Game', 'Association', or 'Resolution' are directly linked to this concept of transition, and",Year;Relocation,Relocation,Point,,Year,,correct,0,,0,none,0,,,1.754,1,0,,"{
+}",,,,,,,,,,,,,,,,,,2026-06-02T13:10:02.891129
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:17:06.773073,bibeg,,,2,,,ai_clue,abstract,,,,,,1,,ai,human,transition,,2,,Relocation;Point,,"The clue 'transition' connects 'Relocation' and 'Point' as both involve change or movement from one state to another. 'Relocation' is a transition of place, while 'Point' can refer to a transition in an argument or direction. None of the neutrals like 'Source', 'Bond', 'Customs', 'Memory', 'Time', 'Year', 'Game', 'Association', or 'Resolution' are directly linked to this concept of transition, and",Year;Relocation,,,Relocation,,,,Point,,Year,,correct,,,0,,0,none,0,,,1.754,1,0,,"{
   ""reasoning"": ""The clue 'transition' connects 'Relocation' and 'Point' as both involve change or movement from one state to another. 'Relocation' is a transition of place, while 'Point' can refer to a transition in an argument or direction. None of the neutrals like 'Source', 'Bond', 'Customs', 'Memory', 'Time', 'Year', 'Game', 'Association', or 'Resolution' are directly linked to this concept of transition, and the bombs 'Intent' and 'Means' are more about purpose and method rather than the process of change."",
   ""clue"": ""transition"",
   ""number"": 2,
   ""targets"": [""Relocation"", ""Point""]
-}",,2026-06-02T13:14:58.990501
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:17:06.773073,bibeg,2,ai_clue,abstract,2,ai,human,emotion,2,Good;Blue,"The clue 'emotion' connects the target words 'Good' and 'Blue' through their association with feelings and emotional states. 'Good' can refer to positive emotions, and 'Blue' is often linked to sadness or feeling down. The neutral words do not specifically relate to emotions as a category, and neither do the bomb words 'Intent' and 'Means', which are more about purpose",Bond;Intent,,Good;Blue,,Bond,Intent,bomb,0,,1,none,0,,,1.829,1,0,,"{
+}",,,,,,,,,,,,,,,,,,,2026-06-02T13:14:58.990501
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:17:06.773073,bibeg,,,2,,,ai_clue,abstract,,,,,,2,,ai,human,emotion,,2,,Good;Blue,,"The clue 'emotion' connects the target words 'Good' and 'Blue' through their association with feelings and emotional states. 'Good' can refer to positive emotions, and 'Blue' is often linked to sadness or feeling down. The neutral words do not specifically relate to emotions as a category, and neither do the bomb words 'Intent' and 'Means', which are more about purpose",Bond;Intent,,,,,,,Good;Blue,,Bond,Intent,bomb,,,0,,1,none,0,,,1.829,1,0,,"{
   ""reasoning"": ""The clue 'emotion' connects the target words 'Good' and 'Blue' through their association with feelings and emotional states. 'Good' can refer to positive emotions, and 'Blue' is often linked to sadness or feeling down. The neutral words do not specifically relate to emotions as a category, and neither do the bomb words 'Intent' and 'Means', which are more about purpose and methods rather than emotional states."",
   ""clue"": ""emotion"",
   ""number"": 2,
   ""targets"": [""Good"", ""Blue""]
-}",,2026-06-02T13:15:58.708062
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,3,human_clue,abstract,1,human,ai,partying,3,Spirit;Dance;Life,,Dance;Spirit;Luck,Dance;Spirit,Life,,Luck,,correct,0,,0,silver,1,2,4,,,0,2.722,,"```json
+}",,,,,,,,,,,,,,,,,,,2026-06-02T13:15:58.708062
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,,,3,,,human_clue,abstract,,,,,,1,,human,ai,partying,,3,,Spirit;Dance;Life,,,Dance;Spirit;Luck,,,Dance;Spirit,,,,Life,,Luck,,correct,,,0,,0,silver,1,2,4,,,0,2.722,,"```json
 {
   ""reasoning"": ""Dance is directly associated with partying as a common activity at parties. Spirit is often linked to the mood or energy of a party, as in 'party spirit.' Luck can be associated with partying through games of chance or the idea of having a lucky night out."",
   ""guesses"": [""Dance"", ""Spirit"", ""Luck""]
@@ -298,8 +298,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""Dance is directly associated with partying as a common activity at parties. Spirit is often linked to the mood or energy of a party, as in 'party spirit.' Luck can be associated with partying through games of chance or the idea of having a lucky night out."",""guesses"":[""Dance"", ""Spirit"", ""Luck""]}",2026-06-02T13:18:33.370287
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,3,human_clue,abstract,2,human,ai,routine,2,Day;Life,,Day;Life,Day;Life,,,,,correct,0,,0,silver,1,2,4,,,0,2.272,,"```json
+{""reasoning"":""Dance is directly associated with partying as a common activity at parties. Spirit is often linked to the mood or energy of a party, as in 'party spirit.' Luck can be associated with partying through games of chance or the idea of having a lucky night out."",""guesses"":[""Dance"", ""Spirit"", ""Luck""]}",,,,,,,,,,,,,,,,,,2026-06-02T13:18:33.370287
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,,,3,,,human_clue,abstract,,,,,,2,,human,ai,routine,,2,,Day;Life,,,Day;Life,,,Day;Life,,,,,,,,correct,,,0,,0,silver,1,2,4,,,0,2.272,,"```json
 {
   ""reasoning"": ""Routine is commonly associated with daily activities, making 'Day' a strong link. 'Life' also fits as routines are a part of everyday life."",
   ""guesses"": [""Day"", ""Life""]
@@ -310,8 +310,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""'Day' is strongly linked to routine as routines are often daily activities. 'Life' is also associated because routines are integral parts of everyday life."",
   ""guesses"": [""Day"", ""Life""]
-}",2026-06-02T13:19:47.458437
-6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,3,human_clue,abstract,3,human,ai,cause,1,Reason,,Reason,Reason,,,,,correct,0,,0,silver,1,2,4,,,0,1.936,,"```json
+}",,,,,,,,,,,,,,,,,,2026-06-02T13:19:47.458437
+6d22bd80-6658-4b14-b835-90ef22698bca,2026-06-02T13:21:23.257607,bibeg,,,3,,,human_clue,abstract,,,,,,3,,human,ai,cause,,1,,Reason,,,Reason,,,Reason,,,,,,,,correct,,,0,,0,silver,1,2,4,,,0,1.936,,"```json
 {
   ""reasoning"": ""The word 'Reason' is directly associated with 'cause' as it represents the explanation or justification for an event or action."",
   ""guesses"": [""Reason""]
@@ -319,8 +319,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""The word 'Reason' is directly associated with 'cause' as it represents the explanation or justification for an event or action."",""guesses"":[""Reason""]}",2026-06-02T13:20:30.760777
-1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,1,human,ai,rule,2,Map;King,,King;Police,King,Map,,Police,,correct,0,,0,bronze,1,3,4,,,0,2.293,,"```json
+{""reasoning"":""The word 'Reason' is directly associated with 'cause' as it represents the explanation or justification for an event or action."",""guesses"":[""Reason""]}",,,,,,,,,,,,,,,,,,2026-06-02T13:20:30.760777
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,,,1,,,human_clue,concrete,,,,,,1,,human,ai,rule,,2,,Map;King,,,King;Police,,,King,,,,Map,,Police,,correct,,,0,,0,bronze,1,3,4,,,0,2.293,,"```json
 {
   ""reasoning"": ""King is directly associated with rule as kings are rulers. Police is associated with rule as they enforce laws and rules."",
   ""guesses"": [""King"", ""Police""]
@@ -328,8 +328,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""King is directly associated with rule as kings are rulers. Police is associated with rule as they enforce laws and rules."",""guesses"":[""King"", ""Police""]}",2026-06-07T09:06:55.934133
-1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,2,human,ai,backpacker,2,Map;Shoe,,Map;Sea,Map,Shoe,,Sea,,correct,0,,0,bronze,1,3,3,,,0,1.383,,"```json
+{""reasoning"":""King is directly associated with rule as kings are rulers. Police is associated with rule as they enforce laws and rules."",""guesses"":[""King"", ""Police""]}",,,,,,,,,,,,,,,,,,2026-06-07T09:06:55.934133
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,,,1,,,human_clue,concrete,,,,,,2,,human,ai,backpacker,,2,,Map;Shoe,,,Map;Sea,,,Map,,,,Shoe,,Sea,,correct,,,0,,0,bronze,1,3,3,,,0,1.383,,"```json
 {
   ""reasoning"": ""Backpackers often use a Map for navigation during their travels. They may also travel by Sea, especially if they are exploring coastal or island destinations."",
   ""guesses"": [""Map"", ""Sea""]
@@ -340,8 +340,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""Backpackers often use a Map for navigation during their travels. They may also travel by Sea, especially if they are exploring coastal or island destinations."",
   ""guesses"": [""Map"", ""Sea""]
-}",2026-06-07T09:07:50.781696
-1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,3,human,ai,sport,2,Shoe;Ball,,Ball;Shoe,Ball;Shoe,,,,,correct,0,,0,bronze,1,3,3,,,0,1.930,,"```json
+}",,,,,,,,,,,,,,,,,,2026-06-07T09:07:50.781696
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,,,1,,,human_clue,concrete,,,,,,3,,human,ai,sport,,2,,Shoe;Ball,,,Ball;Shoe,,,Ball;Shoe,,,,,,,,correct,,,0,,0,bronze,1,3,3,,,0,1.930,,"```json
 {
   ""reasoning"": ""Ball is directly associated with many sports like basketball, soccer, and tennis. Shoe is strongly linked to sports as athletic shoes are essential for most sports activities."",
   ""guesses"": [""Ball"", ""Shoe""]
@@ -352,8 +352,8 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 {
   ""reasoning"": ""Ball is directly associated with many sports like basketball, soccer, and tennis. Shoe is strongly linked to sports as athletic shoes are essential for most sports activities."",
   ""guesses"": [""Ball"", ""Shoe""]
-}",2026-06-07T09:08:44.580896
-1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,1,human_clue,concrete,4,human,ai,dinner,1,Fork,,Fork,Fork,,,,,correct,0,,0,bronze,1,3,3,,,0,1.248,,"```json
+}",,,,,,,,,,,,,,,,,,2026-06-07T09:08:44.580896
+1f7a6cb8-cbc6-4bef-b4da-b412d4ef2c9e,2026-06-07T09:09:46.400344,Shaghayegh,,,1,,,human_clue,concrete,,,,,,4,,human,ai,dinner,,1,,Fork,,,Fork,,,Fork,,,,,,,,correct,,,0,,0,bronze,1,3,3,,,0,1.248,,"```json
 {
   ""reasoning"": ""Fork is directly associated with dinner as it is a common utensil used during meals."",
   ""guesses"": [""Fork""]
@@ -361,4 +361,28 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,1,human_cl
 ```
 
 <repair_response>
-{""reasoning"":""Fork is directly associated with dinner as it is a common utensil used during meals."",""guesses"":[""Fork""]}",2026-06-07T09:09:10.451327
+{""reasoning"":""Fork is directly associated with dinner as it is a common utensil used during meals."",""guesses"":[""Fork""]}",,,,,,,,,,,,,,,,,,2026-06-07T09:09:10.451327
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:08:49.724437,Shima,baseline,ai_clue,1,1,ai_clue,ai_clue,mixed,A,"{""Opera"": ""concrete"", ""Sea"": ""concrete"", ""Year"": ""abstract"", ""War"": ""abstract"", ""Castle"": ""concrete"", ""Freedom"": ""abstract"", ""Fork"": ""concrete"", ""Intent"": ""abstract"", ""Air"": ""abstract"", ""Customs"": ""abstract"", ""Means"": ""abstract"", ""Hospital"": ""concrete"", ""Association"": ""abstract"", ""Bottle"": ""concrete"", ""Pen"": ""concrete"", ""Shell"": ""concrete""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,1,1,ai,human,medieval,medieval,2,2,Castle;Fork,Castle;Fork,"The targets 'Castle' and 'Fork' can be linked through the concept of 'medieval'. Castles are iconic structures from the medieval period, and forks were commonly used eating utensils during that time. The bombs 'Air' and 'Sea' do not relate to 'medieval', and neither do the neutrals, which are more modern or unrelated to the medieval period.",War;Year,War;Year,abstract;abstract,,,War;Year,abstract;abstract,Castle;Fork,,War;Year,,wrong,misaligned,neutral,0,,0,none,0,,,1.779,1,0,,"{
+  ""reasoning"": ""The targets 'Castle' and 'Fork' can be linked through the concept of 'medieval'. Castles are iconic structures from the medieval period, and forks were commonly used eating utensils during that time. The bombs 'Air' and 'Sea' do not relate to 'medieval', and neither do the neutrals, which are more modern or unrelated to the medieval period."",
+  ""clue"": ""medieval"",
+  ""number"": 2,
+  ""targets"": [""Castle"", ""Fork""]
+}",,2,,,True,,Theme / shared situation,The clue relates to items or concepts commonly associated with the historical period known for knights and feudal systems.,The clue relates to items or concepts commonly associated with the historical period known for knights and feudal systems.,True,,The clue relates to items or concepts commonly associated with the historical period known for knights and feudal systems.,ai_clue_giver,2,,,True,,2026-06-15T19:05:25.245849
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:08:49.724437,Shima,baseline,ai_clue,1,1,ai_clue,ai_clue,mixed,A,"{""Opera"": ""concrete"", ""Sea"": ""concrete"", ""Year"": ""abstract"", ""War"": ""abstract"", ""Castle"": ""concrete"", ""Freedom"": ""abstract"", ""Fork"": ""concrete"", ""Intent"": ""abstract"", ""Air"": ""abstract"", ""Customs"": ""abstract"", ""Means"": ""abstract"", ""Hospital"": ""concrete"", ""Association"": ""abstract"", ""Bottle"": ""concrete"", ""Pen"": ""concrete"", ""Shell"": ""concrete""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,2,2,ai,human,choice,choice,3,3,Intent;Freedom;Association,Intent;Freedom;Association,"The targets Intent, Freedom, and Association can be linked through the concept of 'choice', which involves making decisions, having the freedom to act, and forming associations. None of the bombs or neutrals are strongly associated with 'choice', as they are more concrete or related to specific actions or objects.",Castle;Intent;Means,Castle;Intent;Means,concrete;abstract;abstract,Castle;Intent,concrete;abstract,Means,abstract,Freedom;Association,Castle,Means,,correct,partial,neutral,0,,0,none,0,,,2.137,1,0,,"{
+  ""reasoning"": ""The targets Intent, Freedom, and Association can be linked through the concept of 'choice', which involves making decisions, having the freedom to act, and forming associations. None of the bombs or neutrals are strongly associated with 'choice', as they are more concrete or related to specific actions or objects."",
+  ""clue"": ""choice"",
+  ""number"": 3,
+  ""targets"": [""Intent"", ""Freedom"", ""Association""]
+}",,3,,,True,,Theme / shared situation,"The clue relates to making decisions, having autonomy, and forming connections, all involving elements of choice.","The clue relates to making decisions, having autonomy, and forming connections, all involving elements of choice.",True,,"The clue relates to making decisions, having autonomy, and forming connections, all involving elements of choice.",ai_clue_giver,3,,,True,,2026-06-15T19:06:33.319411
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:08:49.724437,Shima,baseline,ai_clue,1,1,ai_clue,ai_clue,mixed,A,"{""Opera"": ""concrete"", ""Sea"": ""concrete"", ""Year"": ""abstract"", ""War"": ""abstract"", ""Castle"": ""concrete"", ""Freedom"": ""abstract"", ""Fork"": ""concrete"", ""Intent"": ""abstract"", ""Air"": ""abstract"", ""Customs"": ""abstract"", ""Means"": ""abstract"", ""Hospital"": ""concrete"", ""Association"": ""abstract"", ""Bottle"": ""concrete"", ""Pen"": ""concrete"", ""Shell"": ""concrete""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,3,3,ai,human,liberty,liberty,2,2,Freedom;Association,Freedom;Association,"The clue 'liberty' connects the targets Freedom and Association through the idea of personal and collective rights or groups advocating for rights. None of the neutrals or bombs relate directly to 'liberty,' as they are either more concrete or relate to other abstract concepts like War or Means.",Freedom;Association,Freedom;Association,abstract;abstract,Freedom;Association,abstract;abstract,,,,,,,correct,perfect,none,0,,0,none,0,,,1.553,1,0,,"{
+  ""reasoning"": ""The clue 'liberty' connects the targets Freedom and Association through the idea of personal and collective rights or groups advocating for rights. None of the neutrals or bombs relate directly to 'liberty,' as they are either more concrete or relate to other abstract concepts like War or Means."",
+  ""clue"": ""liberty"",
+  ""number"": 2,
+  ""targets"": [""Freedom"", ""Association""]
+}",,5,,,True,,Theme / shared situation,The clue connects concepts related to personal and collective rights or groups advocating for rights.,The clue connects concepts related to personal and collective rights or groups advocating for rights.,True,,The clue connects concepts related to personal and collective rights or groups advocating for rights.,ai_clue_giver,5,,,True,,2026-06-15T19:07:21.729520
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:08:49.724437,Shima,baseline,ai_clue,1,1,ai_clue,ai_clue,mixed,A,"{""Opera"": ""concrete"", ""Sea"": ""concrete"", ""Year"": ""abstract"", ""War"": ""abstract"", ""Castle"": ""concrete"", ""Freedom"": ""abstract"", ""Fork"": ""concrete"", ""Intent"": ""abstract"", ""Air"": ""abstract"", ""Customs"": ""abstract"", ""Means"": ""abstract"", ""Hospital"": ""concrete"", ""Association"": ""abstract"", ""Bottle"": ""concrete"", ""Pen"": ""concrete"", ""Shell"": ""concrete""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,4,4,ai,human,utensil,utensil,1,1,Fork,Fork,"The remaining target word is 'Fork', which is a concrete object used for eating. The clue 'utensil' directly links to 'Fork' without suggesting any of the neutrals or bombs. None of the other words on the board relate closely to utensils, ensuring the safety of the guess.",Bottle,Bottle,concrete,,,Bottle,concrete,Fork,,Bottle,,wrong,misaligned,neutral,0,,0,none,0,,,2.809,1,0,,"{
+  ""reasoning"": ""The remaining target word is 'Fork', which is a concrete object used for eating. The clue 'utensil' directly links to 'Fork' without suggesting any of the neutrals or bombs. None of the other words on the board relate closely to utensils, ensuring the safety of the guess."",
+  ""clue"": ""utensil"",
+  ""number"": 1,
+  ""targets"": [""Fork""]
+}",,2,,,True,,Category / shared type,The clue refers to a common category of tools used for eating or food preparation.,The clue refers to a common category of tools used for eating or food preparation.,True,,The clue refers to a common category of tools used for eating or food preparation.,ai_clue_giver,2,,,True,,2026-06-15T19:08:01.269886
