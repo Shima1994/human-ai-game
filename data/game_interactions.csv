@@ -481,3 +481,15 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,,,1,,,huma
   ""reasoning"": ""Bond is a direct term for the union in marriage, and King is often associated with marriage as part of royal weddings."",
   ""guesses"": [""Bond"", ""King""]
 }",3,Other,,True,,,,,,,,human_clue_giver,3,Other,,True,,2026-06-15T19:18:44.601291
+1d3e255b-97db-4e0f-9867-930ab4f86c20,2026-06-15T19:26:35.288609,XXXX,baseline,human_clue,1,1,human_clue,human_clue,mixed,A,"{""East"": ""abstract"", ""Theater"": ""concrete"", ""King"": ""concrete"", ""Luck"": ""abstract"", ""Clock"": ""concrete"", ""Sea"": ""concrete"", ""Customs"": ""abstract"", ""Map"": ""concrete"", ""Game"": ""abstract"", ""Day"": ""abstract"", ""Honey"": ""concrete"", ""Good"": ""abstract"", ""Bottle"": ""concrete"", ""Spirit"": ""abstract"", ""Shell"": ""concrete"", ""Fire"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,west,west,2,2,Map;East,Map;East,,East;Sea,East;Sea,abstract;concrete,East,abstract,Sea,concrete,Map,,,Sea,bomb,partial,bomb,0,,1,none,0,4,,,,0,5.112,,"```json
+{
+  ""reasoning"": ""West is directly opposite to East, making East a strong association. Sea is associated with directions like east and west, as in the phrase 'westward sea'."",
+  ""guesses"": [""East"", ""Sea""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""West is directly opposite to East, making East a strong association. Sea is associated with directions like east and west, as in the phrase 'westward sea'."",
+  ""guesses"": [""East"", ""Sea""]
+}",3,Other,,True,,,,,,,,human_clue_giver,3,Other,,True,,2026-06-15T19:26:26.878856
