@@ -516,7 +516,7 @@ def screen_human_clue():
                     st.session_state.ai_round_summaries,
                     MAX_SKIPS_PER_ROUND - st.session_state.get("round_skips", 0),
                     can_skip_current_clue(),
-                    condition=st.session_state.get("condition", "baseline"),
+                    condition=st.session_state.get("condition", "adaptive"),
                 )
 
             action = guess_result.get("action", "guess")
@@ -675,7 +675,7 @@ def screen_human_guesser():
                     st.session_state.interaction_history,
                     st.session_state.used_hints,
                     st.session_state.ai_round_summaries,
-                    condition=st.session_state.get("condition", "baseline"),
+                    condition=st.session_state.get("condition", "adaptive"),
                 )
             st.session_state.hint = hint_result.get("hint", "")
             st.session_state.hint_number = hint_result.get("hint_number", 1)

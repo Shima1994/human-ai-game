@@ -7,6 +7,7 @@ import streamlit as st
 from core.constants import AI_REROLLS_PER_GAME, HUMAN_REROLLS_PER_GAME
 
 VALID_CONDITIONS = {"baseline", "adaptive"}
+DEFAULT_CONDITION = "adaptive"
 
 
 def _new_session_id():
@@ -15,13 +16,13 @@ def _new_session_id():
 
 def _condition_from_query_params():
     try:
-        raw_value = st.query_params.get("condition", "baseline")
+        raw_value = st.query_params.get("condition", DEFAULT_CONDITION)
     except Exception:
-        raw_value = "baseline"
+        raw_value = DEFAULT_CONDITION
     if isinstance(raw_value, list):
-        raw_value = raw_value[0] if raw_value else "baseline"
-    condition = str(raw_value or "baseline").strip().lower()
-    return condition if condition in VALID_CONDITIONS else "baseline"
+        raw_value = raw_value[0] if raw_value else DEFAULT_CONDITION
+    condition = str(raw_value or DEFAULT_CONDITION).strip().lower()
+    return condition if condition in VALID_CONDITIONS else DEFAULT_CONDITION
 
 
 def _new_starting_role():
@@ -143,7 +144,7 @@ def reset_round_state():
 
 def restart_game(keep_participant=False):
     participant_id = st.session_state.get("participant_id") if keep_participant else None
-    condition = st.session_state.get("condition", "baseline")
+    condition = st.session_state.get("condition", DEFAULT_CONDITION)
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
