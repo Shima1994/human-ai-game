@@ -386,3 +386,31 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,,,1,,,huma
   ""number"": 1,
   ""targets"": [""Fork""]
 }",,2,,,True,,Category / shared type,The clue refers to a common category of tools used for eating or food preparation.,The clue refers to a common category of tools used for eating or food preparation.,True,,The clue refers to a common category of tools used for eating or food preparation.,ai_clue_giver,2,,,True,,2026-06-15T19:08:01.269886
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:11:13.914046,Shima,baseline,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Spider"": ""concrete"", ""Game"": ""abstract"", ""Fox"": ""concrete"", ""Chocolate"": ""concrete"", ""Source"": ""abstract"", ""Death"": ""abstract"", ""Angel"": ""abstract"", ""Theater"": ""concrete"", ""Ice"": ""concrete"", ""Ship"": ""concrete"", ""Space"": ""abstract"", ""Reason"": ""abstract"", ""Penguin"": ""concrete"", ""Cake"": ""concrete"", ""Spirit"": ""abstract"", ""Blue"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,internet,internet,2,2,Spider;Source,Spider;Source,,Source;Game,Source;Game,abstract;abstract,Source,abstract,Game,abstract,Spider,,Game,,correct,partial,neutral,0,,0,silver,1,4,,,,0,2.366,,"```json
+{
+  ""reasoning"": ""The word 'internet' is strongly associated with 'Source' as it is a primary source of information. 'Game' is also a strong association as many games are played online via the internet."",
+  ""guesses"": [""Source"", ""Game""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""'Source' is directly linked to 'internet' as it is a primary source of information. 'Game' is strongly associated because many games are played online via the internet."",
+  ""guesses"": [""Source"", ""Game""]
+}",3,Theme / shared situation,i think abaut web and net,True,,,,,,,,human_clue_giver,3,Theme / shared situation,i think abaut web and net,True,,2026-06-15T19:09:32.044345
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:11:13.914046,Shima,baseline,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Spider"": ""concrete"", ""Game"": ""abstract"", ""Fox"": ""concrete"", ""Chocolate"": ""concrete"", ""Source"": ""abstract"", ""Death"": ""abstract"", ""Angel"": ""abstract"", ""Theater"": ""concrete"", ""Ice"": ""concrete"", ""Ship"": ""concrete"", ""Space"": ""abstract"", ""Reason"": ""abstract"", ""Penguin"": ""concrete"", ""Cake"": ""concrete"", ""Spirit"": ""abstract"", ""Blue"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,suicide,suicide,2,2,Penguin;Death,Penguin;Death,,Death;Spirit,Death;Spirit,abstract;abstract,Death,abstract,Spirit,abstract,Penguin,,Spirit,,correct,partial,neutral,0,,0,silver,1,4,,,,0,1.367,,"{
+  ""reasoning"": ""Death is directly associated with suicide as both involve the end of life. Spirit is linked to suicide as it can involve mental or emotional states, often discussed in terms of one's spirit or soul."",
+  ""guesses"": [""Death"", ""Spirit""]
+}",3,Category / shared type,I think about vall,True,,,,,,,,human_clue_giver,3,Category / shared type,I think about vall,True,,2026-06-15T19:10:31.124550
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:11:13.914046,Shima,baseline,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Spider"": ""concrete"", ""Game"": ""abstract"", ""Fox"": ""concrete"", ""Chocolate"": ""concrete"", ""Source"": ""abstract"", ""Death"": ""abstract"", ""Angel"": ""abstract"", ""Theater"": ""concrete"", ""Ice"": ""concrete"", ""Ship"": ""concrete"", ""Space"": ""abstract"", ""Reason"": ""abstract"", ""Penguin"": ""concrete"", ""Cake"": ""concrete"", ""Spirit"": ""abstract"", ""Blue"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,animals,animals,3,3,Penguin;Fox;Spider,Penguin;Fox;Spider,,Fox;Penguin;Spider,Fox;Penguin;Spider,concrete;concrete;concrete,Fox;Penguin;Spider,concrete;concrete;concrete,,,,,,,correct,perfect,none,0,,0,silver,1,5,,,,0,2.346,,"```json
+{
+  ""reasoning"": ""Fox and Penguin are both animals, making them direct associations with the clue. Spider is also an animal, fitting the clue well."",
+  ""guesses"": [""Fox"", ""Penguin"", ""Spider""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Fox and Penguin are both animals, making them direct associations with the clue. Spider is also an animal, fitting the clue well."",
+  ""guesses"": [""Fox"", ""Penguin"", ""Spider""]
+}",5,,,True,,,,,,,,human_clue_giver,5,,,True,,2026-06-15T19:11:04.981398
