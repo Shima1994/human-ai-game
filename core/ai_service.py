@@ -332,7 +332,7 @@ def build_hint_user_prompt(
     round_summaries=None,
     used_hints=None,
     forbidden_hint=None,
-    condition="baseline",
+    condition="adaptive",
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []
@@ -533,7 +533,7 @@ def _generate_hint_with_forbidden(
     round_summaries,
     forbidden_hint=None,
     fallback_size_cap=2,
-    condition="baseline",
+    condition="adaptive",
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []
@@ -624,7 +624,7 @@ def generate_ai_hint(
     history=None,
     used_hints=None,
     round_summaries=None,
-    condition="baseline",
+    condition="adaptive",
 ):
     return _generate_hint_with_forbidden(
         target_words,
@@ -649,7 +649,7 @@ def generate_ai_hint_reroll(
     history=None,
     used_hints=None,
     round_summaries=None,
-    condition="baseline",
+    condition="adaptive",
 ):
     return _generate_hint_with_forbidden(
         target_words,
@@ -711,7 +711,7 @@ def build_guess_user_prompt(
     round_summaries,
     remaining_skips,
     can_skip,
-    condition="baseline",
+    condition="adaptive",
 ):
     available_board = [word for word in board if word not in previous_guesses]
     word_type_per_card = st.session_state.get("word_type_per_card", {})
@@ -799,7 +799,7 @@ def ai_guess(
     round_summaries=None,
     remaining_skips=0,
     can_skip=False,
-    condition="baseline",
+    condition="adaptive",
 ):
     history = history or []
     previous_guesses = previous_guesses or []

@@ -654,7 +654,7 @@ def _session_row(completed=False):
     return {
         "participant_id": st.session_state.get("participant_id", ""),
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "baseline"),
+        "condition": st.session_state.get("condition", "adaptive"),
         "starting_role": st.session_state.get("starting_role", ""),
         "start_time": st.session_state.get("session_start_time", ""),
         "end_time": st.session_state.get("session_end_time", "") if completed else "",
@@ -693,7 +693,7 @@ def log_event(event_type, payload=None, round_number=None, turn_number=None):
     row = {
         "participant_id": st.session_state.get("participant_id", ""),
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "baseline"),
+        "condition": st.session_state.get("condition", "adaptive"),
         "timestamp": _iso_now(),
         "event_type": event_type,
         "round_number": round_number if round_number is not None else st.session_state.get("round", ""),
@@ -741,7 +741,7 @@ def _round_analysis_row(participant_id, timestamp, score_change):
     return {
         "participant_id": participant_id,
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "baseline"),
+        "condition": st.session_state.get("condition", "adaptive"),
         "round_number": st.session_state.round,
         "round_role": st.session_state.role,
         "clue_giver": clue_giver,
@@ -822,7 +822,7 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
     return {
         "participant_id": participant_id,
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "baseline"),
+        "condition": st.session_state.get("condition", "adaptive"),
         "round_number": st.session_state.round,
         "turn_number": item.get("turn", ""),
         "clue_giver": item.get("clue_giver", ""),
@@ -982,7 +982,7 @@ def log_round(participant_id):
     )
 
     session_id = st.session_state.get("session_id", "")
-    condition = st.session_state.get("condition", "baseline")
+    condition = st.session_state.get("condition", "adaptive")
     starting_role = st.session_state.get("starting_role", "")
     round_role = st.session_state.get("role", "")
     word_type_per_card = st.session_state.get("word_type_per_card", {})
