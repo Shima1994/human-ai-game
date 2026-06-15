@@ -438,3 +438,46 @@ c717d44d-1a3a-497c-a757-7c94c2664816,2026-05-29T09:52:53.010845,bibeg,,,1,,,huma
   ""number"": 2,
   ""targets"": [""Dance"", ""Mouse""]
 }",,3,,,True,,Theme / shared situation,The clue relates to a type of rhythmic movement and a character often associated with such movement in stories.,The clue relates to a type of rhythmic movement and a character often associated with such movement in stories.,True,,The clue relates to a type of rhythmic movement and a character often associated with such movement in stories.,ai_clue_giver,3,,,True,,2026-06-15T19:13:25.405382
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:18:55.481027,Shima,baseline,ai_clue,4,4,human_clue,human_clue,mixed,B,"{""Tower"": ""concrete"", ""Snowman"": ""concrete"", ""Relocation"": ""abstract"", ""Shoe"": ""concrete"", ""King"": ""concrete"", ""Clock"": ""concrete"", ""Map"": ""concrete"", ""Luck"": ""abstract"", ""Lens"": ""concrete"", ""Good"": ""abstract"", ""Solution"": ""abstract"", ""Car"": ""concrete"", ""Life"": ""abstract"", ""Bond"": ""abstract"", ""Economy"": ""abstract"", ""Day"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,navigator,navigator,2,2,Map;Car,Map;Car,,Map;Clock,Map;Clock,concrete;concrete,Map,concrete,Clock,concrete,Car,,Clock,,correct,partial,neutral,0,,0,none,0,4,,,,0,4.364,,"```json
+{
+  ""reasoning"": ""A navigator often uses a Map to chart courses and find directions, making it a strong association. A navigator also relies on a Clock to keep track of time during navigation, especially in maritime contexts."",
+  ""guesses"": [""Map"", ""Clock""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""A navigator often uses a Map to chart courses and find directions, making it a strong association. A navigator also relies on a Clock to keep track of time during navigation, especially in maritime contexts."",
+  ""guesses"": [""Map"", ""Clock""]
+}",3,Theme / shared situation,I think we use it in this place not for time,True,,,,,,,,human_clue_giver,3,Theme / shared situation,I think we use it in this place not for time,True,,2026-06-15T19:15:16.022515
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:18:55.481027,Shima,baseline,ai_clue,4,4,human_clue,human_clue,mixed,B,"{""Tower"": ""concrete"", ""Snowman"": ""concrete"", ""Relocation"": ""abstract"", ""Shoe"": ""concrete"", ""King"": ""concrete"", ""Clock"": ""concrete"", ""Map"": ""concrete"", ""Luck"": ""abstract"", ""Lens"": ""concrete"", ""Good"": ""abstract"", ""Solution"": ""abstract"", ""Car"": ""concrete"", ""Life"": ""abstract"", ""Bond"": ""abstract"", ""Economy"": ""abstract"", ""Day"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,sayapple,sayapple,3,3,Good;Lens;Bond,Good;Lens;Bond,,,,,,,,,Good;Lens;Bond,,,,skip,,none,1,ai,0,none,0,,,,,0,1.626,,"REROLL_HINT
+
+<repair_response>
+{
+  ""reasoning"": ""The clue 'sayapple' does not have a clear or direct association with any of the available board words."",
+  ""guesses"": []
+}",,,,,,,,,,,,,,,,,,2026-06-15T19:16:28.624074
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:18:55.481027,Shima,baseline,ai_clue,4,4,human_clue,human_clue,mixed,B,"{""Tower"": ""concrete"", ""Snowman"": ""concrete"", ""Relocation"": ""abstract"", ""Shoe"": ""concrete"", ""King"": ""concrete"", ""Clock"": ""concrete"", ""Map"": ""concrete"", ""Luck"": ""abstract"", ""Lens"": ""concrete"", ""Good"": ""abstract"", ""Solution"": ""abstract"", ""Car"": ""concrete"", ""Life"": ""abstract"", ""Bond"": ""abstract"", ""Economy"": ""abstract"", ""Day"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,driver,driver,2,2,Car;Good,Car;Good,,Car;Lens,Car;Lens,concrete;concrete,Car;Lens,concrete;concrete,,,Good,Lens,,,correct,partial,none,0,,0,none,0,4,,,,0,2.595,,"```json
+{
+  ""reasoning"": ""Car is directly associated with driver as it is a vehicle typically operated by a driver. Lens is associated with driver because drivers often use lenses in glasses or sunglasses for better vision while driving."",
+  ""guesses"": [""Car"", ""Lens""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Car is directly associated with driver as it is a vehicle typically operated by a driver. Lens is associated with driver because drivers often use lenses in glasses or sunglasses for better vision while driving."",
+  ""guesses"": [""Car"", ""Lens""]
+}",3,Category / shared type,why you choice this Items,True,,,,,,,,human_clue_giver,3,Category / shared type,why you choice this Items,True,,2026-06-15T19:17:13.230313
+9c141ad2-3a96-44d5-99cd-32610b6dc558,2026-06-15T19:18:55.481027,Shima,baseline,ai_clue,4,4,human_clue,human_clue,mixed,B,"{""Tower"": ""concrete"", ""Snowman"": ""concrete"", ""Relocation"": ""abstract"", ""Shoe"": ""concrete"", ""King"": ""concrete"", ""Clock"": ""concrete"", ""Map"": ""concrete"", ""Luck"": ""abstract"", ""Lens"": ""concrete"", ""Good"": ""abstract"", ""Solution"": ""abstract"", ""Car"": ""concrete"", ""Life"": ""abstract"", ""Bond"": ""abstract"", ""Economy"": ""abstract"", ""Day"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,4,4,human,ai,married,married,2,2,Good;Bond,Good;Bond,,Bond;King,Bond;King,abstract;concrete,Bond,abstract,King,concrete,Good,,King,,correct,partial,neutral,0,,0,none,0,4,,,,0,4.499,,"```json
+{
+  ""reasoning"": ""King is often associated with marriage as part of royal weddings, and Bond is a common term for the union in marriage."",
+  ""guesses"": [""King"", ""Bond""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Bond is a direct term for the union in marriage, and King is often associated with marriage as part of royal weddings."",
+  ""guesses"": [""Bond"", ""King""]
+}",3,Other,,True,,,,,,,,human_clue_giver,3,Other,,True,,2026-06-15T19:18:44.601291
