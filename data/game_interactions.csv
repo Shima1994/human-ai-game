@@ -11,3 +11,35 @@ bf087ead-1d66-4be3-b594-a58ad313093c,2026-06-16T11:32:19.927973,bibeg,adaptive,a
   ""number"": 2,
   ""targets"": [""Dance"", ""Means""]
 }",,1,,,True,,Theme / shared situation,Both relate to the concept of executing or presenting an artistic or skillful display.,Both relate to the concept of executing or presenting an artistic or skillful display.,True,,Both relate to the concept of executing or presenting an artistic or skillful display.,ai_clue_giver,1,,,True,,2026-06-16T11:31:28.362605
+bf087ead-1d66-4be3-b594-a58ad313093c,2026-06-16T11:36:43.218963,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Honey"": ""concrete"", ""Ball"": ""concrete"", ""Air"": ""abstract"", ""Economy"": ""abstract"", ""Spider"": ""concrete"", ""Spirit"": ""abstract"", ""Snowman"": ""concrete"", ""Point"": ""abstract"", ""Association"": ""abstract"", ""Angel"": ""abstract"", ""Source"": ""abstract"", ""Shell"": ""concrete"", ""Sea"": ""concrete"", ""Customs"": ""abstract"", ""Elevator"": ""concrete"", ""Chocolate"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,s,s,3,3,Spirit;Shell;Sea,Spirit;Shell;Sea,,,,,,,,,Spirit;Shell;Sea,,,,skip,,none,1,ai,0,none,0,,,,,0,1.432,,"REROLL_HINT
+
+<repair_response>
+{
+  ""reasoning"": ""The clue 's' is too vague and does not have a clear, direct association with any of the available board words."",
+  ""guesses"": []
+}",,,,,,,,,,,,,,,,,,2026-06-16T11:32:53.709611
+bf087ead-1d66-4be3-b594-a58ad313093c,2026-06-16T11:36:43.218963,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Honey"": ""concrete"", ""Ball"": ""concrete"", ""Air"": ""abstract"", ""Economy"": ""abstract"", ""Spider"": ""concrete"", ""Spirit"": ""abstract"", ""Snowman"": ""concrete"", ""Point"": ""abstract"", ""Association"": ""abstract"", ""Angel"": ""abstract"", ""Source"": ""abstract"", ""Shell"": ""concrete"", ""Sea"": ""concrete"", ""Customs"": ""abstract"", ""Elevator"": ""concrete"", ""Chocolate"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,words,words,3,3,Spirit;Shell;Sea,Spirit;Shell;Sea,,,,,,,,,Spirit;Shell;Sea,,,,skip,,none,1,ai,0,none,0,,,,,0,0.783,,SKIP_CLUE,,,,,,,,,,,,,,,,,,2026-06-16T11:33:15.814491
+bf087ead-1d66-4be3-b594-a58ad313093c,2026-06-16T11:36:43.218963,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Honey"": ""concrete"", ""Ball"": ""concrete"", ""Air"": ""abstract"", ""Economy"": ""abstract"", ""Spider"": ""concrete"", ""Spirit"": ""abstract"", ""Snowman"": ""concrete"", ""Point"": ""abstract"", ""Association"": ""abstract"", ""Angel"": ""abstract"", ""Source"": ""abstract"", ""Shell"": ""concrete"", ""Sea"": ""concrete"", ""Customs"": ""abstract"", ""Elevator"": ""concrete"", ""Chocolate"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,ocean,ocean,2,2,Shell;Sea,Shell;Sea,,Sea;Shell,Sea;Shell,concrete;concrete,Sea;Shell,concrete;concrete,,,,,,,correct,perfect,none,0,,0,none,0,4,,,,0,1.715,,"```json
+{
+  ""reasoning"": ""Sea is a direct association with ocean as they are both large bodies of saltwater. Shell is commonly found on ocean beaches and is strongly associated with the ocean environment."",
+  ""guesses"": [""Sea"", ""Shell""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Sea is a direct association with ocean as they are both large bodies of saltwater. Shell is commonly found on ocean beaches and is strongly associated with the ocean environment."",
+  ""guesses"": [""Sea"", ""Shell""]
+}",5,,,True,,,,,,,,human_clue_giver,5,,,True,,2026-06-16T11:34:06.370952
+bf087ead-1d66-4be3-b594-a58ad313093c,2026-06-16T11:36:43.218963,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Honey"": ""concrete"", ""Ball"": ""concrete"", ""Air"": ""abstract"", ""Economy"": ""abstract"", ""Spider"": ""concrete"", ""Spirit"": ""abstract"", ""Snowman"": ""concrete"", ""Point"": ""abstract"", ""Association"": ""abstract"", ""Angel"": ""abstract"", ""Source"": ""abstract"", ""Shell"": ""concrete"", ""Sea"": ""concrete"", ""Customs"": ""abstract"", ""Elevator"": ""concrete"", ""Chocolate"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,4,4,human,ai,dinner,dinner,2,2,Spirit;Chocolate,Spirit;Chocolate,,Chocolate;Honey,Chocolate;Honey,concrete;concrete,Chocolate,concrete,Honey,concrete,Spirit,,Honey,,correct,partial,neutral,0,,0,none,0,4,,,,0,1.980,,"```json
+{
+  ""reasoning"": ""Chocolate is often associated with dinner as a dessert. Honey can be used as a sweetener or ingredient in dinner recipes."",
+  ""guesses"": [""Chocolate"", ""Honey""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Chocolate is often associated with dinner as a dessert. Honey can be used as a sweetener or ingredient in dinner recipes."",
+  ""guesses"": [""Chocolate"", ""Honey""]
+}",3,Category / shared type,"Often after dinner, you would have a wine or sweets",True,,,,,,,,human_clue_giver,3,Category / shared type,"Often after dinner, you would have a wine or sweets",True,,2026-06-16T11:35:10.543857
