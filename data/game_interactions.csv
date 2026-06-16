@@ -134,3 +134,32 @@ bf087ead-1d66-4be3-b594-a58ad313093c,2026-06-16T11:50:44.706810,bibeg,adaptive,a
   ""number"": 1,
   ""targets"": [""Economy""]
 }",,4,,,True,,Category / shared type,"The clue relates to the management and study of money, investments, and financial systems.","The clue relates to the management and study of money, investments, and financial systems.",True,,"The clue relates to the management and study of money, investments, and financial systems.",ai_clue_giver,4,,,True,,2026-06-16T11:57:12.703363
+75bd9f25-de60-4b05-9586-b0979f0c9aae,2026-06-16T12:26:06.432288,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Police"": ""concrete"", ""Death"": ""abstract"", ""Opera"": ""concrete"", ""Penguin"": ""concrete"", ""Ship"": ""concrete"", ""Angel"": ""abstract"", ""Bottle"": ""concrete"", ""Air"": ""abstract"", ""Theater"": ""concrete"", ""Day"": ""abstract"", ""Luck"": ""abstract"", ""Source"": ""abstract"", ""Cake"": ""concrete"", ""Time"": ""abstract"", ""Fork"": ""concrete"", ""Association"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,wood,wood,2,2,Ship;Fork,Ship;Fork,,Fork;Theater,Fork;Theater,concrete;concrete,Fork,concrete,Theater,concrete,Ship,,Theater,,correct,partial,neutral,0,,0,none,0,4,,,,0,1.224,,"{
+  ""reasoning"": ""Wood is commonly associated with trees and forests, which are natural sources of wood. However, none of the words directly relate to wood. Fork can be made of wood and is a common wooden utensil. Theater often uses wooden structures in sets and stages."",
+  ""guesses"": [""Fork"", ""Theater""]
+}",3,Category / shared type,material composition,True,,,,,,,,human_clue_giver,3,Category / shared type,material composition,True,,2026-06-16T12:09:14.970574
+75bd9f25-de60-4b05-9586-b0979f0c9aae,2026-06-16T12:26:06.432288,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Police"": ""concrete"", ""Death"": ""abstract"", ""Opera"": ""concrete"", ""Penguin"": ""concrete"", ""Ship"": ""concrete"", ""Angel"": ""abstract"", ""Bottle"": ""concrete"", ""Air"": ""abstract"", ""Theater"": ""concrete"", ""Day"": ""abstract"", ""Luck"": ""abstract"", ""Source"": ""abstract"", ""Cake"": ""concrete"", ""Time"": ""abstract"", ""Fork"": ""concrete"", ""Association"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,journey,journey,2,2,Ship;Day,Ship;Day,,Ship;Time,Ship;Time,concrete;abstract,Ship,concrete,Time,abstract,Day,,Time,,correct,partial,neutral,0,,0,none,0,4,,,,0,2.088,,"```json
+{
+  ""reasoning"": ""Ship is directly associated with journey as it is a common mode of travel. Time is often linked with journey as journeys take time and are measured in terms of duration."",
+  ""guesses"": [""Ship"", ""Time""]
+}
+```
+
+<repair_response>
+{
+  ""reasoning"": ""Ship is directly associated with journey as it is a common mode of travel. Time is often linked with journey as journeys take time and are measured in terms of duration."",
+  ""guesses"": [""Ship"", ""Time""]
+}",4,Category / shared type,travel with boat for extended interval,True,,,,,,,,human_clue_giver,4,Category / shared type,travel with boat for extended interval,True,,2026-06-16T12:11:43.972741
+75bd9f25-de60-4b05-9586-b0979f0c9aae,2026-06-16T12:26:06.432288,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Police"": ""concrete"", ""Death"": ""abstract"", ""Opera"": ""concrete"", ""Penguin"": ""concrete"", ""Ship"": ""concrete"", ""Angel"": ""abstract"", ""Bottle"": ""concrete"", ""Air"": ""abstract"", ""Theater"": ""concrete"", ""Day"": ""abstract"", ""Luck"": ""abstract"", ""Source"": ""abstract"", ""Cake"": ""concrete"", ""Time"": ""abstract"", ""Fork"": ""concrete"", ""Association"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,sun,sun,2,2,Source;Day,Source;Day,,Day;Air,Day;Air,abstract;abstract,Day,abstract,Air,abstract,Source,,Air,,correct,partial,neutral,0,,0,none,0,2,,,,0,4.723,,"```json
+{
+  ""reasoning"": ""The word 'sun' is directly associated with 'Day' as the sun is a defining feature of daytime. 'Air' is also linked to 'sun' because sunlight affects the atmosphere and weather, which involves air."",
+  ""guesses"": [""Day"", ""Air""]
+}
+```
+
+<repair_response>
+{""reasoning"":""The word 'sun' is directly associated with 'Day' as the sun is a defining feature of daytime. 'Air' is also linked to 'sun' because sunlight affects the atmosphere and weather, which involves air."",""guesses"":[""Day"", ""Air""]}",3,Category / shared type,light comes form sun,True,,,,,,,,human_clue_giver,3,Category / shared type,light comes form sun,True,,2026-06-16T12:19:53.925135
+75bd9f25-de60-4b05-9586-b0979f0c9aae,2026-06-16T12:26:06.432288,bibeg,adaptive,ai_clue,2,2,human_clue,human_clue,mixed,B,"{""Police"": ""concrete"", ""Death"": ""abstract"", ""Opera"": ""concrete"", ""Penguin"": ""concrete"", ""Ship"": ""concrete"", ""Angel"": ""abstract"", ""Bottle"": ""concrete"", ""Air"": ""abstract"", ""Theater"": ""concrete"", ""Day"": ""abstract"", ""Luck"": ""abstract"", ""Source"": ""abstract"", ""Cake"": ""concrete"", ""Time"": ""abstract"", ""Fork"": ""concrete"", ""Association"": ""abstract""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,4,4,human,ai,glass,glass,2,2,Bottle;Source,Bottle;Source,,Bottle;Opera,Bottle;Opera,concrete;concrete,Bottle,concrete,Opera,concrete,Source,,,Opera,bomb,partial,bomb,0,,1,none,0,2,,,,0,1.641,,"{
+  ""reasoning"": ""Glass is commonly associated with Bottle as bottles are often made of glass. Opera glasses are a type of small binoculars used in theaters, linking Opera to glass."",
+  ""guesses"": [""Bottle"", ""Opera""]
+}",3,Theme / shared situation,POKEMON,True,,,,,,,,human_clue_giver,3,Theme / shared situation,POKEMON,True,,2026-06-16T12:24:48.550531
