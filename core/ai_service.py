@@ -442,15 +442,12 @@ def build_hint_user_prompt(
     forbidden_block = ", ".join(all_used) if all_used else "(none)"
     word_type_per_card = st.session_state.get("word_type_per_card", {})
     board_words = target_words + neutral_words + list(bomb_words)
-<<<<<<< HEAD
     already_guessed = {
         guess
         for item in history
         for guess in item.get("guesses", [])
     }
     available_board = [word for word in board_words if word not in already_guessed]
-=======
->>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
     feedback_block = ""
     if condition == "adaptive":
         feedback_block = (
@@ -471,11 +468,8 @@ def build_hint_user_prompt(
         f"{format_interaction_history(history)}\n\n"
         "Memory from previous rounds in this game:\n"
         f"{format_round_memory(round_summaries or [])}\n\n"
-<<<<<<< HEAD
         "Persistent teammate memory from the whole game:\n"
         f"{format_persistent_teammate_memory(history, round_summaries or [])}\n\n"
-=======
->>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
         f"{feedback_block}\n\n"
         "Produce the best one-word clue you can, then explain (in the reasoning field) the link and why each neutral and both bombs are safe. Respond with the JSON object only."
     )
@@ -873,11 +867,8 @@ def build_guess_user_prompt(
         f"{format_interaction_history(history)}\n\n"
         "Memory from previous rounds:\n"
         f"{format_round_memory(round_summaries or [])}\n\n"
-<<<<<<< HEAD
         "Persistent teammate memory from the whole game:\n"
         f"{format_persistent_teammate_memory(history, round_summaries or [])}\n\n"
-=======
->>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
         f"{feedback_block}\n\n"
         "Default to guessing. REROLL_HINT and SKIP_CLUE are last resorts. "
         "Respond with the JSON object OR a single literal token."
