@@ -154,6 +154,7 @@ def _build_word_type_map(board_words):
     return word_types
 
 
+<<<<<<< HEAD
 def build_board_id(round_number, template_type, board_words, word_roles):
     board_signature = "|".join(
         f"{word}:{word_roles.get(word, '')}" for word in sorted(board_words)
@@ -162,6 +163,8 @@ def build_board_id(round_number, template_type, board_words, word_roles):
     return f"round-{round_number}-template-{template_type}-{digest}"
 
 
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
 def _draw_role_words(template, role_name, used_words):
     abstract_words = _draw_words(
         WORD_BANKS["abstract"],
@@ -221,12 +224,15 @@ def setup_new_round():
     )
     st.session_state.board = board
     st.session_state.board_template_type = template_type
+<<<<<<< HEAD
     st.session_state.board_id = build_board_id(
         st.session_state.round,
         template_type,
         board,
         word_roles,
     )
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
     st.session_state.target_words = targets
     st.session_state.bomb_words = bombs
     st.session_state.neutral_words = neutrals
@@ -256,9 +262,12 @@ def setup_new_round():
     st.session_state.start_time = datetime.utcnow()
     st.session_state.round_start_time = st.session_state.start_time.isoformat()
     st.session_state.current_turn_start_time = ""
+<<<<<<< HEAD
     st.session_state.current_hint_start_time = ""
     st.session_state.current_guess_start_time = ""
     st.session_state.current_reflection_start_time = ""
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
     st.session_state.last_score_change = 0
     st.session_state.round_medal = "none"
     st.session_state.round_success = False
@@ -313,12 +322,15 @@ def record_interaction(
     guess_response_time_sec=None,
 ):
     intended_targets = intended_targets or []
+<<<<<<< HEAD
     expected_guesses = expected_guesses or []
     guess_rationale = (guess_rationale or "").strip()
     guess_order = [
         {"position": position, "word": guess}
         for position, guess in enumerate(guesses or [], start=1)
     ]
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
     turn_end = datetime.utcnow()
     turn_start_raw = st.session_state.get("current_turn_start_time") or turn_end.isoformat()
     try:
@@ -423,9 +435,12 @@ def record_interaction(
             "turn_start_time": turn_start.isoformat(),
             "turn_end_time": turn_end.isoformat(),
             "turn_duration_seconds": (turn_end - turn_start).total_seconds(),
+<<<<<<< HEAD
             "reflection_start_time": "",
             "reflection_end_time": "",
             "reflection_time_sec": "",
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
             "recorded_at": turn_end.isoformat(),
             "reflection_rating": "",
             "reflection_relationship_type": "",
@@ -482,9 +497,12 @@ def record_skip(
     guess_response_time_sec=None,
 ):
     intended_targets = intended_targets or []
+<<<<<<< HEAD
     expected_guesses = expected_guesses or []
     guess_rationale = (guess_rationale or "").strip()
     guess_order = []
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
     turn_end = datetime.utcnow()
     turn_start_raw = st.session_state.get("current_turn_start_time") or turn_end.isoformat()
     try:
@@ -552,9 +570,12 @@ def record_skip(
             "turn_start_time": turn_start.isoformat(),
             "turn_end_time": turn_end.isoformat(),
             "turn_duration_seconds": (turn_end - turn_start).total_seconds(),
+<<<<<<< HEAD
             "reflection_start_time": "",
             "reflection_end_time": "",
             "reflection_time_sec": "",
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
             "recorded_at": turn_end.isoformat(),
             "reflection_rating": "",
             "reflection_relationship_type": "",
@@ -622,7 +643,10 @@ def append_ai_round_summary():
             "role": st.session_state.role,
             "word_type": st.session_state.word_type,
             "board_template_type": st.session_state.get("board_template_type", ""),
+<<<<<<< HEAD
             "board_id": st.session_state.get("board_id", ""),
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
             "word_type_per_card": dict(word_type_per_card),
             "targets": list(st.session_state.target_words),
             "target_word_types": word_types_for(st.session_state.target_words),
@@ -680,9 +704,12 @@ def append_ai_round_summary():
                     "ai_explanation_blocked_reason": item.get("ai_explanation_blocked_reason", ""),
                     "ai_explanation": item.get("ai_explanation", ""),
                     "reflection_source": item.get("reflection_source", ""),
+<<<<<<< HEAD
                     "reflection_start_time": item.get("reflection_start_time", ""),
                     "reflection_end_time": item.get("reflection_end_time", ""),
                     "reflection_time_sec": item.get("reflection_time_sec", ""),
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
                 }
                 for item in st.session_state.interaction_history
             ],

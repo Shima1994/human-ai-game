@@ -53,7 +53,10 @@ def main():
                 {
                     "round_role": st.session_state.role,
                     "board_template_type": st.session_state.get("board_template_type", ""),
+<<<<<<< HEAD
                     "board_id": st.session_state.get("board_id", ""),
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
                 },
                 round_number=st.session_state.round,
                 turn_number="",

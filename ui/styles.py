@@ -688,7 +688,11 @@ def inject_css():
             padding: 1rem 1.05rem !important;
         }
         .st-key-reflection_panel [data-testid="stVerticalBlock"] {
+<<<<<<< HEAD
             gap: 0.55rem !important;
+=======
+            gap: 0.95rem !important;
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
         }
         .reflection-header {
             margin-bottom: 0.2rem;
@@ -721,6 +725,7 @@ def inject_css():
             background: #FFFFFF !important;
             border: 1px solid #E5E5E5 !important;
             border-radius: 12px !important;
+<<<<<<< HEAD
             padding: 0.62rem 0.78rem !important;
             box-shadow: 0 4px 12px rgba(18, 34, 54, 0.05) !important;
         }
@@ -734,18 +739,30 @@ def inject_css():
             font-size: 0.86rem;
             line-height: 1.28;
         }
+=======
+            padding: 0.85rem 0.95rem !important;
+            box-shadow: 0 4px 12px rgba(18, 34, 54, 0.05) !important;
+        }
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
         .st-key-reflection_panel .reflection-ai-explanation .panel-title {
             color: var(--color-text-muted);
         }
         .st-key-reflection_panel .stRadio [role="radiogroup"] {
+<<<<<<< HEAD
             margin-top: 0.28rem;
+=======
+            margin-top: 0.45rem;
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
         }
         .st-key-reflection_panel .stRadio label {
             background: #FFFFFF !important;
             border: 1px solid #E5E5E5 !important;
             color: var(--color-heading) !important;
+<<<<<<< HEAD
             min-height: 42px;
             padding: 0.35rem 0.5rem;
+=======
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
         }
         .st-key-reflection_panel .stRadio label:hover {
             border-color: rgba(29, 94, 168, 0.32) !important;
@@ -763,9 +780,14 @@ def inject_css():
             color: #111827 !important;
             border: 1px solid #D5DAE1 !important;
             border-radius: 10px !important;
+<<<<<<< HEAD
             min-height: 78px;
             height: 78px;
             padding: 0.65rem 0.78rem;
+=======
+            min-height: 112px;
+            padding: 0.85rem 0.95rem;
+>>>>>>> b99f46c05b6d7f3e8f6468b20923080bc9e3c490
             box-shadow: none !important;
         }
         .st-key-reflection_panel .stTextArea textarea::placeholder {
