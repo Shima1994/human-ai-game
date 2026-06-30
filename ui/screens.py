@@ -48,6 +48,65 @@ RELATIONSHIP_OPTIONS = [
     "Other",
 ]
 
+POST_GAME_QUESTIONS = [
+    (
+        "ai_understood_my_clues",
+        "I felt that the AI understood what I meant when I gave clues.",
+    ),
+    (
+        "i_understood_ai_clues",
+        "I felt that I understood what the AI meant when it gave clues.",
+    ),
+    (
+        "predict_ai_interpretation",
+        "By the end of the game, I could predict how the AI would interpret my clues.",
+    ),
+    (
+        "adapted_to_ai_behavior",
+        "I adapted my communication based on the AI's behaviour.",
+    ),
+    (
+        "ai_adapted_to_me",
+        "I felt that the AI adapted to my communication during the game.",
+    ),
+    (
+        "reflection_helped",
+        "The reflection steps helped improve the communication between me and the AI.",
+    ),
+    (
+        "shared_strategy",
+        "By the end of the game, I felt that the AI and I were working with a shared strategy.",
+    ),
+]
+
+AGE_GROUP_OPTIONS = ["18-24", "25-34", "35-44", "45-54", "55+", "Prefer not to say"]
+GENDER_OPTIONS = [
+    "Female",
+    "Male",
+    "Non-binary",
+    "Prefer to self-describe",
+    "Prefer not to say",
+]
+ENGLISH_PROFICIENCY_OPTIONS = [
+    "Beginner",
+    "Intermediate",
+    "Advanced",
+    "Native / Near-native",
+]
+AI_EXPERIENCE_OPTIONS = [
+    "Never",
+    "Less than once a month",
+    "A few times a month",
+    "A few times a week",
+    "Daily",
+]
+CODENAMES_EXPERIENCE_OPTIONS = [
+    "Never",
+    "Once or twice",
+    "Occasionally",
+    "Frequently",
+]
+
 BOARD_WORD_ERROR = (
     "Your explanation mentions a board word. Please describe the relationship without naming specific cards."
 )
@@ -118,17 +177,106 @@ def screen_welcome():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _anonymous_participant_id():
+    session_id = str(st.session_state.get("session_id", "")).replace("-", "")
+    suffix = session_id[-8:] if session_id else "unknown"
+    return f"participant_{suffix}"
+
+
+def _display_player_name():
+    return st.session_state.get("nickname") or "Participant"
+
+
 def screen_name():
-    st.markdown('<div class="center-actions compact-field">', unsafe_allow_html=True)
-    name = st.text_input("Your name", placeholder="Your name", label_visibility="collapsed")
-    if st.button("Continue", type="primary", use_container_width=True):
-        if not name.strip():
-            st.error("Please enter your name.")
-        else:
-            st.session_state.participant_id = name.strip()
-            initialize_session_log(name.strip())
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    with st.container(border=True, key="participant_profile_panel"):
+        st.markdown(
+            """
+            <div class="panel-title">Participant profile</div>
+            <p class="subtle-text" style="margin-top:0;">These answers help us analyze the game results.</p>
+            """,
+            unsafe_allow_html=True,
+        )
+        nickname = st.text_input(
+            "Nickname (optional)",
+            value=st.session_state.get("nickname", ""),
+            placeholder="Optional nickname",
+        )
+        age_group = st.selectbox(
+            "What is your age group?",
+            [""] + AGE_GROUP_OPTIONS,
+            index=0,
+            format_func=lambda option: "Select age group" if option == "" else option,
+            key="profile_age_group",
+        )
+        gender_choice = st.radio(
+            "What is your gender? Optional",
+            GENDER_OPTIONS,
+            index=None,
+            horizontal=True,
+            key="profile_gender",
+        )
+        gender_self_describe = ""
+        if gender_choice == "Prefer to self-describe":
+            gender_self_describe = st.text_input(
+                "Self-describe",
+                placeholder="Write your gender",
+                key="profile_gender_self_describe",
+            )
+        english_proficiency = st.radio(
+            "How would you describe your English proficiency?",
+            ENGLISH_PROFICIENCY_OPTIONS,
+            index=None,
+            horizontal=True,
+            key="profile_english_proficiency",
+        )
+        ai_experience = st.radio(
+            "How often do you use AI tools such as ChatGPT, Gemini, or Claude?",
+            AI_EXPERIENCE_OPTIONS,
+            index=None,
+            horizontal=True,
+            key="profile_ai_experience",
+        )
+        codenames_experience = st.radio(
+            "Have you played Codenames before?",
+            CODENAMES_EXPERIENCE_OPTIONS,
+            index=None,
+            horizontal=True,
+            key="profile_codenames_experience",
+        )
+
+        if st.button("Continue", type="primary", use_container_width=True):
+            missing = []
+            if not age_group:
+                missing.append("age group")
+            if gender_choice is None:
+                missing.append("gender")
+            if gender_choice == "Prefer to self-describe" and not gender_self_describe.strip():
+                missing.append("self-described gender")
+            if english_proficiency is None:
+                missing.append("English proficiency")
+            if ai_experience is None:
+                missing.append("AI experience")
+            if codenames_experience is None:
+                missing.append("Codenames experience")
+            if missing:
+                st.error("Please complete: " + ", ".join(missing) + ".")
+            else:
+                clean_nickname = nickname.strip()
+                participant_id = clean_nickname or _anonymous_participant_id()
+                gender = (
+                    f"Self-describe: {gender_self_describe.strip()}"
+                    if gender_choice == "Prefer to self-describe"
+                    else gender_choice
+                )
+                st.session_state.nickname = clean_nickname
+                st.session_state.participant_id = participant_id
+                st.session_state.age_group = age_group
+                st.session_state.gender = gender
+                st.session_state.english_proficiency = english_proficiency
+                st.session_state.ai_experience = ai_experience
+                st.session_state.codenames_experience = codenames_experience
+                initialize_session_log(participant_id)
+                st.rerun()
 
 
 def _skip_help_text():
@@ -147,14 +295,86 @@ def _clear_current_clue():
     st.session_state.hint = ""
     st.session_state.hint_number = 1
     st.session_state.hint_targets = []
+    st.session_state.hint_expected_guesses = []
     st.session_state.hint_explanation = ""
     st.session_state.pending_guesses = []
+    st.session_state.current_guess_rationale = ""
+    st.session_state.current_hint_start_time = ""
+    st.session_state.current_guess_start_time = ""
+    st.session_state.current_reflection_start_time = ""
     st.session_state.pending_ai_guess_review = None
     st.session_state.pending_hint_meta = None
 
 
 def _word_count(text):
     return len([word for word in text.split() if word.strip()])
+
+
+def _now_iso():
+    return datetime.utcnow().isoformat()
+
+
+def _seconds_between(start_iso, end_iso=None):
+    if not start_iso:
+        return None
+    try:
+        start = datetime.fromisoformat(start_iso)
+        end = datetime.fromisoformat(end_iso) if end_iso else datetime.utcnow()
+        return round((end - start).total_seconds(), 3)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ensure_timer(key):
+    if not st.session_state.get(key):
+        st.session_state[key] = _now_iso()
+
+
+def _available_guess_options():
+    guessed = set(st.session_state.get("guesses", []))
+    return [word for word in st.session_state.get("board", []) if word not in guessed]
+
+
+def _guess_rationale_key():
+    return f"guess_rationale_{st.session_state.round}_{st.session_state.round_interactions}"
+
+
+def _render_guess_rationale_input():
+    key = _guess_rationale_key()
+    existing = st.session_state.get(key, st.session_state.get("current_guess_rationale", ""))
+    st.session_state[key] = existing
+    st.markdown(
+        """
+        <div class="guess-rationale-head">
+            <div class="panel-title">Why these cards?</div>
+            <div class="guess-rationale-rule">3-30 words, before selecting cards</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    rationale = st.text_area(
+        "Guess reasoning",
+        max_chars=240,
+        placeholder="Write 3-30 words. Example: Fortune points to luck, so I prefer Wealth over Crown...",
+        label_visibility="collapsed",
+        key=key,
+    )
+    st.session_state.current_guess_rationale = rationale
+    word_count = _word_count(rationale)
+    is_valid = 3 <= word_count <= 30
+    status_class = "ok" if is_valid else "pending"
+    status_text = (
+        f"{word_count} / 30 words"
+        if word_count
+        else "Write a short reason, then choose cards"
+    )
+    if word_count and not is_valid:
+        status_text = "Use 3 to 30 words"
+    st.markdown(
+        f"<div class='guess-rationale-status {status_class}'>{escape(status_text)}</div>",
+        unsafe_allow_html=True,
+    )
+    return rationale.strip(), is_valid
 
 
 def _mentions_board_word(text, board_words):
@@ -184,6 +404,9 @@ def _sync_reflection_to_round_summary(item):
                     "reflection_explanation_raw",
                     "reflection_explanation_is_valid",
                     "reflection_blocked_reason",
+                    "reflection_start_time",
+                    "reflection_end_time",
+                    "reflection_time_sec",
                     "human_understanding_rating",
                     "human_relationship_type",
                     "human_explanation_raw",
@@ -241,6 +464,9 @@ def render_turn_reflection():
     human_clue_giver = item.get("clue_giver") == "human"
     show_full_form = human_clue_giver and item.get("alignment_status") != "perfect"
     if not item.get("reflection_shown_logged"):
+        reflection_start = _now_iso()
+        st.session_state.current_reflection_start_time = reflection_start
+        item["reflection_start_time"] = reflection_start
         log_event(
             "reflection_shown",
             {"reflection_source": "human_clue_giver" if human_clue_giver else "ai_clue_giver"},
@@ -250,60 +476,91 @@ def render_turn_reflection():
 
     render_top_status()
     with st.container(border=True, key="reflection_panel"):
+        ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
+        header_body = (
+            escape(ai_explanation)
+            if not human_clue_giver and ai_explanation
+            else "Rate the clue understanding and add the general link."
+        )
         st.markdown(
-            """
-            <div class="reflection-header">
-                <div class="reflection-title">Turn Reflection</div>
-                <div class="reflection-subtitle">Help us understand how the clue was interpreted.</div>
+            f"""
+            <div class="glass-card compact-card reflection-ai-explanation reflection-compact-head">
+                <div class="panel-title">Turn reflection</div>
+                <p class="subtle-text" style="margin:0;">{header_body}</p>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
-        if not human_clue_giver and ai_explanation:
-            st.markdown(
-                f"""
-                <div class="glass-card compact-card reflection-ai-explanation">
-                    <div class="panel-title">AI clue explanation</div>
-                    <p class="subtle-text" style="margin:0;">{escape(ai_explanation)}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        st.radio(
-            "How well was your intended meaning understood?"
-            if human_clue_giver
-            else "How well did you understand the AI's intended meaning?",
-            options=list(RATING_OPTIONS.keys()),
-            index=2,
-            format_func=lambda option: f"{option}",
-            horizontal=True,
-            key=f"reflection_rating_{st.session_state.round}_{item.get('turn')}",
-        )
         explanation_key = f"reflection_explanation_{st.session_state.round}_{item.get('turn')}"
         relationship_key = f"reflection_relationship_{st.session_state.round}_{item.get('turn')}"
         if show_full_form:
-            st.selectbox(
-                "What type of relationship did your clue mainly express?",
-                options=RELATIONSHIP_OPTIONS,
-                key=relationship_key,
+            rating_col, relationship_col = st.columns([1, 1.35])
+        else:
+            rating_col = st.container()
+            relationship_col = None
+
+        with rating_col:
+            st.radio(
+                "Understood?",
+                options=list(RATING_OPTIONS.keys()),
+                index=None,
+                format_func=lambda option: f"{option}",
+                horizontal=True,
+                key=f"reflection_rating_{st.session_state.round}_{item.get('turn')}",
             )
+        if show_full_form:
+            with relationship_col:
+                st.selectbox(
+                    "Relationship",
+                    options=RELATIONSHIP_OPTIONS,
+                    key=relationship_key,
+                )
             st.text_area(
-                "Briefly describe the general relationship behind your clue.",
+                "General link (3-20 words, no card names)",
                 value=st.session_state.get(explanation_key, ""),
                 max_chars=150,
+                placeholder="Example: Both ideas connect through luck and success.",
                 key=explanation_key,
             )
-            st.caption("Do not mention any card names or target words.")
 
         if st.button("Continue", type="primary", use_container_width=True):
             rating = st.session_state[f"reflection_rating_{st.session_state.round}_{item.get('turn')}"]
+            if rating is None:
+                st.error("Please select a rating before continuing.")
+                return True
+            reflection_end_time = _now_iso()
+            reflection_start_time = item.get("reflection_start_time") or st.session_state.get(
+                "current_reflection_start_time", ""
+            )
+            item["reflection_start_time"] = reflection_start_time
+            item["reflection_end_time"] = reflection_end_time
+            item["reflection_time_sec"] = _seconds_between(
+                reflection_start_time,
+                reflection_end_time,
+            )
             relationship_type = ""
             explanation = ""
             if show_full_form:
                 relationship_type = st.session_state[relationship_key]
                 explanation = st.session_state.get(explanation_key, "")
-                if _word_count(explanation) > 20 or len(explanation) > 150:
+                explanation_word_count = _word_count(explanation)
+                if explanation_word_count < 3:
+                    item["reflection_explanation_raw"] = explanation.strip()
+                    item["human_explanation_sanitized"] = ""
+                    item["reflection_explanation_is_valid"] = False
+                    item["reflection_blocked_reason"] = "too_short"
+                    item["human_explanation_raw"] = explanation.strip()
+                    item["human_explanation_sanitized"] = ""
+                    item["human_explanation_is_valid"] = False
+                    item["human_explanation_blocked_reason"] = "too_short"
+                    log_event(
+                        "reflection_blocked",
+                        {"reason": "too_short"},
+                        turn_number=item.get("turn", ""),
+                    )
+                    st.error("Please write at least 3 words about the general relationship behind your clue.")
+                    return True
+                if explanation_word_count > 20 or len(explanation) > 150:
                     item["reflection_explanation_raw"] = explanation.strip()
                     item["human_explanation_sanitized"] = ""
                     item["reflection_explanation_is_valid"] = False
@@ -375,15 +632,17 @@ def screen_human_clue():
         pending_review = st.session_state.pending_ai_guess_review
         guesses_text = ", ".join(pending_review.get("guesses", []))
         st.info(f"AI selected: {guesses_text}")
-        st.markdown(
-            """
-            <div class="glass-card compact-card section-gap">
-                <div class="panel-title">After AI guessed</div>
-                <p class="subtle-text" style="margin:0;">Save this turn to reflect on how your clue was understood.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        guess_rationale = pending_review.get("guess_rationale", "")
+        if guess_rationale:
+            st.markdown(
+                f"""
+                <div class="glass-card compact-card section-gap">
+                    <div class="panel-title">AI guess reasoning</div>
+                    <p class="subtle-text" style="margin:0;">{escape(guess_rationale)}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         if st.button("Save this turn", type="primary", use_container_width=True):
             st.session_state.last_ai_guesses = pending_review.get("guesses", [])
             record_interaction(
@@ -391,9 +650,13 @@ def screen_human_clue():
                 pending_review.get("hint_number", 1),
                 pending_review.get("guesses", []),
                 pending_review.get("intended_targets", []),
+                expected_guesses=pending_review.get("expected_guesses", []),
+                guess_rationale=pending_review.get("guess_rationale", ""),
                 hint_explanation=pending_review.get("hint_explanation", ""),
                 ai_understanding_rating_before=pending_review.get("rating_before"),
+                hint_time_sec=pending_review.get("hint_time_sec"),
                 guess_raw_response=pending_review.get("guess_raw_response", ""),
+                guess_time_sec=pending_review.get("guess_time_sec"),
                 guess_response_time_sec=pending_review.get("guess_response_time_sec"),
             )
             st.session_state.pending_ai_guess_review = None
@@ -402,7 +665,11 @@ def screen_human_clue():
                 st.session_state.hint = ""
                 st.session_state.hint_number = 1
                 st.session_state.hint_targets = []
+                st.session_state.hint_expected_guesses = []
                 st.session_state.hint_explanation = ""
+                st.session_state.current_hint_start_time = ""
+                st.session_state.current_guess_start_time = ""
+                st.session_state.current_reflection_start_time = ""
             st.rerun()
         render_interaction_history(st.session_state.interaction_history)
         return
@@ -413,6 +680,7 @@ def screen_human_clue():
         """,
         unsafe_allow_html=True,
     )
+    _ensure_timer("current_hint_start_time")
 
     with st.container(border=True):
         clue_col, count_col = st.columns([4.2, 1.2])
@@ -453,30 +721,56 @@ def screen_human_clue():
         st.session_state.hint_targets,
         selected_count,
     )
-
-    st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
-    st.caption(
-        "The AI can also ask for the next clue if this clue looks too risky. "
-        + _skip_help_text()
+    expected_guess_key = f"expected_guesses_{st.session_state.round}_{st.session_state.round_interactions}"
+    available_guess_options = _available_guess_options()
+    existing_expected_guesses = st.session_state.get(
+        expected_guess_key,
+        st.session_state.get("hint_expected_guesses", []),
     )
+    current_expected_guesses = [
+        word
+        for word in existing_expected_guesses
+        if word in available_guess_options
+    ][:selected_count]
+    st.session_state.hint_expected_guesses = current_expected_guesses
+    st.session_state[expected_guess_key] = current_expected_guesses
     st.markdown(
         """
-        <div class="glass-card compact-card section-gap">
-            <div class="panel-title">Before AI guesses</div>
-            <p class="subtle-text" style="margin:0;">How well do you expect the AI understood your clue?</p>
-        </div>
+        <div class="panel-title section-gap">Select the cards you think the AI will choose</div>
         """,
         unsafe_allow_html=True,
     )
-    rating_before = st.radio(
-        "Before AI guess rating",
-        options=list(RATING_OPTIONS.keys()),
-        index=max(0, st.session_state.ai_understanding_rating_before - 1),
-        format_func=lambda option: f"{option}",
-        horizontal=True,
+    st.multiselect(
+        "Expected AI guesses",
+        options=available_guess_options,
+        max_selections=selected_count,
+        placeholder=f"Choose {selected_count} card(s)...",
         label_visibility="collapsed",
-        key=f"before_ai_guess_rating_{st.session_state.round}_{st.session_state.round_interactions}",
+        key=expected_guess_key,
     )
+    st.session_state.hint_expected_guesses = st.session_state.get(expected_guess_key, [])
+
+    st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
+    with st.container(border=True, key="before_ai_guess_panel"):
+        prompt_col, rating_col = st.columns([1.45, 1])
+        with prompt_col:
+            st.markdown(
+                """
+                <div class="panel-title">Before AI guesses</div>
+                <p class="subtle-text before-ai-question">How well do you expect the AI understood your clue?</p>
+                """,
+                unsafe_allow_html=True,
+            )
+        with rating_col:
+            rating_before = st.radio(
+                "Before AI guess rating",
+                options=list(RATING_OPTIONS.keys()),
+                index=None,
+                format_func=lambda option: f"{option}",
+                horizontal=True,
+                label_visibility="collapsed",
+                key=f"before_ai_guess_rating_{st.session_state.round}_{st.session_state.round_interactions}",
+            )
     st.session_state.ai_understanding_rating_before = rating_before
 
     if st.button("Let AI Guess", type="primary", use_container_width=True):
@@ -490,21 +784,36 @@ def screen_human_clue():
             st.error(error_message)
         elif len(st.session_state.hint_targets) != selected_count:
             st.error(f"Please select exactly {selected_count} target card(s) for this clue.")
+        elif len(st.session_state.hint_expected_guesses) != selected_count:
+            st.error(f"Please select exactly {selected_count} card(s) you think the AI will choose.")
+        elif rating_before is None:
+            st.error("Please select how well you expect the AI understood your clue.")
         else:
+            hint_end_time = _now_iso()
+            hint_time_sec = _seconds_between(
+                st.session_state.get("current_hint_start_time", ""),
+                hint_end_time,
+            )
             st.session_state.hint = hint.strip().lower()
             st.session_state.hint_number = int(hint_number)
-            st.session_state.current_turn_start_time = datetime.utcnow().isoformat()
+            st.session_state.current_turn_start_time = st.session_state.get(
+                "current_hint_start_time", hint_end_time
+            )
             intended_targets = st.session_state.hint_targets[:]
+            expected_guess_cards = st.session_state.hint_expected_guesses[:]
             log_event(
                 "clue_submitted",
                 {
                     "clue": st.session_state.hint,
                     "clue_number": st.session_state.hint_number,
                     "intended_cards": intended_targets,
+                    "expected_guess_cards": expected_guess_cards,
                 },
                 turn_number=st.session_state.round_interactions + 1,
             )
             log_event("ai_guess_started", {"clue": st.session_state.hint}, turn_number=st.session_state.round_interactions + 1)
+            guess_start_time = _now_iso()
+            st.session_state.current_guess_start_time = guess_start_time
             with st.spinner("AI is thinking..."):
                 guess_result = ai_guess(
                     st.session_state.board,
@@ -518,11 +827,18 @@ def screen_human_clue():
                     can_skip_current_clue(),
                     condition=st.session_state.get("condition", "adaptive"),
                 )
+            guess_end_time = _now_iso()
+            guess_time_sec = _seconds_between(guess_start_time, guess_end_time)
 
             action = guess_result.get("action", "guess")
             log_event(
                 "ai_guess_completed",
-                {"action": action, "guesses": guess_result.get("guesses", [])},
+                {
+                    "action": action,
+                    "guesses": guess_result.get("guesses", []),
+                    "guess_rationale": guess_result.get("guess_rationale", ""),
+                    "raw_response": guess_result.get("raw_response", ""),
+                },
                 turn_number=st.session_state.round_interactions + 1,
             )
             if action == "reroll":
@@ -536,9 +852,13 @@ def screen_human_clue():
                     st.session_state.hint,
                     st.session_state.hint_number,
                     intended_targets,
-                    st.session_state.get("hint_explanation", ""),
+                    expected_guess_cards,
+                    guess_rationale=guess_result.get("guess_rationale", ""),
+                    hint_explanation=st.session_state.get("hint_explanation", ""),
+                    hint_time_sec=hint_time_sec,
                     skipped_by="ai",
                     guess_raw_response=guess_result.get("raw_response", ""),
+                    guess_time_sec=guess_time_sec,
                     guess_response_time_sec=guess_result.get("response_time_sec"),
                 )
                 _clear_current_clue()
@@ -550,9 +870,13 @@ def screen_human_clue():
                     "hint_number": st.session_state.hint_number,
                     "guesses": guess_result.get("guesses", []),
                     "intended_targets": intended_targets,
+                    "expected_guesses": expected_guess_cards,
+                    "guess_rationale": guess_result.get("guess_rationale", ""),
                     "hint_explanation": "",
                     "rating_before": rating_before,
+                    "hint_time_sec": hint_time_sec,
                     "guess_raw_response": guess_result.get("raw_response", ""),
+                    "guess_time_sec": guess_time_sec,
                     "guess_response_time_sec": guess_result.get("response_time_sec"),
                 }
                 st.rerun()
@@ -571,6 +895,57 @@ def screen_human_guesser():
 
     render_top_status()
 
+    if not st.session_state.hint:
+        if not st.session_state.get("ai_clue_intro_seen", False):
+            st.markdown(
+                """
+                <div class="glass-card compact-card section-gap">
+                    <div class="panel-title">Clue</div>
+                    <p class="subtle-text" style="margin:0;">Ask the AI for a clue when you are ready.</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.session_state.ai_clue_intro_seen = True
+        if st.button("Ask AI for a clue", type="primary", use_container_width=True):
+            hint_start_time = _now_iso()
+            st.session_state.current_hint_start_time = hint_start_time
+            with st.spinner("AI is generating a clue..."):
+                hint_result = generate_ai_hint(
+                    st.session_state.target_words,
+                    st.session_state.bomb_words,
+                    st.session_state.neutral_words,
+                    st.session_state.word_type,
+                    st.session_state.interaction_history,
+                    st.session_state.used_hints,
+                    st.session_state.ai_round_summaries,
+                    condition=st.session_state.get("condition", "adaptive"),
+                )
+            hint_end_time = _now_iso()
+            hint_time_sec = _seconds_between(hint_start_time, hint_end_time)
+            st.session_state.hint = hint_result.get("hint", "")
+            st.session_state.hint_number = hint_result.get("hint_number", 1)
+            st.session_state.hint_targets = hint_result.get("intended_targets", [])
+            st.session_state.hint_expected_guesses = hint_result.get("expected_guesses", [])
+            st.session_state.hint_explanation = hint_result.get("explanation", "")
+            st.session_state.current_turn_start_time = hint_start_time
+            st.session_state.current_guess_start_time = hint_end_time
+            st.session_state.pending_hint_meta = {
+                "raw_response": hint_result.get("raw_response", ""),
+                "hint_time_sec": hint_time_sec,
+                "response_time_sec": hint_result.get("response_time_sec"),
+                "attempts": hint_result.get("attempts"),
+                "used_fallback": hint_result.get("used_fallback", False),
+            }
+            st.rerun()
+    else:
+        render_hint_panel(
+            st.session_state.hint,
+            st.session_state.hint_number,
+            st.session_state.previous_hint,
+        )
+        guess_rationale, rationale_is_valid = _render_guess_rationale_input()
+
     with st.container(border=True):
         st.markdown('<div class="panel-title">Board</div>', unsafe_allow_html=True)
 
@@ -587,7 +962,7 @@ def screen_human_guesser():
                 st.session_state.word_roles,
                 guesses=st.session_state.guesses + st.session_state.pending_guesses,
                 reveal_all=False,
-                clickable=True,
+                clickable=rationale_is_valid,
                 max_clicks=st.session_state.hint_number + len(st.session_state.guesses),
             )
             if clicked:
@@ -599,20 +974,30 @@ def screen_human_guesser():
                 ):
                     pending_meta = st.session_state.get("pending_hint_meta") or {}
                     submitted_guesses = list(st.session_state.pending_guesses)
+                    guess_time_sec = _seconds_between(
+                        st.session_state.get("current_guess_start_time", "")
+                    )
                     record_interaction(
                         st.session_state.hint,
                         st.session_state.hint_number,
                         submitted_guesses,
                         st.session_state.hint_targets,
+                        expected_guesses=st.session_state.get("hint_expected_guesses", []),
+                        guess_rationale=guess_rationale,
                         hint_explanation=st.session_state.get("hint_explanation", ""),
                         hint_raw_response=pending_meta.get("raw_response", ""),
+                        hint_time_sec=pending_meta.get("hint_time_sec"),
                         hint_response_time_sec=pending_meta.get("response_time_sec"),
                         hint_attempts=pending_meta.get("attempts"),
                         hint_used_fallback=pending_meta.get("used_fallback", False),
+                        guess_time_sec=guess_time_sec,
                     )
                     log_event(
                         "human_guess_submitted",
-                        {"guessed_cards": submitted_guesses},
+                        {
+                            "guessed_cards": submitted_guesses,
+                            "guess_rationale": guess_rationale,
+                        },
                         turn_number=st.session_state.round_interactions,
                     )
                     if st.session_state.interaction_history:
@@ -646,56 +1031,20 @@ def screen_human_guesser():
                         )
                         latest_item["reflection_source"] = "ai_clue_giver"
                     st.session_state.pending_guesses = []
+                    st.session_state.current_guess_rationale = ""
+                    st.session_state.current_hint_start_time = ""
+                    st.session_state.current_guess_start_time = ""
                     if not st.session_state.round_finished:
                         st.session_state.previous_hint = st.session_state.hint
                         st.session_state.hint = ""
                         st.session_state.hint_number = 1
                         st.session_state.hint_targets = []
+                        st.session_state.hint_expected_guesses = []
                         st.session_state.hint_explanation = ""
                     st.session_state.pending_hint_meta = None
                 st.rerun()
 
-    if not st.session_state.hint:
-        st.markdown(
-            """
-            <div class="glass-card compact-card section-gap">
-                <div class="panel-title">Clue</div>
-                <p class="subtle-text" style="margin:0;">Ask the AI for a clue when you are ready.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if st.button("Ask AI for a clue", type="primary", use_container_width=True):
-            with st.spinner("AI is generating a clue..."):
-                hint_result = generate_ai_hint(
-                    st.session_state.target_words,
-                    st.session_state.bomb_words,
-                    st.session_state.neutral_words,
-                    st.session_state.word_type,
-                    st.session_state.interaction_history,
-                    st.session_state.used_hints,
-                    st.session_state.ai_round_summaries,
-                    condition=st.session_state.get("condition", "adaptive"),
-                )
-            st.session_state.hint = hint_result.get("hint", "")
-            st.session_state.hint_number = hint_result.get("hint_number", 1)
-            st.session_state.hint_targets = hint_result.get("intended_targets", [])
-            st.session_state.hint_explanation = hint_result.get("explanation", "")
-            st.session_state.current_turn_start_time = datetime.utcnow().isoformat()
-            st.session_state.pending_hint_meta = {
-                "raw_response": hint_result.get("raw_response", ""),
-                "response_time_sec": hint_result.get("response_time_sec"),
-                "attempts": hint_result.get("attempts"),
-                "used_fallback": hint_result.get("used_fallback", False),
-            }
-            st.rerun()
-    else:
-        render_hint_panel(
-            st.session_state.hint,
-            st.session_state.hint_number,
-            st.session_state.previous_hint,
-        )
-        st.caption(_skip_help_text())
+    if st.session_state.hint:
         if st.button(
             "Skip this clue and ask for the next one",
             use_container_width=True,
@@ -706,12 +1055,16 @@ def screen_human_guesser():
                 st.session_state.hint,
                 st.session_state.hint_number,
                 st.session_state.hint_targets,
-                st.session_state.get("hint_explanation", ""),
+                st.session_state.get("hint_expected_guesses", []),
+                guess_rationale=guess_rationale if rationale_is_valid else "",
+                hint_explanation=st.session_state.get("hint_explanation", ""),
                 skipped_by="human",
                 hint_raw_response=pending_meta.get("raw_response", ""),
+                hint_time_sec=pending_meta.get("hint_time_sec"),
                 hint_response_time_sec=pending_meta.get("response_time_sec"),
                 hint_attempts=pending_meta.get("attempts"),
                 hint_used_fallback=pending_meta.get("used_fallback", False),
+                guess_time_sec=_seconds_between(st.session_state.get("current_guess_start_time", "")),
             )
             _clear_current_clue()
             st.rerun()
@@ -826,24 +1179,8 @@ def screen_round_summary():
 
 
 def screen_game_over():
-    player_name = st.session_state.get("participant_id") or "Player"
+    player_name = _display_player_name()
     total_score = st.session_state.get("score", 0)
-    if not st.session_state.get("session_completed_logged"):
-        if not st.session_state.get("completion_code"):
-            st.session_state.completion_code = (
-                str(st.session_state.get("session_id", "")).replace("-", "")[-8:].upper()
-            )
-        log_session_state(completed=True)
-        log_event(
-            "session_completed",
-            {
-                "final_total_score": total_score,
-                "completion_code": st.session_state.completion_code,
-            },
-            round_number="",
-            turn_number="",
-        )
-        st.session_state.session_completed_logged = True
     if total_score >= 16:
         title = "Elite team!"
         subtitle = f"Fantastic finish, {player_name}! Your team was sharp, fast, and beautifully in sync."
@@ -891,16 +1228,76 @@ def screen_game_over():
         f"<div class='summary-stat'><strong>&#129353; Bronze</strong><br>{medal_counts.get('bronze', 0)}</div>",
         unsafe_allow_html=True,
     )
+
+    if not st.session_state.get("post_game_questionnaire_submitted"):
+        with st.container(border=True, key="post_game_questionnaire_panel"):
+            st.markdown(
+                """
+                <div class="panel-title">Final questions</div>
+                <p class="subtle-text" style="margin-top:0;">Rate each statement from 1 to 5. 5 = very good.</p>
+                """,
+                unsafe_allow_html=True,
+            )
+            answers = {}
+            for question_id, question_text in POST_GAME_QUESTIONS:
+                answers[question_id] = st.radio(
+                    question_text,
+                    options=[1, 2, 3, 4, 5],
+                    index=None,
+                    horizontal=True,
+                    key=f"post_game_{question_id}",
+                )
+            if st.button("Submit final answers", type="primary", use_container_width=True):
+                missing = [
+                    question_text
+                    for question_id, question_text in POST_GAME_QUESTIONS
+                    if answers.get(question_id) is None
+                ]
+                if missing:
+                    st.error("Please answer all final questions before finishing.")
+                    return
+                st.session_state.post_game_questionnaire = {
+                    question_id: int(answers[question_id])
+                    for question_id, _ in POST_GAME_QUESTIONS
+                }
+                st.session_state.post_game_questionnaire_submitted = True
+                if not st.session_state.get("completion_code"):
+                    st.session_state.completion_code = (
+                        str(st.session_state.get("session_id", "")).replace("-", "")[-8:].upper()
+                    )
+                log_session_state(completed=True)
+                log_event(
+                    "post_game_questionnaire_submitted",
+                    st.session_state.post_game_questionnaire,
+                    round_number="",
+                    turn_number="",
+                )
+                log_event(
+                    "session_completed",
+                    {
+                        "final_total_score": total_score,
+                        "completion_code": st.session_state.completion_code,
+                        "post_game_questionnaire": st.session_state.post_game_questionnaire,
+                    },
+                    round_number="",
+                    turn_number="",
+                )
+                st.session_state.session_completed_logged = True
+                st.rerun()
+        return
+
     remote_status = st.session_state.get("remote_log_status")
     remote_error = st.session_state.get("remote_log_error", "")
     if remote_status == "github_saved":
-        st.info(f"The run has been saved to GitHub, {player_name}.")
+        st.success(f"Thank you, {player_name}. Your answers and game data have been saved.")
     elif remote_status == "github_failed":
-        st.warning(f"The run was saved locally, but GitHub logging failed: {remote_error}")
+        st.warning(
+            f"Thank you, {player_name}. Your answers were saved locally, but GitHub logging failed: {remote_error}"
+        )
     elif remote_status == "local_only":
-        st.info(f"The run has been saved locally, {player_name}.")
+        st.success(f"Thank you, {player_name}. Your answers and game data have been saved locally.")
     else:
-        st.info(f"The run has been saved locally, {player_name}.")
+        st.success(f"Thank you, {player_name}. Your answers and game data have been saved locally.")
 
     st.markdown('<div class="center-actions">', unsafe_allow_html=True)
     if st.button("Play again", type="primary", use_container_width=True):

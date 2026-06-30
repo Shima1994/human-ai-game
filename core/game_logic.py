@@ -1,3 +1,4 @@
+import hashlib
 import random
 from datetime import datetime
 
@@ -153,6 +154,14 @@ def _build_word_type_map(board_words):
     return word_types
 
 
+def build_board_id(round_number, template_type, board_words, word_roles):
+    board_signature = "|".join(
+        f"{word}:{word_roles.get(word, '')}" for word in sorted(board_words)
+    )
+    digest = hashlib.sha1(board_signature.encode("utf-8")).hexdigest()[:10]
+    return f"round-{round_number}-template-{template_type}-{digest}"
+
+
 def _draw_role_words(template, role_name, used_words):
     abstract_words = _draw_words(
         WORD_BANKS["abstract"],
@@ -212,6 +221,12 @@ def setup_new_round():
     )
     st.session_state.board = board
     st.session_state.board_template_type = template_type
+    st.session_state.board_id = build_board_id(
+        st.session_state.round,
+        template_type,
+        board,
+        word_roles,
+    )
     st.session_state.target_words = targets
     st.session_state.bomb_words = bombs
     st.session_state.neutral_words = neutrals
@@ -220,6 +235,7 @@ def setup_new_round():
     st.session_state.word_type_per_card = word_types
     st.session_state.guesses = []
     st.session_state.pending_guesses = []
+    st.session_state.current_guess_rationale = ""
     st.session_state.found_targets = []
     st.session_state.interaction_history = []
     st.session_state.round_interactions = 0
@@ -228,17 +244,21 @@ def setup_new_round():
     st.session_state.hint = ""
     st.session_state.hint_number = 1
     st.session_state.hint_targets = []
+    st.session_state.hint_expected_guesses = []
     st.session_state.hint_explanation = ""
     st.session_state.last_ai_guesses = []
     st.session_state.last_ai_hint = ""
-    st.session_state.perception_rating = 3
-    st.session_state.ai_understanding_rating_before = 3
-    st.session_state.ai_understanding_rating_after = 3
+    st.session_state.perception_rating = None
+    st.session_state.ai_understanding_rating_before = None
+    st.session_state.ai_understanding_rating_after = None
     st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.utcnow()
     st.session_state.round_start_time = st.session_state.start_time.isoformat()
     st.session_state.current_turn_start_time = ""
+    st.session_state.current_hint_start_time = ""
+    st.session_state.current_guess_start_time = ""
+    st.session_state.current_reflection_start_time = ""
     st.session_state.last_score_change = 0
     st.session_state.round_medal = "none"
     st.session_state.round_success = False
@@ -278,17 +298,27 @@ def record_interaction(
     hint_number,
     guesses,
     intended_targets=None,
+    expected_guesses=None,
+    guess_rationale="",
     hint_explanation="",
     ai_understanding_rating_before=None,
     ai_understanding_rating_after=None,
     hint_raw_response="",
+    hint_time_sec=None,
     hint_response_time_sec=None,
     hint_attempts=None,
     hint_used_fallback=False,
     guess_raw_response="",
+    guess_time_sec=None,
     guess_response_time_sec=None,
 ):
     intended_targets = intended_targets or []
+    expected_guesses = expected_guesses or []
+    guess_rationale = (guess_rationale or "").strip()
+    guess_order = [
+        {"position": position, "word": guess}
+        for position, guess in enumerate(guesses or [], start=1)
+    ]
     turn_end = datetime.utcnow()
     turn_start_raw = st.session_state.get("current_turn_start_time") or turn_end.isoformat()
     try:
@@ -359,8 +389,12 @@ def record_interaction(
             "hint": normalized_hint,
             "hint_number": hint_number,
             "intended_targets": intended_targets,
+            "expected_guesses": expected_guesses,
+            "guess_rationale": guess_rationale,
+            "guess_rationale_word_count": len(guess_rationale.split()) if guess_rationale else 0,
             "hint_explanation": hint_explanation,
             "guesses": guesses,
+            "guess_order": guess_order,
             "correct": bool(correct_guesses),
             "correct_guesses": correct_guesses,
             "neutral_guesses": neutral_guesses,
@@ -373,10 +407,12 @@ def record_interaction(
             "ai_understanding_rating_before": ai_understanding_rating_before,
             "ai_understanding_rating_after": ai_understanding_rating_after,
             "hint_raw_response": hint_raw_response,
+            "hint_time_sec": hint_time_sec,
             "hint_response_time_sec": hint_response_time_sec,
             "hint_attempts": hint_attempts,
             "hint_used_fallback": bool(hint_used_fallback),
             "guess_raw_response": guess_raw_response,
+            "guess_time_sec": guess_time_sec,
             "guess_response_time_sec": guess_response_time_sec,
             "remaining_targets_before_turn": remaining_before,
             "remaining_targets_after_turn": remaining_after,
@@ -387,6 +423,9 @@ def record_interaction(
             "turn_start_time": turn_start.isoformat(),
             "turn_end_time": turn_end.isoformat(),
             "turn_duration_seconds": (turn_end - turn_start).total_seconds(),
+            "reflection_start_time": "",
+            "reflection_end_time": "",
+            "reflection_time_sec": "",
             "recorded_at": turn_end.isoformat(),
             "reflection_rating": "",
             "reflection_relationship_type": "",
@@ -429,16 +468,23 @@ def record_skip(
     hint,
     hint_number,
     intended_targets=None,
+    expected_guesses=None,
+    guess_rationale="",
     hint_explanation="",
     skipped_by=None,
     hint_raw_response="",
+    hint_time_sec=None,
     hint_response_time_sec=None,
     hint_attempts=None,
     hint_used_fallback=False,
     guess_raw_response="",
+    guess_time_sec=None,
     guess_response_time_sec=None,
 ):
     intended_targets = intended_targets or []
+    expected_guesses = expected_guesses or []
+    guess_rationale = (guess_rationale or "").strip()
+    guess_order = []
     turn_end = datetime.utcnow()
     turn_start_raw = st.session_state.get("current_turn_start_time") or turn_end.isoformat()
     try:
@@ -462,8 +508,12 @@ def record_skip(
             "hint": normalized_hint,
             "hint_number": hint_number,
             "intended_targets": intended_targets,
+            "expected_guesses": expected_guesses,
+            "guess_rationale": guess_rationale,
+            "guess_rationale_word_count": len(guess_rationale.split()) if guess_rationale else 0,
             "hint_explanation": hint_explanation,
             "guesses": [],
+            "guess_order": guess_order,
             "correct": False,
             "correct_guesses": [],
             "neutral_guesses": [],
@@ -478,10 +528,12 @@ def record_skip(
             "ai_understanding_rating_before": None,
             "ai_understanding_rating_after": None,
             "hint_raw_response": hint_raw_response,
+            "hint_time_sec": hint_time_sec,
             "hint_response_time_sec": hint_response_time_sec,
             "hint_attempts": hint_attempts,
             "hint_used_fallback": bool(hint_used_fallback),
             "guess_raw_response": guess_raw_response,
+            "guess_time_sec": guess_time_sec,
             "guess_response_time_sec": guess_response_time_sec,
             "remaining_targets_before_turn": [
                 word
@@ -500,6 +552,9 @@ def record_skip(
             "turn_start_time": turn_start.isoformat(),
             "turn_end_time": turn_end.isoformat(),
             "turn_duration_seconds": (turn_end - turn_start).total_seconds(),
+            "reflection_start_time": "",
+            "reflection_end_time": "",
+            "reflection_time_sec": "",
             "recorded_at": turn_end.isoformat(),
             "reflection_rating": "",
             "reflection_relationship_type": "",
@@ -567,6 +622,7 @@ def append_ai_round_summary():
             "role": st.session_state.role,
             "word_type": st.session_state.word_type,
             "board_template_type": st.session_state.get("board_template_type", ""),
+            "board_id": st.session_state.get("board_id", ""),
             "word_type_per_card": dict(word_type_per_card),
             "targets": list(st.session_state.target_words),
             "target_word_types": word_types_for(st.session_state.target_words),
@@ -587,8 +643,14 @@ def append_ai_round_summary():
                     "hint": item.get("hint"),
                     "hint_number": item.get("hint_number"),
                     "intended_targets": list(item.get("intended_targets", [])),
+                    "expected_guesses": list(item.get("expected_guesses", [])),
+                    "guess_rationale": item.get("guess_rationale", ""),
+                    "guess_rationale_word_count": item.get("guess_rationale_word_count", 0),
                     "hint_explanation": item.get("hint_explanation", ""),
+                    "hint_time_sec": item.get("hint_time_sec"),
                     "guesses": list(item.get("guesses", [])),
+                    "guess_order": list(item.get("guess_order", [])),
+                    "guess_time_sec": item.get("guess_time_sec"),
                     "correct_guesses": list(item.get("correct_guesses", [])),
                     "neutral_guesses": list(item.get("neutral_guesses", [])),
                     "bomb_guesses": list(item.get("bomb_guesses", [])),
@@ -618,6 +680,9 @@ def append_ai_round_summary():
                     "ai_explanation_blocked_reason": item.get("ai_explanation_blocked_reason", ""),
                     "ai_explanation": item.get("ai_explanation", ""),
                     "reflection_source": item.get("reflection_source", ""),
+                    "reflection_start_time": item.get("reflection_start_time", ""),
+                    "reflection_end_time": item.get("reflection_end_time", ""),
+                    "reflection_time_sec": item.get("reflection_time_sec", ""),
                 }
                 for item in st.session_state.interaction_history
             ],

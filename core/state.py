@@ -36,12 +36,19 @@ def init_session_state():
         "starting_role": _new_starting_role(),
         "started": False,
         "participant_id": None,
+        "nickname": "",
+        "age_group": "",
+        "gender": "",
+        "english_proficiency": "",
+        "ai_experience": "",
+        "codenames_experience": "",
         "round": 1,
         "score": 0,
         "board": None,
         "role": None,
         "word_type": None,
         "board_template_type": "",
+        "board_id": "",
         "word_type_per_card": {},
         "used_board_words": [],
         "used_board_words_by_type": {"abstract": [], "concrete": []},
@@ -53,10 +60,12 @@ def init_session_state():
         "hint": "",
         "hint_number": 1,
         "hint_targets": [],
+        "hint_expected_guesses": [],
         "hint_explanation": "",
         "used_hints": [],
         "guesses": [],
         "pending_guesses": [],
+        "current_guess_rationale": "",
         "found_targets": [],
         "interaction_history": [],
         "ai_round_summaries": [],
@@ -70,12 +79,18 @@ def init_session_state():
         "round_start_time": "",
         "logged_round_starts": [],
         "current_turn_start_time": "",
+        "current_hint_start_time": "",
+        "current_guess_start_time": "",
+        "current_reflection_start_time": "",
         "consent_given": False,
         "completion_code": "",
         "session_completed_logged": False,
-        "perception_rating": 3,
-        "ai_understanding_rating_before": 3,
-        "ai_understanding_rating_after": 3,
+        "ai_clue_intro_seen": False,
+        "post_game_questionnaire_submitted": False,
+        "post_game_questionnaire": {},
+        "perception_rating": None,
+        "ai_understanding_rating_before": None,
+        "ai_understanding_rating_after": None,
         "pending_ai_guess_review": None,
         "previous_hint": None,
         "last_ai_guesses": [],
@@ -105,6 +120,7 @@ def reset_round_state():
     st.session_state.role = None
     st.session_state.word_type = None
     st.session_state.board_template_type = ""
+    st.session_state.board_id = ""
     st.session_state.word_type_per_card = {}
     st.session_state.target_words = []
     st.session_state.bomb_words = []
@@ -114,9 +130,11 @@ def reset_round_state():
     st.session_state.hint = ""
     st.session_state.hint_number = 1
     st.session_state.hint_targets = []
+    st.session_state.hint_expected_guesses = []
     st.session_state.hint_explanation = ""
     st.session_state.guesses = []
     st.session_state.pending_guesses = []
+    st.session_state.current_guess_rationale = ""
     st.session_state.found_targets = []
     st.session_state.interaction_history = []
     st.session_state.round_interactions = 0
@@ -125,9 +143,12 @@ def reset_round_state():
     st.session_state.start_time = None
     st.session_state.round_start_time = ""
     st.session_state.current_turn_start_time = ""
-    st.session_state.perception_rating = 3
-    st.session_state.ai_understanding_rating_before = 3
-    st.session_state.ai_understanding_rating_after = 3
+    st.session_state.current_hint_start_time = ""
+    st.session_state.current_guess_start_time = ""
+    st.session_state.current_reflection_start_time = ""
+    st.session_state.perception_rating = None
+    st.session_state.ai_understanding_rating_before = None
+    st.session_state.ai_understanding_rating_after = None
     st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
     st.session_state.last_ai_guesses = []
@@ -144,6 +165,12 @@ def reset_round_state():
 
 def restart_game(keep_participant=False):
     participant_id = st.session_state.get("participant_id") if keep_participant else None
+    nickname = st.session_state.get("nickname") if keep_participant else ""
+    age_group = st.session_state.get("age_group") if keep_participant else ""
+    gender = st.session_state.get("gender") if keep_participant else ""
+    english_proficiency = st.session_state.get("english_proficiency") if keep_participant else ""
+    ai_experience = st.session_state.get("ai_experience") if keep_participant else ""
+    codenames_experience = st.session_state.get("codenames_experience") if keep_participant else ""
     condition = st.session_state.get("condition", DEFAULT_CONDITION)
     for key in list(st.session_state.keys()):
         del st.session_state[key]
@@ -158,9 +185,18 @@ def restart_game(keep_participant=False):
     st.session_state.consent_given = False
     st.session_state.completion_code = ""
     st.session_state.session_completed_logged = False
+    st.session_state.ai_clue_intro_seen = False
+    st.session_state.post_game_questionnaire_submitted = False
+    st.session_state.post_game_questionnaire = {}
     if participant_id:
         st.session_state.started = True
         st.session_state.participant_id = participant_id
+        st.session_state.nickname = nickname or participant_id
+        st.session_state.age_group = age_group or ""
+        st.session_state.gender = gender or ""
+        st.session_state.english_proficiency = english_proficiency or ""
+        st.session_state.ai_experience = ai_experience or ""
+        st.session_state.codenames_experience = codenames_experience or ""
     reset_round_state()
     st.session_state.round = 1
     st.session_state.score = 0

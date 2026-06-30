@@ -35,6 +35,7 @@ ROUND_LOG_FIELDS = [
     "role",
     "word_type",
     "board_template_type",
+    "board_id",
     "word_type_per_card",
     "board",
     "all_board_words",
@@ -97,6 +98,7 @@ INTERACTION_LOG_FIELDS = [
     "role",
     "word_type",
     "board_template_type",
+    "board_id",
     "word_type_per_card",
     "target_word_types",
     "neutral_word_types",
@@ -111,9 +113,16 @@ INTERACTION_LOG_FIELDS = [
     "clue_number",
     "intended_targets",
     "intended_cards",
+    "expected_guesses",
+    "expected_guess_cards",
+    "expected_guess_word_types",
+    "guess_rationale",
+    "guess_rationale_word_count",
     "hint_explanation",
     "guesses",
     "guessed_cards",
+    "guess_order",
+    "guess_order_json",
     "guessed_word_types",
     "correct_guesses",
     "correct_guess_word_types",
@@ -134,9 +143,11 @@ INTERACTION_LOG_FIELDS = [
     "ai_understanding_rating_before",
     "ai_understanding_rating_after",
     "hint_response_time_sec",
+    "hint_time_sec",
     "hint_attempts",
     "hint_used_fallback",
     "guess_response_time_sec",
+    "guess_time_sec",
     "hint_raw_response",
     "guess_raw_response",
     "human_understanding_rating",
@@ -156,12 +167,21 @@ INTERACTION_LOG_FIELDS = [
     "reflection_explanation_raw",
     "reflection_explanation_is_valid",
     "reflection_blocked_reason",
+    "reflection_start_time",
+    "reflection_end_time",
+    "reflection_time_sec",
     "interaction_recorded_at",
 ]
 
 
 SESSIONS_LOG_FIELDS = [
     "participant_id",
+    "nickname",
+    "age_group",
+    "gender",
+    "english_proficiency",
+    "ai_experience",
+    "codenames_experience",
     "session_id",
     "condition",
     "starting_role",
@@ -178,6 +198,14 @@ SESSIONS_LOG_FIELDS = [
     "screen_size",
     "browser_language",
     "completion_code",
+    "post_game_ai_understood_my_clues",
+    "post_game_i_understood_ai_clues",
+    "post_game_predict_ai_interpretation",
+    "post_game_adapted_to_ai_behavior",
+    "post_game_ai_adapted_to_me",
+    "post_game_reflection_helped",
+    "post_game_shared_strategy",
+    "post_game_questionnaire_json",
 ]
 
 
@@ -190,6 +218,7 @@ ROUNDS_LOG_FIELDS = [
     "clue_giver",
     "guesser",
     "board_template_type",
+    "board_id",
     "all_board_words",
     "word_type_per_card",
     "target_words",
@@ -223,9 +252,16 @@ TURNS_LOG_FIELDS = [
     "guesser",
     "clue",
     "clue_number",
+    "board_id",
     "intended_cards",
     "intended_word_types",
+    "expected_guess_cards",
+    "expected_guess_word_types",
+    "guess_rationale",
+    "guess_rationale_word_count",
     "guessed_cards",
+    "guess_order",
+    "guess_order_json",
     "guessed_word_types",
     "correct_guesses",
     "correct_guess_word_types",
@@ -237,6 +273,8 @@ TURNS_LOG_FIELDS = [
     "bomb_guess_word_types",
     "remaining_targets_before_turn",
     "remaining_targets_after_turn",
+    "hint_time_sec",
+    "guess_time_sec",
     "hit_rate",
     "target_yield",
     "jaccard_alignment",
@@ -247,6 +285,9 @@ TURNS_LOG_FIELDS = [
     "turn_end_time",
     "turn_duration_seconds",
     "reflection_shown",
+    "reflection_start_time",
+    "reflection_end_time",
+    "reflection_time_sec",
     "reflection_source",
     "human_understanding_rating",
     "human_relationship_type",
@@ -551,6 +592,14 @@ def clean_interaction_history(history):
         guesses = list(item.get("guesses", []))
         correct_guesses = list(item.get("correct_guesses", []))
         intended_targets = list(item.get("intended_targets", []))
+        expected_guesses = list(item.get("expected_guesses", []))
+        guess_order = list(
+            item.get("guess_order")
+            or [
+                {"position": position, "word": guess}
+                for position, guess in enumerate(guesses, start=1)
+            ]
+        )
         clean_items.append(
             {
                 "turn": index,
@@ -559,8 +608,12 @@ def clean_interaction_history(history):
                 "hint": item.get("hint", ""),
                 "hint_number": int(item.get("hint_number", 0) or 0),
                 "intended_targets": intended_targets,
+                "expected_guesses": expected_guesses,
+                "guess_rationale": item.get("guess_rationale", ""),
+                "guess_rationale_word_count": item.get("guess_rationale_word_count", 0),
                 "hint_explanation": item.get("hint_explanation", ""),
                 "guesses": guesses,
+                "guess_order": guess_order,
                 "correct_guesses": correct_guesses,
                 "incorrect_guesses": [
                     word for word in guesses if word not in correct_guesses
@@ -587,7 +640,12 @@ def clean_interaction_history(history):
                 "hint_attempts": item.get("hint_attempts"),
                 "hint_used_fallback": bool(item.get("hint_used_fallback", False)),
                 "guess_raw_response": item.get("guess_raw_response", ""),
+                "hint_time_sec": item.get("hint_time_sec"),
+                "guess_time_sec": item.get("guess_time_sec"),
                 "guess_response_time_sec": item.get("guess_response_time_sec"),
+                "reflection_start_time": item.get("reflection_start_time", ""),
+                "reflection_end_time": item.get("reflection_end_time", ""),
+                "reflection_time_sec": item.get("reflection_time_sec", ""),
                 "reflection_rating": item.get("reflection_rating", ""),
                 "reflection_relationship_type": item.get("reflection_relationship_type", ""),
                 "reflection_explanation_raw": item.get("reflection_explanation_raw", ""),
@@ -651,8 +709,15 @@ def _session_row(completed=False):
     total_completed = len(st.session_state.get("ai_round_summaries", []))
     if st.session_state.get("round_finished"):
         total_completed = max(total_completed, int(st.session_state.get("round", 0) or 0))
+    questionnaire = st.session_state.get("post_game_questionnaire", {}) or {}
     return {
         "participant_id": st.session_state.get("participant_id", ""),
+        "nickname": st.session_state.get("nickname", st.session_state.get("participant_id", "")),
+        "age_group": st.session_state.get("age_group", ""),
+        "gender": st.session_state.get("gender", ""),
+        "english_proficiency": st.session_state.get("english_proficiency", ""),
+        "ai_experience": st.session_state.get("ai_experience", ""),
+        "codenames_experience": st.session_state.get("codenames_experience", ""),
         "session_id": st.session_state.get("session_id", ""),
         "condition": st.session_state.get("condition", "adaptive"),
         "starting_role": st.session_state.get("starting_role", ""),
@@ -673,6 +738,14 @@ def _session_row(completed=False):
         "screen_size": st.session_state.get("screen_size", "unknown"),
         "browser_language": st.session_state.get("browser_language", "unknown"),
         "completion_code": st.session_state.get("completion_code", ""),
+        "post_game_ai_understood_my_clues": questionnaire.get("ai_understood_my_clues", ""),
+        "post_game_i_understood_ai_clues": questionnaire.get("i_understood_ai_clues", ""),
+        "post_game_predict_ai_interpretation": questionnaire.get("predict_ai_interpretation", ""),
+        "post_game_adapted_to_ai_behavior": questionnaire.get("adapted_to_ai_behavior", ""),
+        "post_game_ai_adapted_to_me": questionnaire.get("ai_adapted_to_me", ""),
+        "post_game_reflection_helped": questionnaire.get("reflection_helped", ""),
+        "post_game_shared_strategy": questionnaire.get("shared_strategy", ""),
+        "post_game_questionnaire_json": json.dumps(questionnaire, ensure_ascii=False),
     }
 
 
@@ -707,9 +780,23 @@ def initialize_session_log(participant_id):
     if st.session_state.get("session_log_initialized"):
         return
     st.session_state.participant_id = participant_id
+    st.session_state.nickname = st.session_state.get("nickname", participant_id) or participant_id
     st.session_state.consent_given = True
     log_session_state(completed=False)
-    log_event("session_started", {"starting_role": st.session_state.get("starting_role", "")}, round_number="", turn_number="")
+    log_event(
+        "session_started",
+        {
+            "starting_role": st.session_state.get("starting_role", ""),
+            "nickname": st.session_state.get("nickname", ""),
+            "age_group": st.session_state.get("age_group", ""),
+            "gender": st.session_state.get("gender", ""),
+            "english_proficiency": st.session_state.get("english_proficiency", ""),
+            "ai_experience": st.session_state.get("ai_experience", ""),
+            "codenames_experience": st.session_state.get("codenames_experience", ""),
+        },
+        round_number="",
+        turn_number="",
+    )
     log_event("consent_given", {}, round_number="", turn_number="")
     log_event("instruction_viewed", {}, round_number="", turn_number="")
     st.session_state.session_log_initialized = True
@@ -747,6 +834,7 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "clue_giver": clue_giver,
         "guesser": guesser,
         "board_template_type": st.session_state.get("board_template_type", ""),
+        "board_id": st.session_state.get("board_id", ""),
         "all_board_words": _json(st.session_state.board),
         "word_type_per_card": _format_word_type_per_card(st.session_state.board, word_type_per_card),
         "target_words": _json(st.session_state.target_words),
@@ -781,6 +869,7 @@ def _llm_fields_for_turn(item):
             "clue": item.get("hint", ""),
             "number": item.get("hint_number", ""),
             "targets": item.get("intended_targets", []),
+            "expected_guesses": item.get("expected_guesses", []),
         }
         model = HINT_MODEL_NAME
         temperature = "0.55"
@@ -789,7 +878,10 @@ def _llm_fields_for_turn(item):
     else:
         raw = item.get("guess_raw_response", "")
         latency = item.get("guess_response_time_sec")
-        parsed = {"guesses": item.get("guesses", [])}
+        parsed = {
+            "guesses": item.get("guesses", []),
+            "reasoning": item.get("guess_rationale", ""),
+        }
         model = GUESS_MODEL_NAME
         temperature = "0.2"
         prompt_version = "guess_v1"
@@ -829,9 +921,19 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "guesser": item.get("guesser", ""),
         "clue": item.get("hint", ""),
         "clue_number": item.get("hint_number", ""),
+        "board_id": st.session_state.get("board_id", ""),
         "intended_cards": _json(item.get("intended_targets", [])),
         "intended_word_types": _json(_types_for_words(item.get("intended_targets", []), word_type_per_card)),
+        "expected_guess_cards": _json(item.get("expected_guesses", [])),
+        "expected_guess_word_types": _json(_types_for_words(item.get("expected_guesses", []), word_type_per_card)),
+        "guess_rationale": item.get("guess_rationale", ""),
+        "guess_rationale_word_count": item.get("guess_rationale_word_count", 0),
         "guessed_cards": _json(guessed),
+        "guess_order": ";".join(
+            f"{entry.get('position')}:{entry.get('word')}"
+            for entry in item.get("guess_order", [])
+        ),
+        "guess_order_json": _json(item.get("guess_order", [])),
         "guessed_word_types": _json(_types_for_words(guessed, word_type_per_card)),
         "correct_guesses": _json(correct),
         "correct_guess_word_types": _json(_types_for_words(correct, word_type_per_card)),
@@ -843,6 +945,8 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "bomb_guess_word_types": _json(_types_for_words(bombs, word_type_per_card)),
         "remaining_targets_before_turn": _json(item.get("remaining_targets_before_turn", [])),
         "remaining_targets_after_turn": _json(item.get("remaining_targets_after_turn", [])),
+        "hint_time_sec": _format_optional_float(item.get("hint_time_sec")),
+        "guess_time_sec": _format_optional_float(item.get("guess_time_sec")),
         "hit_rate": f"{float(item.get('hit_rate', 0) or 0):.3f}",
         "target_yield": item.get("target_yield", 0),
         "jaccard_alignment": f"{float(item.get('jaccard_alignment', 0) or 0):.3f}",
@@ -853,6 +957,9 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "turn_end_time": item.get("turn_end_time", ""),
         "turn_duration_seconds": _format_optional_float(item.get("turn_duration_seconds", "")),
         "reflection_shown": str(bool(item.get("reflection_source"))).lower(),
+        "reflection_start_time": item.get("reflection_start_time", ""),
+        "reflection_end_time": item.get("reflection_end_time", ""),
+        "reflection_time_sec": _format_optional_float(item.get("reflection_time_sec")),
         "reflection_source": item.get("reflection_source", ""),
         "human_understanding_rating": item.get("human_understanding_rating", ""),
         "human_relationship_type": item.get("human_relationship_type", ""),
@@ -1009,6 +1116,7 @@ def log_round(participant_id):
         st.session_state.role,
         st.session_state.word_type,
         st.session_state.get("board_template_type", ""),
+        st.session_state.get("board_id", ""),
         word_type_per_card_json,
         ";".join(st.session_state.board),
         ";".join(st.session_state.board),
@@ -1073,6 +1181,7 @@ def log_round(participant_id):
                 st.session_state.role,
                 st.session_state.word_type,
                 st.session_state.get("board_template_type", ""),
+                st.session_state.get("board_id", ""),
                 word_type_per_card_json,
                 _join_word_types(st.session_state.target_words, word_type_per_card),
                 _join_word_types(st.session_state.neutral_words, word_type_per_card),
@@ -1087,9 +1196,19 @@ def log_round(participant_id):
                 item["hint_number"],
                 ";".join(item["intended_targets"]),
                 ";".join(item["intended_targets"]),
+                ";".join(item["expected_guesses"]),
+                ";".join(item["expected_guesses"]),
+                _join_word_types(item["expected_guesses"], word_type_per_card),
+                item["guess_rationale"],
+                item["guess_rationale_word_count"],
                 item["hint_explanation"],
                 ";".join(item["guesses"]),
                 ";".join(item["guesses"]),
+                ";".join(
+                    f"{entry.get('position')}:{entry.get('word')}"
+                    for entry in item["guess_order"]
+                ),
+                _json(item["guess_order"]),
                 _join_word_types(item["guesses"], word_type_per_card),
                 ";".join(item["correct_guesses"]),
                 _join_word_types(item["correct_guesses"], word_type_per_card),
@@ -1110,9 +1229,11 @@ def log_round(participant_id):
                 item["ai_understanding_rating_before"] if item["ai_understanding_rating_before"] is not None else "",
                 item["ai_understanding_rating_after"] if item["ai_understanding_rating_after"] is not None else "",
                 _format_optional_float(item["hint_response_time_sec"]),
+                _format_optional_float(item["hint_time_sec"]),
                 item["hint_attempts"] if item["hint_attempts"] is not None else "",
                 int(item["hint_used_fallback"]),
                 _format_optional_float(item["guess_response_time_sec"]),
+                _format_optional_float(item["guess_time_sec"]),
                 item["hint_raw_response"] or "",
                 item["guess_raw_response"] or "",
                 item["human_understanding_rating"],
@@ -1132,6 +1253,9 @@ def log_round(participant_id):
                 item["reflection_explanation_raw"],
                 item["reflection_explanation_is_valid"],
                 item["reflection_blocked_reason"],
+                item["reflection_start_time"],
+                item["reflection_end_time"],
+                _format_optional_float(item["reflection_time_sec"]),
                 item["recorded_at"],
             ]
         )

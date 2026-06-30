@@ -155,8 +155,10 @@ def render_hint_panel(current_hint, hint_number, previous_hint=None):
     st.markdown(
         f"""
         <div class="hint-card">
-            <div class="hint-label">AI clue</div>
-            <div class="hint-main">{escape(current_hint.upper())}</div>
+            <div class="hint-copy">
+                <div class="hint-label">AI clue</div>
+                <div class="hint-main">{escape(current_hint.upper())}</div>
+            </div>
             {chips_section}
         </div>
         """,
@@ -210,6 +212,8 @@ def render_interaction_history(history, show_ai_intended=False):
         guesses = item.get("guesses", [])
         correct_guesses = item.get("correct_guesses", [])
         intended_targets = item.get("intended_targets", [])
+        expected_guesses = item.get("expected_guesses", [])
+        guess_rationale = item.get("guess_rationale", "")
         hint = escape(item.get("hint", "").upper())
         clue_giver = escape((item.get("clue_giver") or "-").title())
         guesser = escape((item.get("guesser") or "-").title())
@@ -246,6 +250,10 @@ def render_interaction_history(history, show_ai_intended=False):
 
         intended_label = "AI intended" if item.get("clue_giver") == "ai" else "Human intended"
         intended_row = chip_row(intended_label, intended_targets)
+        expected_label = (
+            "AI expected human" if item.get("clue_giver") == "ai" else "Human expected AI"
+        )
+        expected_row = chip_row(expected_label, expected_guesses)
         correct_set = set(correct_guesses)
         neutral_set = set(item.get("neutral_guesses", []))
         bomb_guesses = set(item.get("bomb_guesses", []))
@@ -262,6 +270,14 @@ def render_interaction_history(history, show_ai_intended=False):
             return ""
 
         guesses_row = chip_row("Guesses", guesses, class_for_value=guess_class)
+        rationale_row = ""
+        if guess_rationale:
+            rationale_row = (
+                "<div class='history-detail'>"
+                "<span class='history-detail-label'>Why</span>"
+                f"<span class='history-chip-row'><span class='history-chip muted'>{escape(guess_rationale)}</span></span>"
+                "</div>"
+            )
         skip_note = ""
         if is_skip:
             skipped_by = escape((item.get("skipped_by") or guesser).title())
@@ -280,7 +296,9 @@ def render_interaction_history(history, show_ai_intended=False):
             f"<span class='history-number'>x{item.get('hint_number', '')}</span>"
             "</div>"
             f"{intended_row if show_ai_intended or item.get('clue_giver') == 'human' else ''}"
+            f"{expected_row if expected_guesses and (show_ai_intended or item.get('clue_giver') == 'human') else ''}"
             f"{guesses_row}"
+            f"{rationale_row}"
             f"{skip_note}"
             "</div>"
             f"<div class='history-outcome {outcome_class}'>{outcome}</div>"

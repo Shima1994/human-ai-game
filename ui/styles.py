@@ -227,6 +227,13 @@ def inject_css():
             gap: 0.22rem;
             font-family: var(--font-sans);
         }
+        .board-wrap [data-testid="stButton"],
+        .board-wrap .element-container {
+            margin-bottom: 0.7rem;
+        }
+        .board-wrap .word-card {
+            margin-bottom: 0;
+        }
         .word-hidden {
             background: linear-gradient(135deg, var(--color-hidden-from), var(--color-hidden-to));
             color: #eff6ff;
@@ -260,9 +267,9 @@ def inject_css():
             opacity: 0.95;
         }
         .word-selected {
-            outline: 4px solid var(--color-heading);
-            outline-offset: 2px;
-            box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.75);
+            outline: 3px solid var(--color-heading);
+            outline-offset: -4px;
+            box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.82);
         }
 
         /* Legend */
@@ -303,41 +310,82 @@ def inject_css():
 
         /* Hint card (no explanation shown) */
         .hint-card {
-            background: linear-gradient(180deg, #f9fbff, #eef4fb);
-            border: 1px solid rgba(29, 94, 168, 0.12);
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, #f3f8ff, #dcecff);
+            border: 1px solid rgba(29, 94, 168, 0.22);
             border-radius: var(--radius-xl);
-            padding: 0.95rem 1rem;
-            box-shadow: 0 8px 18px rgba(29, 94, 168, 0.06);
-            margin-bottom: 0.8rem;
+            padding: 0.82rem 1rem;
+            box-shadow: 0 10px 24px rgba(29, 94, 168, 0.10);
+            margin: 0.6rem 0 0.55rem 0;
         }
         .hint-label {
             font-size: 0.72rem;
             text-transform: uppercase;
             letter-spacing: 0.14em;
-            color: #6d85a0;
+            color: #315f91;
             font-weight: 800;
         }
         .hint-main {
-            font-size: clamp(1.4rem, 2vw + 0.4rem, 2rem);
+            font-size: clamp(1.45rem, 2vw + 0.35rem, 2.05rem);
             line-height: 1.05;
-            margin: 0.38rem 0 0.55rem 0;
+            margin: 0.2rem 0 0 0;
             font-weight: 900;
-            color: var(--color-heading);
-            letter-spacing: 0.04em;
+            color: #0b4a8b;
+            letter-spacing: 0.03em;
             word-break: break-word;
         }
         .hint-chip-row {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
+            justify-content: flex-end;
         }
         .hint-chip {
             border-radius: var(--radius-pill);
             padding: 0.34rem 0.72rem;
-            background: var(--color-primary-soft);
-            color: var(--color-primary);
-            font-weight: 700;
+            background: #0b4a8b;
+            color: #ffffff;
+            font-weight: 800;
             font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .guess-rationale-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin: 0.35rem 0 0.35rem 0;
+        }
+        .guess-rationale-head .panel-title {
+            margin-bottom: 0;
+        }
+        .guess-rationale-rule {
+            color: var(--color-text-muted);
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-align: right;
+        }
+        div[class*="st-key-guess_rationale_"] .stTextArea textarea {
+            min-height: 88px;
+            height: 88px;
+            padding: 0.68rem 0.82rem;
+            line-height: 1.35;
+            background: #f6f8fb;
+        }
+        .guess-rationale-status {
+            margin: 0.2rem 0 0.45rem 0;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--color-text-muted);
+        }
+        .guess-rationale-status.ok {
+            color: #207344;
+        }
+        .guess-rationale-status.pending {
+            color: #9b4d11;
         }
 
         /* Guide / welcome screens */
@@ -640,7 +688,7 @@ def inject_css():
             padding: 1rem 1.05rem !important;
         }
         .st-key-reflection_panel [data-testid="stVerticalBlock"] {
-            gap: 0.95rem !important;
+            gap: 0.55rem !important;
         }
         .reflection-header {
             margin-bottom: 0.2rem;
@@ -673,19 +721,31 @@ def inject_css():
             background: #FFFFFF !important;
             border: 1px solid #E5E5E5 !important;
             border-radius: 12px !important;
-            padding: 0.85rem 0.95rem !important;
+            padding: 0.62rem 0.78rem !important;
             box-shadow: 0 4px 12px rgba(18, 34, 54, 0.05) !important;
+        }
+        .st-key-reflection_panel .reflection-compact-head {
+            margin-bottom: 0.1rem !important;
+        }
+        .st-key-reflection_panel .reflection-compact-head .panel-title {
+            margin-bottom: 0.22rem;
+        }
+        .st-key-reflection_panel .reflection-compact-head .subtle-text {
+            font-size: 0.86rem;
+            line-height: 1.28;
         }
         .st-key-reflection_panel .reflection-ai-explanation .panel-title {
             color: var(--color-text-muted);
         }
         .st-key-reflection_panel .stRadio [role="radiogroup"] {
-            margin-top: 0.45rem;
+            margin-top: 0.28rem;
         }
         .st-key-reflection_panel .stRadio label {
             background: #FFFFFF !important;
             border: 1px solid #E5E5E5 !important;
             color: var(--color-heading) !important;
+            min-height: 42px;
+            padding: 0.35rem 0.5rem;
         }
         .st-key-reflection_panel .stRadio label:hover {
             border-color: rgba(29, 94, 168, 0.32) !important;
@@ -703,8 +763,9 @@ def inject_css():
             color: #111827 !important;
             border: 1px solid #D5DAE1 !important;
             border-radius: 10px !important;
-            min-height: 112px;
-            padding: 0.85rem 0.95rem;
+            min-height: 78px;
+            height: 78px;
+            padding: 0.65rem 0.78rem;
             box-shadow: none !important;
         }
         .st-key-reflection_panel .stTextArea textarea::placeholder {
@@ -841,6 +902,105 @@ def inject_css():
         .let-ai-guess-marker + div [data-testid="stButton"] > button:hover,
         .let-ai-guess-marker + div button:hover {
             box-shadow: 0 12px 26px rgba(155, 77, 17, 0.22);
+        }
+        .st-key-before_ai_guess_panel,
+        .st-key-before_ai_guess_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            background: var(--color-card) !important;
+            border-color: var(--color-border) !important;
+            border-radius: var(--radius-xl) !important;
+            box-shadow: var(--color-shadow) !important;
+        }
+        .st-key-before_ai_guess_panel {
+            margin-top: 1rem;
+        }
+        .st-key-before_ai_guess_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 0.72rem 0.9rem !important;
+        }
+        .st-key-before_ai_guess_panel [data-testid="stVerticalBlock"] {
+            gap: 0.2rem !important;
+        }
+        .st-key-before_ai_guess_panel .before-ai-question {
+            margin: 0 !important;
+            line-height: 1.25;
+        }
+        .st-key-before_ai_guess_panel .stRadio [role="radiogroup"] {
+            margin-top: 0;
+            grid-template-columns: repeat(5, minmax(42px, 1fr));
+            gap: 0.38rem;
+        }
+        .st-key-before_ai_guess_panel .stRadio label {
+            min-height: 42px;
+            padding: 0.32rem 0.45rem;
+        }
+        .st-key-post_game_questionnaire_panel,
+        .st-key-post_game_questionnaire_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            background: var(--color-card) !important;
+            border-color: var(--color-border) !important;
+            border-radius: var(--radius-xl) !important;
+            box-shadow: var(--color-shadow) !important;
+        }
+        .st-key-post_game_questionnaire_panel {
+            margin-top: 1rem;
+        }
+        .st-key-post_game_questionnaire_panel [data-testid="stVerticalBlock"] {
+            gap: 0.55rem !important;
+        }
+        .st-key-post_game_questionnaire_panel .stRadio {
+            padding: 0.55rem 0;
+            border-top: 1px solid rgba(18, 34, 54, 0.08);
+        }
+        .st-key-post_game_questionnaire_panel .stRadio [role="radiogroup"] {
+            grid-template-columns: repeat(5, minmax(42px, 1fr));
+            max-width: 360px;
+            margin-top: 0.32rem;
+        }
+        .st-key-post_game_questionnaire_panel .stRadio label {
+            min-height: 40px;
+            padding: 0.32rem 0.48rem;
+        }
+        .st-key-post_game_questionnaire_panel [data-testid="stWidgetLabel"] p {
+            color: var(--color-heading) !important;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+        .st-key-participant_profile_panel,
+        .st-key-participant_profile_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            background: var(--color-card) !important;
+            border-color: var(--color-border) !important;
+            border-radius: var(--radius-xl) !important;
+            box-shadow: var(--color-shadow) !important;
+        }
+        .st-key-participant_profile_panel {
+            margin: 0 auto;
+            max-width: 960px;
+        }
+        .st-key-participant_profile_panel [data-testid="stVerticalBlock"] {
+            gap: 0.6rem !important;
+        }
+        .st-key-participant_profile_panel .stRadio {
+            padding-top: 0.35rem;
+        }
+        .st-key-participant_profile_panel .stRadio [role="radiogroup"] {
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            width: 100%;
+        }
+        .st-key-participant_profile_panel .stRadio label {
+            width: auto;
+            min-height: 42px;
+            min-width: 0;
+            padding: 0.42rem 0.68rem;
+            justify-content: flex-start;
+            white-space: nowrap;
+        }
+        .st-key-participant_profile_panel .stRadio label > div {
+            justify-content: flex-start;
+        }
+        .st-key-participant_profile_panel [data-testid="stWidgetLabel"] p {
+            color: var(--color-heading) !important;
+            font-weight: 750;
+            line-height: 1.25;
         }
         .stButton > button[kind="secondary"],
         .stButton button[kind="secondary"],
@@ -1083,11 +1243,32 @@ def inject_css():
                 line-height: 1.1;
             }
             .hint-card {
+                grid-template-columns: 1fr;
+                gap: 0.55rem;
                 border-radius: var(--radius-md);
                 padding: 0.78rem;
             }
             .hint-main {
                 font-size: 1.35rem;
+            }
+            .hint-chip-row {
+                justify-content: flex-start;
+            }
+            .guess-rationale-head {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 0.18rem;
+            }
+            .guess-rationale-rule {
+                text-align: left;
+            }
+            div[class*="st-key-guess_rationale_"] .stTextArea textarea {
+                min-height: 82px;
+                height: 82px;
+            }
+            .st-key-reflection_panel .stTextArea textarea {
+                min-height: 72px;
+                height: 72px;
             }
             .history-row {
                 grid-template-columns: 26px 1fr;

@@ -146,6 +146,7 @@ def format_interaction_history(history):
             f"Turn {index} | clue_giver={item.get('clue_giver', '')} | guesser={item.get('guesser', '')} | "
             f"clue=\"{item.get('hint', '')}\" N={item.get('hint_number', '')} | "
             f"intended=[{', '.join(item.get('intended_targets', [])) or 'none'}] | "
+            f"expected_guesses=[{', '.join(item.get('expected_guesses', [])) or 'none'}] | "
             f"guessed=[{guesses}] | correct=[{correct_guesses}] | outcome={outcome}"
         )
     return "\n".join(lines)
@@ -266,7 +267,9 @@ def format_round_memory(round_summaries):
                     "hint": item.get("hint"),
                     "hint_number": item.get("hint_number"),
                     "intended_targets": item.get("intended_targets", []),
+                    "expected_guesses": item.get("expected_guesses", []),
                     "guesses": item.get("guesses", []),
+                    "guess_order": item.get("guess_order", []),
                     "correct_guesses": item.get("correct_guesses", []),
                     "neutral_guesses": item.get("neutral_guesses", []),
                     "bomb_guess": item.get("bomb_guess"),
@@ -277,6 +280,89 @@ def format_round_memory(round_summaries):
             ],
         }
         lines.append(json.dumps(compact, ensure_ascii=False))
+    return "\n".join(lines)
+
+
+def _memory_interaction_lines(interactions, round_label="current"):
+    lines = []
+    for item in interactions or []:
+        clue_giver = item.get("clue_giver", "")
+        guesser = item.get("guesser", "")
+        hint = item.get("hint", "")
+        hint_number = item.get("hint_number", "")
+        intended = ", ".join(item.get("intended_targets", [])) or "none"
+        expected = ", ".join(item.get("expected_guesses", [])) or "none"
+        guesses = ", ".join(item.get("guesses", [])) or "none"
+        guess_order = item.get("guess_order") or [
+            {"position": position, "word": guess}
+            for position, guess in enumerate(item.get("guesses", []), start=1)
+        ]
+        guess_order_text = ", ".join(
+            f"{entry.get('position')}:{entry.get('word')}" for entry in guess_order
+        ) or "none"
+        correct = ", ".join(item.get("correct_guesses", [])) or "none"
+        neutral = ", ".join(item.get("neutral_guesses", [])) or "none"
+        rationale = str(item.get("guess_rationale", "") or "").strip()
+        human_rating = item.get("human_understanding_rating")
+        human_relationship = str(item.get("human_relationship_type", "") or "").strip()
+        human_explanation = str(
+            item.get("human_explanation_sanitized", "")
+            or item.get("human_explanation_raw", "")
+            or ""
+        ).strip()
+        ai_explanation = str(
+            item.get("ai_explanation_sanitized", "")
+            or item.get("ai_explanation", "")
+            or ""
+        ).strip()
+
+        parts = [
+            f"- {round_label} turn {item.get('turn', '')}: {clue_giver} clue -> {guesser} guesser",
+            f"  clue=\"{hint}\" N={hint_number}; intended=[{intended}]; clue-giver expected guesses=[{expected}]",
+            f"  actual guesses=[{guesses}]; guess_order=[{guess_order_text}]; correct=[{correct}]; neutral=[{neutral}]; outcome={item.get('outcome', '')}",
+        ]
+        if rationale:
+            parts.append(f'  guesser rationale: "{rationale}"')
+        if human_rating:
+            parts.append(f"  human understanding rating: {human_rating}/5")
+        if human_relationship or human_explanation:
+            parts.append(
+                f"  human-described clue relationship: {human_relationship or 'not specified'}"
+                + (f' - "{human_explanation}"' if human_explanation else "")
+            )
+        if ai_explanation:
+            parts.append(f'  AI clue explanation shown to human: "{ai_explanation}"')
+        lines.append("\n".join(parts))
+    return lines
+
+
+def format_persistent_teammate_memory(history, round_summaries):
+    lines = [
+        "Treat this as your working memory for the whole game. The API call is stateless, so do not assume you remember anything except what is written here.",
+        "Use this memory to model the human teammate's associations, intended meanings, expected guesses, rationales, and feedback from the start of the game.",
+    ]
+
+    for summary in round_summaries or []:
+        round_label = f"round {summary.get('round', '')}"
+        lines.append(
+            f"{round_label} summary: role={summary.get('role', '')}; medal={summary.get('medal', '')}; "
+            f"success={summary.get('success', '')}; bomb_hit={summary.get('bomb_hit', '')}; "
+            f"found_targets=[{', '.join(summary.get('found_targets', [])) or 'none'}]"
+        )
+        lines.extend(_memory_interaction_lines(summary.get("interactions", []), round_label))
+        ai_reflection = str(summary.get("ai_reflection", "") or "").strip()
+        human_feedback = str(summary.get("human_feedback", "") or "").strip()
+        if ai_reflection:
+            lines.append(f'{round_label} AI end-of-round reflection: "{ai_reflection}"')
+        if human_feedback:
+            lines.append(f'{round_label} human end-of-round feedback: "{human_feedback}"')
+
+    if history:
+        lines.append("Current round memory so far:")
+        lines.extend(_memory_interaction_lines(history, "current round"))
+    elif not round_summaries:
+        lines.append("No prior turns yet. Build the teammate model as soon as evidence appears.")
+
     return "\n".join(lines)
 
 
@@ -307,17 +393,24 @@ HOW TO PICK A GREAT CLUE (think like a thoughtful human teammate)
 6. Use the round history. If a previous clue confused the teammate, do not reuse the same association style; switch angle. If a clue worked well, build on what they understood.
 7. Never use the same clue word twice in a round.
 
+PERSISTENT TEAMMATE MEMORY
+- You are called through a stateless API. You only remember what is included in the prompt, so actively use the provided persistent teammate memory every turn.
+- Build a mental model of the human from the whole game: what they intended, what they expected you to guess, what they actually guessed, and how they explained their reasoning.
+- Adapt future clues and guesses to that model, as a careful human teammate would.
+
 OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
 {
   "reasoning": "<one or two short sentences: which targets you chose, what the link is, and why the bombs and neutrals are not at risk>",
   "clue": "<one lowercase English word, letters only; a hyphen is allowed only in idiomatic compounds>",
   "number": <integer between 1 and 5>,
-  "targets": ["<exact remaining target word as spelled in the input>", "..."]
+  "targets": ["<exact remaining target word as spelled in the input>", "..."],
+  "expected_guesses": ["<exact available board word you expect the human to pick>", "..."]
 }
 
 CONSTRAINTS
 - "number" must equal the length of "targets".
 - "targets" must be a subset of the remaining target words listed in the user message.
+- "expected_guesses" must contain exactly "number" words from the available board words listed in the user message. Include the cards you realistically expect the human guesser to choose, even if one could be neutral or a bomb risk.
 - "clue" must not appear on the board nor be a morphological variant.
 - "reasoning" is logged for research analysis and is NEVER shown to the player during gameplay.
 """
@@ -349,6 +442,12 @@ def build_hint_user_prompt(
     forbidden_block = ", ".join(all_used) if all_used else "(none)"
     word_type_per_card = st.session_state.get("word_type_per_card", {})
     board_words = target_words + neutral_words + list(bomb_words)
+    already_guessed = {
+        guess
+        for item in history
+        for guess in item.get("guesses", [])
+    }
+    available_board = [word for word in board_words if word not in already_guessed]
     feedback_block = ""
     if condition == "adaptive":
         feedback_block = (
@@ -361,6 +460,7 @@ def build_hint_user_prompt(
         f"Word type per card: {format_word_type_per_card(board_words, word_type_per_card)}\n"
         f"Remaining target words (you must aim only at these): {', '.join(remaining_targets) or '(none)'}\n"
         f"Targets already found this round: {', '.join(found_targets) or '(none)'}\n"
+        f"Available board words the human can still choose from: {', '.join(available_board)}\n"
         f"Neutral words (AVOID — your clue must not fit these): {', '.join(neutral_words)}\n"
         f"BOMB words (NEVER let your clue fit these): {', '.join(bomb_words)}\n\n"
         f"Forbidden clue words (already used this round, do not repeat): {forbidden_block}\n\n"
@@ -368,19 +468,21 @@ def build_hint_user_prompt(
         f"{format_interaction_history(history)}\n\n"
         "Memory from previous rounds in this game:\n"
         f"{format_round_memory(round_summaries or [])}\n\n"
+        "Persistent teammate memory from the whole game:\n"
+        f"{format_persistent_teammate_memory(history, round_summaries or [])}\n\n"
         f"{feedback_block}\n\n"
         "Produce the best one-word clue you can, then explain (in the reasoning field) the link and why each neutral and both bombs are safe. Respond with the JSON object only."
     )
 
 
-def parse_hint_json(raw_text, fallback_n, remaining_targets):
+def parse_hint_json(raw_text, fallback_n, remaining_targets, available_board=None):
     try:
         data = json.loads(raw_text)
     except (json.JSONDecodeError, TypeError):
-        return "", fallback_n, [], ""
+        return "", fallback_n, [], [], ""
 
     if not isinstance(data, dict):
-        return "", fallback_n, [], ""
+        return "", fallback_n, [], [], ""
 
     clue_raw = str(data.get("clue", "") or "").strip().lower()
     clue = re.sub(r"[^a-z-]", "", clue_raw)
@@ -406,10 +508,23 @@ def parse_hint_json(raw_text, fallback_n, remaining_targets):
             intended_targets.append(target_lookup[key])
             seen.add(key)
 
+    board_lookup = {word.lower(): word for word in available_board or []}
+    raw_expected_guesses = data.get("expected_guesses", []) or []
+    if not isinstance(raw_expected_guesses, list):
+        raw_expected_guesses = []
+
+    expected_guesses = []
+    seen = set()
+    for value in raw_expected_guesses:
+        key = str(value).strip().lower()
+        if key in board_lookup and key not in seen:
+            expected_guesses.append(board_lookup[key])
+            seen.add(key)
+
     explanation = str(data.get("reasoning", "") or "").strip()
     explanation = limit_words(explanation, 60)
 
-    return clue, hint_number, intended_targets, explanation
+    return clue, hint_number, intended_targets, expected_guesses, explanation
 
 
 def choose_fallback_hint(used_hints, board_words=None):
@@ -548,6 +663,12 @@ def _generate_hint_with_forbidden(
         for guess in item.get("correct_guesses", [])
     }
     remaining_targets = [word for word in target_words if word not in found_targets]
+    already_guessed = {
+        guess
+        for item in history
+        for guess in item.get("guesses", [])
+    }
+    available_board = [word for word in board_words if word not in already_guessed]
 
     last_raw = ""
     total_time = 0.0
@@ -579,13 +700,16 @@ def _generate_hint_with_forbidden(
 
         last_raw = raw
         total_time += elapsed
-        hint, hint_number, intended_targets, explanation = parse_hint_json(
-            raw, fallback_number, remaining_targets
+        hint, hint_number, intended_targets, expected_guesses, explanation = parse_hint_json(
+            raw, fallback_number, remaining_targets, available_board
         )
         if not intended_targets:
             intended_targets = remaining_targets[:hint_number]
         hint_number = min(hint_number, len(intended_targets), fallback_number)
         intended_targets = intended_targets[:hint_number]
+        expected_guesses = expected_guesses[:hint_number]
+        if len(expected_guesses) < hint_number:
+            expected_guesses = (expected_guesses + intended_targets)[:hint_number]
         if (
             hint
             and hint not in used_hint_set
@@ -596,6 +720,7 @@ def _generate_hint_with_forbidden(
                 "hint": hint,
                 "hint_number": hint_number,
                 "intended_targets": intended_targets,
+                "expected_guesses": expected_guesses,
                 "explanation": explanation,
                 "raw_response": last_raw,
                 "response_time_sec": round(total_time, 3),
@@ -608,6 +733,7 @@ def _generate_hint_with_forbidden(
         "hint": choose_fallback_hint(used_hint_set, board_words),
         "hint_number": max(1, len(fallback_targets)),
         "intended_targets": fallback_targets,
+        "expected_guesses": fallback_targets,
         "explanation": "Fallback clue selected because the model did not return a usable JSON clue after retries.",
         "raw_response": last_raw,
         "response_time_sec": round(total_time, 3),
@@ -685,13 +811,18 @@ HOW TO PICK GREAT GUESSES
 6. If two words are close, pick the more concrete and mainstream association.
 7. Use the round history. Avoid repeating any word that was already guessed; learn from what your teammate intended last time.
 
+PERSISTENT TEAMMATE MEMORY
+- You are called through a stateless API. You only remember what is included in the prompt, so actively use the provided persistent teammate memory every turn.
+- Build a mental model of the human from the whole game: their intended targets, expected guesses, guess rationales, ratings, and explanations.
+- Guess like a teammate who has been paying attention from the first turn, not like an isolated one-shot model.
+
 WHEN TO REFUSE
 - Output exactly REROLL_HINT only if the clue is genuinely meaningless or unrelated to every available board word. Last resort.
 - Output exactly SKIP_CLUE only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort.
 
 OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
 {
-  "reasoning": "<one or two short sentences explaining the direct everyday link for each guess; logged for research, hidden from the player>",
+  "reasoning": "<3 to 30 words explaining the direct link for each guess and, if useful, a close alternative you rejected; shown to the player and logged>",
   "guesses": ["<exact board word>", "..."]
 }
 
@@ -736,6 +867,8 @@ def build_guess_user_prompt(
         f"{format_interaction_history(history)}\n\n"
         "Memory from previous rounds:\n"
         f"{format_round_memory(round_summaries or [])}\n\n"
+        "Persistent teammate memory from the whole game:\n"
+        f"{format_persistent_teammate_memory(history, round_summaries or [])}\n\n"
         f"{feedback_block}\n\n"
         "Default to guessing. REROLL_HINT and SKIP_CLUE are last resorts. "
         "Respond with the JSON object OR a single literal token."
@@ -748,6 +881,8 @@ def build_guess_repair_prompt(
     max_guesses,
     previous_guesses,
     previous_response,
+    history=None,
+    round_summaries=None,
 ):
     available_board = [word for word in board if word not in previous_guesses]
     return (
@@ -757,9 +892,11 @@ def build_guess_repair_prompt(
         f"N: {max_guesses}\n\n"
         "Your previous response was unusable or did not contain enough exact board words:\n"
         f"{previous_response}\n\n"
+        "Persistent teammate memory from the whole game:\n"
+        f"{format_persistent_teammate_memory(history or [], round_summaries or [])}\n\n"
         "Return strict JSON only. Pick the top N exact board words by direct, everyday semantic association. "
         "Do not add unrelated filler. Schema: "
-        '{"reasoning":"short reason","guesses":["Exact board word"]}'
+        '{"reasoning":"short reason, 3 to 30 words","guesses":["Exact board word"]}'
     )
 
 
@@ -767,14 +904,14 @@ def parse_guess_json(raw_text, available_board, max_guesses):
     try:
         data = json.loads(raw_text)
     except (json.JSONDecodeError, TypeError):
-        return []
+        return [], ""
 
     if not isinstance(data, dict):
-        return []
+        return [], ""
 
     raw_guesses = data.get("guesses", []) or []
     if not isinstance(raw_guesses, list):
-        return []
+        return [], ""
 
     board_lookup = {word.lower(): word for word in available_board}
     valid = []
@@ -786,7 +923,8 @@ def parse_guess_json(raw_text, available_board, max_guesses):
             seen.add(key)
         if len(valid) >= max_guesses:
             break
-    return valid
+    rationale = limit_words(str(data.get("reasoning", "") or "").strip(), 30)
+    return valid, rationale
 
 
 def ai_guess(
@@ -838,11 +976,11 @@ def ai_guess(
     if raw:
         upper = raw.strip().upper()
         if upper == "REROLL_HINT" and remaining_rerolls > 0:
-            return {"action": "reroll", "guesses": [], **meta}
+            return {"action": "reroll", "guesses": [], "guess_rationale": "", **meta}
         if upper == "SKIP_CLUE" and can_skip and remaining_skips > 0:
-            return {"action": "skip", "guesses": [], **meta}
+            return {"action": "skip", "guesses": [], "guess_rationale": "", **meta}
 
-        valid_guesses = parse_guess_json(raw, available_board, max_guesses)
+        valid_guesses, guess_rationale = parse_guess_json(raw, available_board, max_guesses)
 
         if not valid_guesses:
             tokens = [
@@ -869,12 +1007,14 @@ def ai_guess(
                         max_guesses,
                         previous_guesses,
                         raw,
+                        history,
+                        round_summaries,
                     ),
                     temperature=0.0,
                     model=GUESS_MODEL_NAME,
                     json_mode=True,
                 )
-                repaired_guesses = parse_guess_json(
+                repaired_guesses, repair_rationale = parse_guess_json(
                     repair_raw, available_board, max_guesses
                 )
                 meta["raw_response"] = f"{raw}\n\n<repair_response>\n{repair_raw}"
@@ -884,19 +1024,29 @@ def ai_guess(
                 meta["attempts"] = 2
                 if len(repaired_guesses) > len(valid_guesses):
                     valid_guesses = repaired_guesses
+                    guess_rationale = repair_rationale or guess_rationale
             except Exception as error:
                 meta["raw_response"] = (
                     f"{meta['raw_response']}\n\n<repair_error: {error}>"
                 )
 
         if valid_guesses:
-            return {"action": "guess", "guesses": valid_guesses[:max_guesses], **meta}
+            if not guess_rationale:
+                guess_rationale = (
+                    f"I chose {', '.join(valid_guesses[:max_guesses])} because they seemed closest to the clue {hint}."
+                )
+            return {
+                "action": "guess",
+                "guesses": valid_guesses[:max_guesses],
+                "guess_rationale": guess_rationale,
+                **meta,
+            }
 
     if can_skip and remaining_skips > 0:
-        return {"action": "skip", "guesses": [], **meta}
+        return {"action": "skip", "guesses": [], "guess_rationale": "", **meta}
     if remaining_rerolls > 0:
-        return {"action": "reroll", "guesses": [], **meta}
-    return {"action": "guess", "guesses": [], **meta}
+        return {"action": "reroll", "guesses": [], "guess_rationale": "", **meta}
+    return {"action": "guess", "guesses": [], "guess_rationale": "", **meta}
 
 
 REFLECTION_SYSTEM_PROMPT = """You are an AI teammate writing a short reflection at the end of one round of a cooperative word game. Your reader is the human player.
