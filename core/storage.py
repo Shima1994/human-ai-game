@@ -2,6 +2,7 @@
 import csv
 import io
 import json
+import threading
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -21,6 +22,11 @@ from core.constants import (
     TURNS_DATA_FILE,
 )
 from core.game_logic import compute_score_change
+
+
+CONDITION_ASSIGNMENT_LOCK = threading.RLock()
+VALID_CONDITIONS = {"baseline", "adaptive"}
+DEFAULT_CONDITION = "adaptive"
 
 
 ROUND_LOG_FIELDS = [
@@ -69,6 +75,7 @@ ROUND_LOG_FIELDS = [
     "human_understanding_rating",
     "human_relationship_type",
     "human_explanation_raw",
+    "human_explanation_sanitized",
     "human_explanation_is_valid",
     "human_explanation_blocked_reason",
     "ai_relationship_type",
@@ -137,6 +144,9 @@ INTERACTION_LOG_FIELDS = [
     "error_type",
     "skipped",
     "skipped_by",
+    "partial_skip",
+    "completed_guesses",
+    "skipped_guesses",
     "bomb_hit",
     "round_medal",
     "round_success",
@@ -153,6 +163,7 @@ INTERACTION_LOG_FIELDS = [
     "human_understanding_rating",
     "human_relationship_type",
     "human_explanation_raw",
+    "human_explanation_sanitized",
     "human_explanation_is_valid",
     "human_explanation_blocked_reason",
     "ai_relationship_type",
@@ -198,13 +209,11 @@ SESSIONS_LOG_FIELDS = [
     "screen_size",
     "browser_language",
     "completion_code",
-    "post_game_ai_understood_my_clues",
     "post_game_i_understood_ai_clues",
     "post_game_predict_ai_interpretation",
     "post_game_adapted_to_ai_behavior",
-    "post_game_ai_adapted_to_me",
     "post_game_reflection_helped",
-    "post_game_shared_strategy",
+    "post_game_shared_understanding",
     "post_game_questionnaire_json",
 ]
 
@@ -284,6 +293,9 @@ TURNS_LOG_FIELDS = [
     "turn_start_time",
     "turn_end_time",
     "turn_duration_seconds",
+    "partial_skip",
+    "completed_guesses",
+    "skipped_guesses",
     "reflection_shown",
     "reflection_start_time",
     "reflection_end_time",
@@ -340,6 +352,21 @@ def _header_matches(data_file, expected_fields):
     return list(existing) == list(expected_fields)
 
 
+def _repair_legacy_interaction_values(header, values):
+    """Repair rows written with two duplicated values by the legacy list writer."""
+    if not header or len(values) != len(header) + 2:
+        return values
+    required = {"clue_number", "intended_cards", "intended_targets"}
+    if not required.issubset(header):
+        return values
+    first_extra = header.index("clue_number") + 1
+    second_extra = header.index("intended_cards") + 2
+    repaired = list(values)
+    for index in sorted([first_extra, second_extra], reverse=True):
+        repaired.pop(index)
+    return repaired
+
+
 def _ensure_csv_fields(data_file, expected_fields):
     data_file.parent.mkdir(parents=True, exist_ok=True)
     if not data_file.exists():
@@ -349,12 +376,19 @@ def _ensure_csv_fields(data_file, expected_fields):
         return
 
     try:
-        with data_file.open("r", newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            existing_fields = reader.fieldnames or []
-            if existing_fields == list(expected_fields):
+        with data_file.open("r", newline="", encoding="utf-8-sig") as file:
+            raw_rows = list(csv.reader(file))
+            existing_fields = raw_rows[0] if raw_rows else []
+            repaired_values = [
+                _repair_legacy_interaction_values(existing_fields, values)
+                if data_file == INTERACTION_DATA_FILE
+                else values
+                for values in raw_rows[1:]
+            ]
+            rows_are_clean = all(len(values) == len(existing_fields) for values in repaired_values)
+            if existing_fields == list(expected_fields) and rows_are_clean:
                 return
-            rows = list(reader)
+            rows = [dict(zip(existing_fields, values)) for values in repaired_values]
     except (FileNotFoundError, StopIteration):
         rows = []
 
@@ -384,6 +418,20 @@ def ensure_interaction_data_file():
 def ensure_sessions_data_file():
     _ensure_csv_fields(SESSIONS_DATA_FILE, SESSIONS_LOG_FIELDS)
     return SESSIONS_DATA_FILE
+
+
+def _next_balanced_condition(data_file):
+    """Alternate registered sessions, keeping adaptive as the first/default condition."""
+    last_condition = ""
+    if data_file.exists():
+        with data_file.open("r", newline="", encoding="utf-8") as file:
+            for row in csv.DictReader(file):
+                condition = str(row.get("condition", "")).strip().lower()
+                if condition in VALID_CONDITIONS:
+                    last_condition = condition
+    if not last_condition:
+        return DEFAULT_CONDITION
+    return "adaptive" if last_condition == "baseline" else "baseline"
 
 
 def ensure_rounds_data_file():
@@ -450,15 +498,23 @@ def _csv_line(values):
 
 
 def _migrate_csv_content(content, expected_fields):
-    reader = csv.DictReader(io.StringIO(content))
-    existing_fields = reader.fieldnames or []
-    if existing_fields == list(expected_fields):
+    raw_rows = list(csv.reader(io.StringIO(content)))
+    existing_fields = raw_rows[0] if raw_rows else []
+    repaired_values = [
+        _repair_legacy_interaction_values(existing_fields, values)
+        if "interaction_recorded_at" in expected_fields
+        else values
+        for values in raw_rows[1:]
+    ]
+    rows_are_clean = all(len(values) == len(existing_fields) for values in repaired_values)
+    if existing_fields == list(expected_fields) and rows_are_clean:
         return content if content.endswith("\n") else f"{content}\n"
 
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=expected_fields, extrasaction="ignore")
     writer.writeheader()
-    for row in reader:
+    for values in repaired_values:
+        row = dict(zip(existing_fields, values))
         writer.writerow({field: row.get(field, "") for field in expected_fields})
     return buffer.getvalue()
 
@@ -487,6 +543,10 @@ def _github_storage_config():
         "interaction_path": _secret_value(
             "GITHUB_INTERACTION_CSV_PATH",
             "data/game_interactions.csv",
+        ),
+        "sessions_path": _secret_value(
+            "GITHUB_SESSIONS_CSV_PATH",
+            "data/sessions.csv",
         ),
     }
 
@@ -632,6 +692,9 @@ def clean_interaction_history(history):
                 "error_type": item.get("error_type", "none"),
                 "skipped": bool(item.get("skipped", False)),
                 "skipped_by": item.get("skipped_by", ""),
+                "partial_skip": bool(item.get("partial_skip", False)),
+                "completed_guesses": item.get("completed_guesses", len(guesses)),
+                "skipped_guesses": item.get("skipped_guesses", 0),
                 "bomb_hit": bool(item.get("bomb_hit", False)),
                 "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
                 "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
@@ -654,6 +717,7 @@ def clean_interaction_history(history):
                 "human_understanding_rating": item.get("human_understanding_rating", ""),
                 "human_relationship_type": item.get("human_relationship_type", ""),
                 "human_explanation_raw": item.get("human_explanation_raw", ""),
+                "human_explanation_sanitized": item.get("human_explanation_sanitized", ""),
                 "human_explanation_is_valid": item.get("human_explanation_is_valid", ""),
                 "human_explanation_blocked_reason": item.get("human_explanation_blocked_reason", ""),
                 "ai_relationship_type": item.get("ai_relationship_type", ""),
@@ -738,15 +802,103 @@ def _session_row(completed=False):
         "screen_size": st.session_state.get("screen_size", "unknown"),
         "browser_language": st.session_state.get("browser_language", "unknown"),
         "completion_code": st.session_state.get("completion_code", ""),
-        "post_game_ai_understood_my_clues": questionnaire.get("ai_understood_my_clues", ""),
         "post_game_i_understood_ai_clues": questionnaire.get("i_understood_ai_clues", ""),
         "post_game_predict_ai_interpretation": questionnaire.get("predict_ai_interpretation", ""),
         "post_game_adapted_to_ai_behavior": questionnaire.get("adapted_to_ai_behavior", ""),
-        "post_game_ai_adapted_to_me": questionnaire.get("ai_adapted_to_me", ""),
         "post_game_reflection_helped": questionnaire.get("reflection_helped", ""),
-        "post_game_shared_strategy": questionnaire.get("shared_strategy", ""),
+        "post_game_shared_understanding": questionnaire.get("shared_understanding", ""),
         "post_game_questionnaire_json": json.dumps(questionnaire, ensure_ascii=False),
     }
+
+
+def _allocate_remote_condition_and_log_session():
+    """Atomically alternate condition and append the initial remote session snapshot."""
+    config = _github_storage_config()
+    if not config:
+        return None
+    path = config["sessions_path"]
+    encoded_path = "/".join(part.replace(" ", "%20") for part in path.split("/"))
+    get_url = (
+        f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
+        f"?ref={config['branch']}"
+    )
+    put_url = f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
+
+    for attempt in range(3):
+        sha = None
+        content = _csv_line(SESSIONS_LOG_FIELDS)
+        seed_last_condition = ""
+        try:
+            existing = _github_request(get_url, config["token"])
+            sha = existing.get("sha")
+            raw = base64.b64decode(existing.get("content", "")).decode("utf-8")
+            content = _migrate_csv_content(raw, SESSIONS_LOG_FIELDS)
+        except HTTPError as error:
+            if error.code != 404:
+                if error.code == 409 and attempt < 2:
+                    continue
+                raise
+            # First deployment of remote sessions.csv: continue the condition
+            # sequence from the existing durable round export when available.
+            round_encoded = "/".join(
+                part.replace(" ", "%20") for part in config["round_path"].split("/")
+            )
+            round_url = (
+                f"https://api.github.com/repos/{config['repo']}/contents/{round_encoded}"
+                f"?ref={config['branch']}"
+            )
+            try:
+                existing_rounds = _github_request(round_url, config["token"])
+                round_raw = base64.b64decode(existing_rounds.get("content", "")).decode("utf-8")
+                for round_row in csv.DictReader(io.StringIO(round_raw)):
+                    candidate = str(round_row.get("condition", "")).strip().lower()
+                    if candidate in VALID_CONDITIONS:
+                        seed_last_condition = candidate
+            except HTTPError as round_error:
+                if round_error.code != 404:
+                    raise
+
+        reader = csv.DictReader(io.StringIO(content))
+        last_condition = seed_last_condition
+        for row in reader:
+            candidate = str(row.get("condition", "")).strip().lower()
+            if candidate in VALID_CONDITIONS:
+                last_condition = candidate
+        condition = (
+            DEFAULT_CONDITION
+            if not last_condition
+            else ("adaptive" if last_condition == "baseline" else "baseline")
+        )
+        st.session_state.condition = condition
+        content += _csv_line([_session_row(completed=False).get(field, "") for field in SESSIONS_LOG_FIELDS])
+        payload = {
+            "message": "Assign study condition and start session",
+            "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+            "branch": config["branch"],
+        }
+        if sha:
+            payload["sha"] = sha
+        try:
+            _github_request(put_url, config["token"], method="PUT", payload=payload)
+            return condition
+        except HTTPError as error:
+            if error.code == 409 and attempt < 2:
+                continue
+            raise
+    return None
+
+
+def _append_remote_session_snapshot(completed=False):
+    config = _github_storage_config()
+    if not config:
+        return
+    row = _session_row(completed=completed)
+    _append_to_github_csv(
+        config["sessions_path"],
+        SESSIONS_LOG_FIELDS,
+        [[row.get(field, "") for field in SESSIONS_LOG_FIELDS]],
+        "Append completed study session snapshot" if completed else "Append study session snapshot",
+    )
 
 
 def log_session_state(completed=False):
@@ -759,6 +911,12 @@ def log_session_state(completed=False):
         _session_row(completed=completed),
         ["participant_id", "session_id"],
     )
+    if completed:
+        try:
+            _append_remote_session_snapshot(completed=True)
+        except (HTTPError, URLError, TimeoutError, OSError) as error:
+            st.session_state.remote_log_status = "github_failed"
+            st.session_state.remote_log_error = str(error)
 
 
 def log_event(event_type, payload=None, round_number=None, turn_number=None):
@@ -782,7 +940,19 @@ def initialize_session_log(participant_id):
     st.session_state.participant_id = participant_id
     st.session_state.nickname = st.session_state.get("nickname", participant_id) or participant_id
     st.session_state.consent_given = True
-    log_session_state(completed=False)
+    # Allocate only when a participant is actually registered. Ordinary Streamlit
+    # reruns therefore do not consume a slot in the alternating assignment.
+    with CONDITION_ASSIGNMENT_LOCK:
+        sessions_file = ensure_sessions_data_file()
+        remote_condition = None
+        try:
+            remote_condition = _allocate_remote_condition_and_log_session()
+        except (HTTPError, URLError, TimeoutError, OSError) as error:
+            st.session_state.remote_log_status = "github_failed"
+            st.session_state.remote_log_error = str(error)
+        st.session_state.condition = remote_condition or _next_balanced_condition(sessions_file)
+        st.session_state.condition_assigned = True
+        log_session_state(completed=False)
     log_event(
         "session_started",
         {
@@ -862,6 +1032,7 @@ def _round_analysis_row(participant_id, timestamp, score_change):
 
 def _llm_fields_for_turn(item):
     clue_giver = item.get("clue_giver", "")
+    condition = st.session_state.get("condition", "adaptive")
     if clue_giver == "ai":
         raw = item.get("hint_raw_response", "")
         latency = item.get("hint_response_time_sec")
@@ -873,19 +1044,21 @@ def _llm_fields_for_turn(item):
         }
         model = HINT_MODEL_NAME
         temperature = "0.55"
-        prompt_version = "hint_v1"
-        system_version = "hint_system_v1"
+        prompt_version = "hint_v2_condition_memory"
+        system_version = f"hint_system_v2_{condition}"
     else:
         raw = item.get("guess_raw_response", "")
         latency = item.get("guess_response_time_sec")
         parsed = {
+            "action": item.get("outcome", "guess"),
             "guesses": item.get("guesses", []),
             "reasoning": item.get("guess_rationale", ""),
+            "partial_skip": bool(item.get("partial_skip", False)),
         }
         model = GUESS_MODEL_NAME
         temperature = "0.2"
-        prompt_version = "guess_v1"
-        system_version = "guess_system_v1"
+        prompt_version = "guess_v2_partial_skip"
+        system_version = f"guess_system_v2_{condition}"
     error = raw if str(raw).startswith("<api_error:") else ""
     return {
         "llm_model": model,
@@ -956,6 +1129,9 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "turn_start_time": item.get("turn_start_time", ""),
         "turn_end_time": item.get("turn_end_time", ""),
         "turn_duration_seconds": _format_optional_float(item.get("turn_duration_seconds", "")),
+        "partial_skip": str(bool(item.get("partial_skip", False))).lower(),
+        "completed_guesses": item.get("completed_guesses", len(guessed)),
+        "skipped_guesses": item.get("skipped_guesses", 0),
         "reflection_shown": str(bool(item.get("reflection_source"))).lower(),
         "reflection_start_time": item.get("reflection_start_time", ""),
         "reflection_end_time": item.get("reflection_end_time", ""),
@@ -1050,6 +1226,9 @@ def log_round(participant_id):
     )
     human_explanation_valid_flags = ";".join(
         str(item.get("human_explanation_is_valid", "")) for item in clean_history
+    )
+    human_explanations_sanitized = ";".join(
+        item.get("human_explanation_sanitized", "") for item in clean_history
     )
     human_explanation_blocked_reasons = ";".join(
         item.get("human_explanation_blocked_reason", "") for item in clean_history
@@ -1150,6 +1329,7 @@ def log_round(participant_id):
         human_understanding_ratings,
         human_relationship_types,
         human_explanations,
+        human_explanations_sanitized,
         human_explanation_valid_flags,
         human_explanation_blocked_reasons,
         ai_relationship_types,
@@ -1194,8 +1374,6 @@ def log_round(participant_id):
                 item["hint"],
                 item["hint_number"],
                 item["hint_number"],
-                item["hint_number"],
-                ";".join(item["intended_targets"]),
                 ";".join(item["intended_targets"]),
                 ";".join(item["intended_targets"]),
                 ";".join(item["expected_guesses"]),
@@ -1225,6 +1403,9 @@ def log_round(participant_id):
                 item["error_type"],
                 int(item["skipped"]),
                 item["skipped_by"],
+                int(item["partial_skip"]),
+                item["completed_guesses"],
+                item["skipped_guesses"],
                 int(item["bomb_hit"]),
                 st.session_state.round_medal,
                 int(st.session_state.round_success),
@@ -1241,6 +1422,7 @@ def log_round(participant_id):
                 item["human_understanding_rating"],
                 item["human_relationship_type"],
                 item["human_explanation_raw"],
+                item["human_explanation_sanitized"],
                 item["human_explanation_is_valid"],
                 item["human_explanation_blocked_reason"],
                 item["ai_relationship_type"],

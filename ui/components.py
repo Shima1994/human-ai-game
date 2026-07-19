@@ -194,7 +194,7 @@ def render_hint_target_selector(target_words, selected_targets, max_targets):
                 st.rerun()
 
 
-def render_interaction_history(history, show_ai_intended=False):
+def render_interaction_history(history, show_ai_intended=False, share_explanations=True):
     if not history:
         st.markdown(
             """
@@ -271,7 +271,7 @@ def render_interaction_history(history, show_ai_intended=False):
 
         guesses_row = chip_row("Guesses", guesses, class_for_value=guess_class)
         rationale_row = ""
-        if guess_rationale:
+        if share_explanations and guess_rationale:
             rationale_row = (
                 "<div class='history-detail'>"
                 "<span class='history-detail-label'>Why</span>"
@@ -281,7 +281,14 @@ def render_interaction_history(history, show_ai_intended=False):
         skip_note = ""
         if is_skip:
             skipped_by = escape((item.get("skipped_by") or guesser).title())
-            skip_note = f"<div class='history-skip-note'>{skipped_by} asked for the next clue. One turn was used.</div>"
+            if item.get("partial_skip") or item.get("outcome") == "partial_skip":
+                remaining = item.get("skipped_guesses", max(0, int(item.get("hint_number", 0) or 0) - len(guesses)))
+                skip_note = (
+                    f"<div class='history-skip-note'>{skipped_by} kept the completed guesses and skipped "
+                    f"{remaining} remaining guess(es). One full skip was used.</div>"
+                )
+            else:
+                skip_note = f"<div class='history-skip-note'>{skipped_by} asked for the next clue. One full skip was used.</div>"
 
         rows.append(
             "<div class='history-row'>"
@@ -295,8 +302,8 @@ def render_interaction_history(history, show_ai_intended=False):
             f"<span class='history-hint'>{hint}</span>"
             f"<span class='history-number'>x{item.get('hint_number', '')}</span>"
             "</div>"
-            f"{intended_row if show_ai_intended or item.get('clue_giver') == 'human' else ''}"
-            f"{expected_row if expected_guesses and (show_ai_intended or item.get('clue_giver') == 'human') else ''}"
+            f"{intended_row if share_explanations and (show_ai_intended or item.get('clue_giver') == 'human') else ''}"
+            f"{expected_row if share_explanations and expected_guesses and (show_ai_intended or item.get('clue_giver') == 'human') else ''}"
             f"{guesses_row}"
             f"{rationale_row}"
             f"{skip_note}"

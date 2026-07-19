@@ -7,7 +7,7 @@ import streamlit as st
 from core.constants import AI_REROLLS_PER_GAME, HUMAN_REROLLS_PER_GAME
 
 VALID_CONDITIONS = {"baseline", "adaptive"}
-DEFAULT_CONDITION = "adaptive"
+DEFAULT_CONDITION = "baseline"
 
 
 def _new_session_id():
@@ -33,6 +33,7 @@ def init_session_state():
     defaults = {
         "session_id": _new_session_id(),
         "condition": _condition_from_query_params(),
+        "condition_assigned": False,
         "starting_role": _new_starting_role(),
         "started": False,
         "participant_id": None,
@@ -83,6 +84,9 @@ def init_session_state():
         "current_guess_start_time": "",
         "current_reflection_start_time": "",
         "consent_given": False,
+        "consent_timestamp": "",
+        "debriefing_acknowledged": False,
+        "debriefing_acknowledged_at": "",
         "completion_code": "",
         "session_completed_logged": False,
         "ai_clue_intro_seen": False,
@@ -172,17 +176,22 @@ def restart_game(keep_participant=False):
     ai_experience = st.session_state.get("ai_experience") if keep_participant else ""
     codenames_experience = st.session_state.get("codenames_experience") if keep_participant else ""
     condition = st.session_state.get("condition", DEFAULT_CONDITION)
+    condition_assigned = st.session_state.get("condition_assigned", False)
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
     init_session_state()
     st.session_state.session_id = _new_session_id()
     st.session_state.condition = condition
+    st.session_state.condition_assigned = condition_assigned if keep_participant else False
     st.session_state.starting_role = _new_starting_role()
     st.session_state.session_start_time = datetime.utcnow().isoformat()
     st.session_state.session_end_time = ""
     st.session_state.session_log_initialized = False
     st.session_state.consent_given = False
+    st.session_state.consent_timestamp = ""
+    st.session_state.debriefing_acknowledged = False
+    st.session_state.debriefing_acknowledged_at = ""
     st.session_state.completion_code = ""
     st.session_state.session_completed_logged = False
     st.session_state.ai_clue_intro_seen = False

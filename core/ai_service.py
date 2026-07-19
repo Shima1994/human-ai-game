@@ -109,11 +109,21 @@ def is_hint_too_close_to_board(hint, board_words):
             return True
         if stemmed_hint and stemmed_word and stemmed_hint == stemmed_word:
             return True
-        if len(normalized_hint) >= 4 and len(normalized_word) >= 4:
-            if normalized_hint.startswith(normalized_word) or normalized_word.startswith(
-                normalized_hint
-            ):
-                return True
+        shorter, longer = sorted(
+            (normalized_hint, normalized_word), key=len
+        )
+        # Reject spelling tricks that contain a board word as their root/prefix.
+        # Three-letter cards need a bounded check as well (for example, Pen ->
+        # Pencel/Pencil); the previous four-letter minimum let these pass.
+        prefix_extension_limit = 3 if len(shorter) == 3 else None
+        if len(shorter) >= 4 and longer.startswith(shorter):
+            return True
+        if (
+            prefix_extension_limit is not None
+            and longer.startswith(shorter)
+            and len(longer) - len(shorter) <= prefix_extension_limit
+        ):
+            return True
     return False
 
 
@@ -149,6 +159,43 @@ def format_interaction_history(history):
             f"expected_guesses=[{', '.join(item.get('expected_guesses', [])) or 'none'}] | "
             f"guessed=[{guesses}] | correct=[{correct_guesses}] | outcome={outcome}"
         )
+    return "\n".join(lines)
+
+
+def format_baseline_history(history):
+    """Game facts only: no intentions, expected guesses, rationales, or reflections."""
+    if not history:
+        return "No previous interactions in this round."
+    lines = []
+    for index, item in enumerate(history, start=1):
+        guesses = ", ".join(item.get("guesses", [])) or "none"
+        correct = ", ".join(item.get("correct_guesses", [])) or "none"
+        incorrect = ", ".join(item.get("incorrect_guesses", [])) or "none"
+        if item.get("bomb_hit"):
+            outcome = "BOMB HIT"
+        elif item.get("outcome") == "skip" or item.get("skipped"):
+            outcome = "skipped"
+        elif item.get("correct"):
+            outcome = "at least one target correct"
+        else:
+            outcome = "no targets found"
+        lines.append(
+            f"Turn {index} | clue=\"{item.get('hint', '')}\" N={item.get('hint_number', '')} | "
+            f"guessed=[{guesses}] | correct=[{correct}] | incorrect=[{incorrect}] | outcome={outcome}"
+        )
+    return "\n".join(lines)
+
+
+def format_baseline_round_memory(round_summaries):
+    if not round_summaries:
+        return "No previous rounds yet."
+    lines = []
+    for summary in round_summaries:
+        lines.append(
+            f"Round {summary.get('round', '')}: success={summary.get('success', '')}; "
+            f"bomb_hit={summary.get('bomb_hit', '')}; medal={summary.get('medal', '')}"
+        )
+        lines.append(format_baseline_history(summary.get("interactions", [])))
     return "\n".join(lines)
 
 
@@ -415,6 +462,14 @@ CONSTRAINTS
 - "reasoning" is logged for research analysis and is NEVER shown to the player during gameplay.
 """
 
+BASELINE_HINT_SYSTEM_PROMPT = HINT_SYSTEM_PROMPT.replace(
+    "PERSISTENT TEAMMATE MEMORY\n"
+    "- You are called through a stateless API. You only remember what is included in the prompt, so actively use the provided persistent teammate memory every turn.\n"
+    "- Build a mental model of the human from the whole game: what they intended, what they expected you to guess, what they actually guessed, and how they explained their reasoning.\n"
+    "- Adapt future clues and guesses to that model, as a careful human teammate would.\n\n",
+    "",
+)
+
 
 def build_hint_user_prompt(
     target_words,
@@ -454,6 +509,22 @@ def build_hint_user_prompt(
             "\n\nPrevious participant feedback:\n"
             f"{format_all_participant_feedback(history, round_summaries or [])}"
         )
+    interaction_memory = (
+        format_interaction_history(history)
+        if condition == "adaptive"
+        else format_baseline_history(history)
+    )
+    round_memory = (
+        format_round_memory(round_summaries or [])
+        if condition == "adaptive"
+        else format_baseline_round_memory(round_summaries or [])
+    )
+    teammate_memory = (
+        "\n\nPersistent teammate memory from the whole game:\n"
+        f"{format_persistent_teammate_memory(history, round_summaries or [])}"
+        if condition == "adaptive"
+        else ""
+    )
 
     return (
         f"Word type for this round: {word_type}\n"
@@ -465,11 +536,10 @@ def build_hint_user_prompt(
         f"BOMB words (NEVER let your clue fit these): {', '.join(bomb_words)}\n\n"
         f"Forbidden clue words (already used this round, do not repeat): {forbidden_block}\n\n"
         "Interaction history so far this round (use it to learn what your teammate understood and what they missed):\n"
-        f"{format_interaction_history(history)}\n\n"
+        f"{interaction_memory}\n\n"
         "Memory from previous rounds in this game:\n"
-        f"{format_round_memory(round_summaries or [])}\n\n"
-        "Persistent teammate memory from the whole game:\n"
-        f"{format_persistent_teammate_memory(history, round_summaries or [])}\n\n"
+        f"{round_memory}"
+        f"{teammate_memory}\n\n"
         f"{feedback_block}\n\n"
         "Produce the best one-word clue you can, then explain (in the reasoning field) the link and why each neutral and both bombs are safe. Respond with the JSON object only."
     )
@@ -677,7 +747,7 @@ def _generate_hint_with_forbidden(
         attempts += 1
         try:
             raw, elapsed = call_openai_chat(
-                HINT_SYSTEM_PROMPT,
+                HINT_SYSTEM_PROMPT if condition == "adaptive" else BASELINE_HINT_SYSTEM_PROMPT,
                 build_hint_user_prompt(
                     target_words,
                     bomb_words,
@@ -819,9 +889,11 @@ PERSISTENT TEAMMATE MEMORY
 WHEN TO REFUSE
 - Output exactly REROLL_HINT only if the clue is genuinely meaningless or unrelated to every available board word. Last resort.
 - Output exactly SKIP_CLUE only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort.
+- If one or more guesses are strong but the remaining guesses would be unsafe, return action="partial_skip" with only the strong guesses. This consumes one full skip, but is better than risking a bomb.
 
 OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
 {
+  "action": "guess" or "partial_skip",
   "reasoning": "<3 to 30 words explaining the direct link for each guess and, if useful, a close alternative you rejected; shown to the player and logged>",
   "guesses": ["<exact board word>", "..."]
 }
@@ -830,6 +902,20 @@ OR, instead of JSON, exactly one of these two literal tokens on a single line:
 REROLL_HINT
 SKIP_CLUE
 """
+
+BASELINE_GUESS_SYSTEM_PROMPT = GUESS_SYSTEM_PROMPT.replace(
+    "PERSISTENT TEAMMATE MEMORY\n"
+    "- You are called through a stateless API. You only remember what is included in the prompt, so actively use the provided persistent teammate memory every turn.\n"
+    "- Build a mental model of the human from the whole game: their intended targets, expected guesses, guess rationales, ratings, and explanations.\n"
+    "- Guess like a teammate who has been paying attention from the first turn, not like an isolated one-shot model.\n\n",
+    "",
+).replace(
+    "shown to the player and logged",
+    "logged for research and never shown to the player",
+).replace(
+    "learn from what your teammate intended last time",
+    "learn only from which guesses were correct or incorrect last time",
+)
 
 
 def build_guess_user_prompt(
@@ -852,6 +938,22 @@ def build_guess_user_prompt(
             "\n\nPrevious participant feedback:\n"
             f"{format_all_participant_feedback(history, round_summaries or [])}"
         )
+    interaction_memory = (
+        format_interaction_history(history)
+        if condition == "adaptive"
+        else format_baseline_history(history)
+    )
+    round_memory = (
+        format_round_memory(round_summaries or [])
+        if condition == "adaptive"
+        else format_baseline_round_memory(round_summaries or [])
+    )
+    teammate_memory = (
+        "\n\nPersistent teammate memory from the whole game:\n"
+        f"{format_persistent_teammate_memory(history, round_summaries or [])}"
+        if condition == "adaptive"
+        else ""
+    )
     return (
         f"Available board words (only choose from these): {', '.join(available_board)}\n"
         f"Word type per available card: {format_word_type_per_card(available_board, word_type_per_card)}\n"
@@ -863,12 +965,13 @@ def build_guess_user_prompt(
         f"Skipping allowed right now: {'yes' if can_skip else 'no'}\n"
         f"Remaining skips this round: {remaining_skips}\n"
         f"Remaining clue rerolls: {remaining_rerolls}\n\n"
+        "You may make fewer than N strong guesses and set action=partial_skip when the remaining choices are dangerously uncertain. "
+        "A partial skip preserves the guesses already made but consumes one full skip. Prefer it over a serious bomb risk.\n\n"
         "Interaction history so far this round:\n"
-        f"{format_interaction_history(history)}\n\n"
+        f"{interaction_memory}\n\n"
         "Memory from previous rounds:\n"
-        f"{format_round_memory(round_summaries or [])}\n\n"
-        "Persistent teammate memory from the whole game:\n"
-        f"{format_persistent_teammate_memory(history, round_summaries or [])}\n\n"
+        f"{round_memory}"
+        f"{teammate_memory}\n\n"
         f"{feedback_block}\n\n"
         "Default to guessing. REROLL_HINT and SKIP_CLUE are last resorts. "
         "Respond with the JSON object OR a single literal token."
@@ -883,6 +986,7 @@ def build_guess_repair_prompt(
     previous_response,
     history=None,
     round_summaries=None,
+    condition="adaptive",
 ):
     available_board = [word for word in board if word not in previous_guesses]
     return (
@@ -892,9 +996,13 @@ def build_guess_repair_prompt(
         f"N: {max_guesses}\n\n"
         "Your previous response was unusable or did not contain enough exact board words:\n"
         f"{previous_response}\n\n"
-        "Persistent teammate memory from the whole game:\n"
-        f"{format_persistent_teammate_memory(history or [], round_summaries or [])}\n\n"
-        "Return strict JSON only. Pick the top N exact board words by direct, everyday semantic association. "
+        + (
+            "Persistent teammate memory from the whole game:\n"
+            f"{format_persistent_teammate_memory(history or [], round_summaries or [])}\n\n"
+            if condition == "adaptive"
+            else ""
+        )
+        + "Return strict JSON only. Pick the top N exact board words by direct, everyday semantic association. "
         "Do not add unrelated filler. Schema: "
         '{"reasoning":"short reason, 3 to 30 words","guesses":["Exact board word"]}'
     )
@@ -927,6 +1035,17 @@ def parse_guess_json(raw_text, available_board, max_guesses):
     return valid, rationale
 
 
+def parse_guess_action(raw_text):
+    try:
+        data = json.loads(raw_text)
+    except (json.JSONDecodeError, TypeError):
+        return "guess"
+    if not isinstance(data, dict):
+        return "guess"
+    action = str(data.get("action", "guess") or "guess").strip().lower()
+    return action if action in {"guess", "partial_skip"} else "guess"
+
+
 def ai_guess(
     board,
     hint,
@@ -947,7 +1066,7 @@ def ai_guess(
     raw = ""
     try:
         raw, elapsed = call_openai_chat(
-            GUESS_SYSTEM_PROMPT,
+            GUESS_SYSTEM_PROMPT if condition == "adaptive" else BASELINE_GUESS_SYSTEM_PROMPT,
             build_guess_user_prompt(
                 board,
                 hint,
@@ -981,6 +1100,13 @@ def ai_guess(
             return {"action": "skip", "guesses": [], "guess_rationale": "", **meta}
 
         valid_guesses, guess_rationale = parse_guess_json(raw, available_board, max_guesses)
+        requested_action = parse_guess_action(raw)
+        partial_skip_is_valid = (
+            requested_action == "partial_skip"
+            and can_skip
+            and remaining_skips > 0
+            and 0 < len(valid_guesses) < min(max_guesses, len(available_board))
+        )
 
         if not valid_guesses:
             tokens = [
@@ -997,10 +1123,13 @@ def ai_guess(
                 if len(valid_guesses) >= max_guesses:
                     break
 
-        if len(valid_guesses) < min(max_guesses, len(available_board)):
+        if (
+            not partial_skip_is_valid
+            and len(valid_guesses) < min(max_guesses, len(available_board))
+        ):
             try:
                 repair_raw, repair_elapsed = call_openai_chat(
-                    GUESS_SYSTEM_PROMPT,
+                    GUESS_SYSTEM_PROMPT if condition == "adaptive" else BASELINE_GUESS_SYSTEM_PROMPT,
                     build_guess_repair_prompt(
                         board,
                         hint,
@@ -1009,6 +1138,7 @@ def ai_guess(
                         raw,
                         history,
                         round_summaries,
+                        condition,
                     ),
                     temperature=0.0,
                     model=GUESS_MODEL_NAME,
@@ -1030,13 +1160,35 @@ def ai_guess(
                     f"{meta['raw_response']}\n\n<repair_error: {error}>"
                 )
 
+        required_guess_count = min(max_guesses, len(available_board))
+        # Never silently record an undersized normal guess as though the AI
+        # completed the requested N guesses. If both the original response and
+        # its repair remain incomplete, preserve the usable guesses as an
+        # explicit partial skip whenever the game rules allow one.
+        if (
+            valid_guesses
+            and not partial_skip_is_valid
+            and len(valid_guesses) < required_guess_count
+            and can_skip
+            and remaining_skips > 0
+        ):
+            partial_skip_is_valid = True
+            meta["raw_response"] = (
+                f"{meta['raw_response']}\n\n<normalized_action: partial_skip; "
+                "incomplete normal guess after repair>"
+            )
+
         if valid_guesses:
             if not guess_rationale:
                 guess_rationale = (
                     f"I chose {', '.join(valid_guesses[:max_guesses])} because they seemed closest to the clue {hint}."
                 )
             return {
-                "action": "guess",
+                "action": (
+                    "partial_skip"
+                    if partial_skip_is_valid
+                    else "guess"
+                ),
                 "guesses": valid_guesses[:max_guesses],
                 "guess_rationale": guess_rationale,
                 **meta,
@@ -1070,6 +1222,7 @@ def generate_ai_round_reflection(
     round_success,
     round_bomb_hit,
     round_medal,
+    condition="adaptive",
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []
@@ -1082,8 +1235,8 @@ def generate_ai_round_reflection(
         f"All targets found: {round_success}\n"
         f"Bomb hit: {round_bomb_hit}\n"
         f"Medal: {round_medal}\n\n"
-        "Interaction history with intended targets and explanations:\n"
-        f"{format_interaction_history(history)}\n"
+        "Interaction history:\n"
+        f"{format_interaction_history(history) if condition == 'adaptive' else format_baseline_history(history)}\n"
     )
     try:
         text, _ = call_openai_chat(

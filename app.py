@@ -5,6 +5,7 @@ from core.state import init_session_state
 from core.storage import log_event
 from ui.components import render_app_header
 from ui.screens import (
+    screen_consent,
     screen_game_over,
     screen_human_clue,
     screen_human_guesser,
@@ -24,6 +25,11 @@ st.set_page_config(
 def main():
     inject_css()
     init_session_state()
+
+    if not st.session_state.consent_given:
+        render_app_header()
+        screen_consent()
+        return
 
     if not st.session_state.started:
         render_app_header()

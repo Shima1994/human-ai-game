@@ -5,10 +5,11 @@ def inject_css():
     css = """
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
         <style>
         :root {
             --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            --font-reading: "Source Serif 4", Georgia, "Times New Roman", serif;
             --color-bg: #f6f4ef;
             --color-bg-alt: #efece5;
             --color-text: #1f2d3d;
@@ -451,6 +452,82 @@ def inject_css():
         .guide-research {
             background: var(--color-info-soft);
             border-color: rgba(47, 111, 143, 0.18);
+        }
+
+        /* Research documents */
+        .st-key-consent_document,
+        .st-key-debriefing_document {
+            max-width: 1120px;
+            margin: 0 auto 1.1rem auto;
+            padding: clamp(1.25rem, 3vw, 2.6rem) clamp(1.15rem, 4vw, 3.4rem);
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(18, 34, 54, 0.10);
+            border-radius: 22px;
+            box-shadow: 0 18px 48px rgba(18, 34, 54, 0.10);
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"],
+        .st-key-debriefing_document [data-testid="stMarkdownContainer"] {
+            font-family: var(--font-reading);
+            color: #26384a;
+            font-size: 1.05rem;
+            line-height: 1.78;
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"] > h1,
+        .st-key-debriefing_document [data-testid="stMarkdownContainer"] > h1 {
+            font-family: var(--font-sans);
+            font-size: clamp(1.65rem, 3vw, 2.35rem);
+            line-height: 1.18;
+            letter-spacing: -0.035em;
+            margin: 0 0 0.85rem 0;
+            color: #12395f;
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"] > h2,
+        .st-key-debriefing_document [data-testid="stMarkdownContainer"] > h2 {
+            font-family: var(--font-sans);
+            font-size: 1.22rem;
+            line-height: 1.35;
+            margin: 2rem 0 0.8rem 0;
+            color: #174f80;
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"] > h3,
+        .st-key-debriefing_document [data-testid="stMarkdownContainer"] > h3 {
+            font-family: var(--font-sans);
+            font-size: 1.04rem;
+            line-height: 1.4;
+            margin: 1.65rem 0 0.5rem 0;
+            color: #183b5a;
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"] p,
+        .st-key-debriefing_document [data-testid="stMarkdownContainer"] p {
+            margin: 0 0 1rem 0;
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"] li,
+        .st-key-debriefing_document [data-testid="stMarkdownContainer"] li {
+            margin-bottom: 0.48rem;
+            padding-left: 0.2rem;
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"] hr,
+        .st-key-debriefing_document [data-testid="stMarkdownContainer"] hr {
+            margin: 2.35rem 0;
+            border-color: rgba(29, 94, 168, 0.18);
+        }
+        .st-key-consent_action_panel,
+        .st-key-debriefing_action_panel {
+            max-width: 1120px;
+            margin: 0 auto;
+        }
+        .st-key-consent_action_panel [data-testid="stVerticalBlockBorderWrapper"],
+        .st-key-debriefing_action_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 1.05rem 1.15rem;
+            background: rgba(238, 246, 255, 0.94);
+            border: 1px solid rgba(29, 94, 168, 0.18);
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(18, 34, 54, 0.06);
+        }
+        .st-key-consent_action_panel .stCheckbox label,
+        .st-key-debriefing_action_panel .stCheckbox label {
+            font-weight: 650;
+            color: var(--color-heading);
         }
 
         /* Summary stats and history */
@@ -1196,6 +1273,16 @@ def inject_css():
             }
             .guide-card h3 {
                 font-size: 0.98rem;
+            }
+            .st-key-consent_document,
+            .st-key-debriefing_document {
+                border-radius: 15px;
+                padding: 1.15rem 1rem;
+            }
+            .st-key-consent_document [data-testid="stMarkdownContainer"],
+            .st-key-debriefing_document [data-testid="stMarkdownContainer"] {
+                font-size: 0.98rem;
+                line-height: 1.7;
             }
             .legend {
                 gap: 0.32rem;

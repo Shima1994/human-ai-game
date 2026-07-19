@@ -1,282 +1,300 @@
-# AI Prompts
+# AI Prompt and Model-Interaction Specification
 
-This file documents every prompt sent to the AI model in the game, where it is used, and what runtime data is injected into the prompt.
+This document describes every model interaction currently implemented in `core/ai_service.py`, including condition-specific context, parsing, fallback behavior, and stored research fields. The Python source remains authoritative if this document and code ever diverge.
 
-## Models
+## Models and shared API wrapper
 
 Models are configured in `core/constants.py`:
 
-| Variable | Default | Used by |
+| Constant | Current default | Purpose |
 | --- | --- | --- |
-| `HINT_MODEL_NAME` | `gpt-4o` | AI clue generation (and reroll) |
-| `GUESS_MODEL_NAME` | `gpt-4o` | AI guessing the human clue |
-| `REFLECTION_MODEL_NAME` | `gpt-4o` | End-of-round AI reflection |
+| `HINT_MODEL_NAME` | `gpt-4o` | AI clue generation and clue rerolls |
+| `GUESS_MODEL_NAME` | `gpt-4o` | AI card selection and partial-skip decision |
+| `REFLECTION_MODEL_NAME` | `gpt-4o` | AI turn explanations and round reflections |
 
-## Shared model call
+All requests pass through:
 
-All AI requests go through `call_openai_chat(system_prompt, user_prompt, *, temperature, model, json_mode)` in `core/ai_service.py`.
+```python
+call_openai_chat(
+    system_prompt,
+    user_prompt,
+    *,
+    temperature,
+    model,
+    json_mode,
+)
+```
 
-- `system`: the role-specific instruction block below.
-- `user`: round-specific board state, history, and memory.
-- For clue generation the call uses `response_format={"type": "json_object"}`. The guesser does not require JSON mode (it can also reply with single-token control codes `REROLL_HINT` or `SKIP_CLUE`), but is instructed to use a JSON object for normal guesses.
-- The call returns `(text, elapsed_seconds)`. The elapsed time is stored per turn in `data/game_interactions.csv` (`hint_response_time_sec` and `guess_response_time_sec`).
-- The raw model response is also stored in `data/game_interactions.csv` (`hint_raw_response` and `guess_raw_response`) for research analysis.
+The wrapper reads `OPENAI_API_KEY` from Streamlit secrets, optionally loads `.env`, calls the chat-completions API, and returns `(response_text, elapsed_seconds)`.
+
+## Condition boundary
+
+The experiment has two conditions with identical data collection but different communication context.
+
+### Adaptive
+
+Adaptive prompts may include:
+
+- ordinary game facts;
+- intended targets and expected guesses;
+- guess rationales;
+- human understanding ratings;
+- valid human clue explanations;
+- valid AI explanations;
+- end-of-round human feedback and AI reflection;
+- persistent cross-round teammate memory.
+
+`format_all_participant_feedback(...)`, `format_round_memory(...)`, and `format_persistent_teammate_memory(...)` support this condition.
+
+### Baseline
+
+Baseline prompts receive only task-relevant game facts:
+
+- clue and clue number;
+- available and previously guessed board cards;
+- correct and incorrect selections;
+- neutral/bomb outcome;
+- skip state;
+- round success, bomb, and medal facts.
+
+Baseline context is built with `format_baseline_history(...)` and `format_baseline_round_memory(...)`. It excludes intended cards, expected guesses, rationales, ratings, human explanations, AI explanations, and end-of-round feedback. Dedicated baseline system prompts also remove persistent-teammate-memory instructions.
+
+The UI separately prevents AI reasoning/explanations from being shown to the human in baseline. Raw responses and parsed explanations are still stored for research analysis.
 
 ## 1. AI clue generation
 
 Functions:
 
-- `generate_ai_hint(...)` — initial clue.
-- `generate_ai_hint_reroll(...)` — replacement clue when the previous one was rejected or skipped.
-
-When it runs:
-
-- Human is the guesser.
-- The AI must return strict JSON containing a reasoning trace, a one-word clue, a count N, and the intended target words.
-- The reasoning trace is saved for analysis but is **never shown to the player during gameplay**.
-
-System prompt (`HINT_SYSTEM_PROMPT`):
-
-```text
-You are an expert clue-giver in a cooperative Codenames-style word game. You are partnered with one human teammate. Your shared goal is to find all target words quickly without picking either bomb.
-
-GAME RULES
-- The board has 16 cards. Hidden roles: 5 targets (good), 2 bombs (round-ending), 9 neutrals (safe but wrong).
-- You output one English clue word and a number N. Your teammate then guesses N words from the board.
-- The clue word must NOT appear on the board and must NOT be a morphological variant (no plural / verb-form / spelling trick).
-- A great clue links 2 or 3 targets through one vivid, everyday association that any literate adult would recognize instantly.
-
-HOW TO PICK A GREAT CLUE (think like a thoughtful human teammate)
-1. Scan the remaining targets and group them into candidate clusters. Look for shared categories (animals, sports, kitchen), idioms ("breaking the ice"), famous pairings ("salt and pepper"), sensory imagery, or cultural archetypes.
-2. For each candidate clue, mentally test it against EVERY neutral and BOTH BOMBS.
-   - If the clue could reasonably point at a neutral, the teammate will probably pick that neutral. Lower N or pick a safer clue.
-   - If the clue has ANY plausible link to either bomb, throw it away.
-3. Prefer concrete, common, mainstream associations over clever or obscure ones. Your teammate is human and short on time.
-4. Aim for the largest safe cluster. But a confident N=2 always beats a shaky N=4.
-5. Avoid being a simple synonym of a single target. Reach for a richer concept that bridges multiple targets.
-6. Use the round history. If a previous clue confused the teammate, do not reuse the same association style; switch angle. If a clue worked well, build on what they understood.
-7. Never use the same clue word twice in a round.
-
-OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
-{
-  "reasoning": "<one or two short sentences: which targets you chose, what the link is, and why the bombs and neutrals are not at risk>",
-  "clue": "<one lowercase English word, letters only; a hyphen is allowed only in idiomatic compounds>",
-  "number": <integer between 1 and 5>,
-  "targets": ["<exact remaining target word as spelled in the input>", "..."]
-}
-
-CONSTRAINTS
-- "number" must equal the length of "targets".
-- "targets" must be a subset of the remaining target words listed in the user message.
-- "clue" must not appear on the board nor be a morphological variant.
-- "reasoning" is logged for research analysis and is NEVER shown to the player during gameplay.
+```python
+generate_ai_hint(...)
+generate_ai_hint_reroll(...)
 ```
 
-User prompt (built by `build_hint_user_prompt`):
+Used when the AI is clue-giver and the human is guesser. In round 1 generation starts after the participant presses **Ask AI for a clue**; in later AI-clue rounds it starts automatically.
 
-```text
-Word type for this round: {word_type}
-Remaining target words (you must aim only at these): {remaining_targets}
-Targets already found this round: {found_targets or (none)}
-Neutral words (AVOID — your clue must not fit these): {neutral_words}
-BOMB words (NEVER let your clue fit these): {bomb_words}
+### System behavior
 
-Forbidden clue words (already used this round, do not repeat): {used_hints or (none)}
+The model is told that the board contains 16 cards: 5 targets, 9 neutrals, and 2 bombs. It must produce a safe one-word English clue that is not a board word or morphological variant. It evaluates all neutrals and both bombs before choosing a target cluster.
 
-Interaction history so far this round (use it to learn what your teammate understood and what they missed):
-{format_interaction_history(history)}
+### Output schema
 
-Memory from previous rounds in this game:
-{format_round_memory(round_summaries)}
-
-Produce the best one-word clue you can, then explain (in the reasoning field) the link and why each neutral and both bombs are safe. Respond with the JSON object only.
-```
-
-For `generate_ai_hint_reroll(...)` the previously rejected clue is added to the forbidden list and the fallback intended-target cap is reduced to 1.
-
-Call settings: `temperature=0.55`, `response_format={"type":"json_object"}`, up to 3 retries.
-
-Expected output (example):
+Clue generation uses forced JSON mode:
 
 ```json
-{"reasoning":"Police and King both deal with authority and lawmaking, and 'law' is a common everyday concept that does not fit any neutral or the bomb.","clue":"law","number":2,"targets":["Police","King"]}
+{
+  "reasoning": "short research reasoning",
+  "clue": "one-word-clue",
+  "number": 2,
+  "targets": ["Exact target", "Exact target"],
+  "expected_guesses": ["Exact board card", "Exact board card"]
+}
 ```
 
-Storage:
+Rules enforced by parsing and validation:
 
-- The parsed clue, number, intended targets, and reasoning are saved per turn in `data/game_interactions.csv` (`hint_explanation`).
-- The full raw response is stored in `hint_raw_response`.
-- The model response time is stored in `hint_response_time_sec`.
-- The number of retries used is stored in `hint_attempts`.
-- A boolean `hint_used_fallback` records whether the fallback word list had to be used.
+- `clue` is normalized to lowercase English letters/hyphens;
+- `number` is bounded by the configured maximum and remaining targets;
+- targets must be exact remaining target cards;
+- expected guesses must be exact currently available board cards;
+- used clues and board-word variants are rejected;
+- `number`, target count, and returned lists are reconciled before acceptance.
 
-Fallback: If JSON parsing fails three times in a row, the code falls back to a curated word list (`FALLBACK_HINTS`) that is filtered against the board. The fallback hint and reasoning are still logged.
+### Runtime context
 
-## 2. AI guessing the human clue
+Both conditions receive:
 
-Function: `ai_guess(...)`.
+- word type and per-card word types;
+- remaining targets and targets already found;
+- available board cards;
+- all neutrals and bombs;
+- previously used/forbidden clues;
+- condition-appropriate history and round memory.
 
-When it runs:
+Adaptive additionally receives participant feedback and persistent teammate memory. Baseline receives fact-only memory.
 
-- Human gives the clue.
-- AI either picks N board words, asks for a reroll, or skips the clue.
+### Call and fallback
 
-System prompt (`GUESS_SYSTEM_PROMPT`):
+- Temperature: `0.55`.
+- JSON mode: enabled.
+- Maximum initial attempts: three.
+- A reroll forbids the rejected clue and uses a more conservative fallback cap.
+- If all model attempts fail validation, a curated fallback clue is selected after board-word filtering.
+
+### Stored fields
+
+- parsed clue and `N`;
+- intended targets and expected guesses;
+- `hint_explanation` (the parsed reasoning);
+- `hint_raw_response`;
+- `hint_response_time_sec` and total hint time;
+- `hint_attempts`;
+- `hint_used_fallback`.
+
+The raw clue-generation reasoning is research data and is not directly rendered as the gameplay clue explanation.
+
+## 2. AI guessing a human clue
+
+Function:
+
+```python
+ai_guess(...)
+```
+
+The AI sees only available card labels, the human clue, `N`, skip availability, and condition-appropriate history. It never receives the current hidden roles while acting as guesser.
+
+### Normal and partial-skip JSON
+
+```json
+{
+  "action": "guess",
+  "reasoning": "3–30 words explaining the selected cards",
+  "guesses": ["Exact board card", "Exact board card"]
+}
+```
+
+or:
+
+```json
+{
+  "action": "partial_skip",
+  "reasoning": "The first two are strong; the remaining choice risks a bomb.",
+  "guesses": ["Exact board card", "Exact board card"]
+}
+```
+
+A partial skip is accepted only when:
+
+- skipping is currently allowed;
+- at least one skip remains;
+- at least one valid guess is supplied;
+- fewer than `N` valid guesses are supplied.
+
+Completed guesses are retained and scored; the remaining guesses are abandoned; one full skip is consumed.
+
+### Literal control responses
+
+The model may instead return:
 
 ```text
-You are an expert semantic guesser in a cooperative Codenames-style word game. Your human teammate just gave you a clue word and a number N. Your job: pick exactly N words from the available board that a normal human would most likely mean.
-
-GAME RULES
-- The board has 16 words. Some are good targets, some are neutral (safe but wrong), two are bombs (round-ending).
-- You only see the clue and the words — never the hidden roles.
-- Hitting either bomb ends the round with zero points.
-
-HOW TO PICK GREAT GUESSES
-1. First translate the clue into its most ordinary meaning, including common non-English clues if obvious. For example, Persian "دزد دریایی" means pirate.
-2. For EVERY available board word, mentally score the association from 0 to 5:
-   - 5 = direct, iconic, or definitional link (pirate -> Ship, treasure -> Gold)
-   - 4 = strong everyday category, setting, tool, role, or famous pairing
-   - 3 = plausible but secondary link
-   - 0-2 = weak, punny, obscure, spelling-based, or only connected by a forced story
-3. Pick exactly N words with the highest scores. Order them strongest first.
-4. Prefer direct object/setting/category links over abstract vibes. If the clue is "pirate", Ship beats Shoe, Crown, or Paper.
-5. Never pick a word just because you can invent a clever explanation. If a normal human would not immediately understand the link, downgrade it.
-6. If two words are close, pick the more concrete and mainstream association.
-7. Use the round history. Avoid repeating any word that was already guessed; learn from what your teammate intended last time.
-
-WHEN TO REFUSE
-- Output exactly REROLL_HINT only if the clue is genuinely meaningless or unrelated to every available board word. Last resort.
-- Output exactly SKIP_CLUE only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort.
-
-OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
-{
-  "reasoning": "<one or two short sentences explaining the direct everyday link for each guess; logged for research, hidden from the player>",
-  "guesses": ["<exact board word>", "..."]
-}
-
-OR, instead of JSON, exactly one of these two literal tokens on a single line:
 REROLL_HINT
+```
+
+or:
+
+```text
 SKIP_CLUE
 ```
 
-User prompt (built by `build_guess_user_prompt`):
+`SKIP_CLUE` is a full skip with no completed guesses. Control responses are honored only when the corresponding action remains available.
 
-```text
-Available board words (only choose from these): {available_board}
-Words already guessed this round (do NOT repeat): {previous_guesses}
+### Parsing and repair
 
-Your teammate's clue: "{hint}"
-Number of guesses to produce (N): {max_guesses}
+1. Recognize literal reroll/full-skip tokens.
+2. Parse JSON and filter guesses against exact available board cards.
+3. Read `action` as `guess` or `partial_skip`.
+4. If JSON fails, attempt conservative comma/newline token parsing.
+5. If a normal response contains fewer than `N` usable guesses, make one JSON repair call at temperature `0.0`.
+6. Do not repair a valid partial skip into unsafe filler guesses.
+7. If no guesses remain usable, fall back to an allowed full skip/reroll rather than inventing cards.
 
-Before answering, internally rank every available board word by direct semantic association to the clue. Your final guesses must be the top N exact board words, not random filler.
+Primary-call temperature is `0.2`; forced JSON mode is disabled so literal control tokens remain possible.
 
-Skipping allowed right now: {yes/no}
-Remaining skips this round: {remaining_skips}
-Remaining clue rerolls: {remaining_rerolls}
+### Condition-specific visibility
 
-Interaction history so far this round:
-{format_interaction_history(history)}
+- Adaptive: the AI rationale may be displayed in History and is available to later adaptive memory.
+- Baseline: the rationale is collected and logged but is neither displayed to the human nor passed to later prompts.
 
-Memory from previous rounds:
-{format_round_memory(round_summaries)}
+### Stored fields
 
-Default to guessing. REROLL_HINT and SKIP_CLUE are last resorts. Respond with the JSON object OR a single literal token.
+- action and ordered guesses;
+- `guess_rationale` and word count;
+- raw and parsed response;
+- response and total guess timing;
+- retry/repair metadata;
+- full/partial skip fields and actor;
+- completed and abandoned guess counts;
+- correctness, alignment, error type, and bomb outcome.
+
+## 3. AI turn explanation
+
+Function:
+
+```python
+generate_ai_turn_explanation(...)
 ```
 
-Call settings: `temperature=0.2`, no forced JSON mode (so the model can return either JSON or one of the literal tokens). Parsing is layered:
+After a human finishes guessing an AI clue—including a full or partial skip—the AI produces a short general explanation of its own clue relationship.
 
-1. If the trimmed response equals `REROLL_HINT` (and rerolls remain), the action is `reroll`.
-2. If it equals `SKIP_CLUE` (and skipping is allowed), the action is `skip`.
-3. Otherwise the response is parsed as JSON and the `"guesses"` list is filtered against the available board.
-4. If JSON parsing fails, a comma/newline-split fallback parses tokens.
-5. If fewer than N valid words are found, a second repair call is made with `json_mode=True` and `temperature=0.0`.
-6. If no usable guesses are found after repair, the AI skips/rerolls when allowed instead of adding random filler.
+Output schema:
 
-Return shape: `{"action": "guess"|"reroll"|"skip", "guesses": [...], "raw_response": str, "response_time_sec": float, "attempts": int}`.
-
-Storage:
-
-- The action and resulting guesses are recorded normally.
-- `guess_raw_response` and `guess_response_time_sec` are stored per turn in `data/game_interactions.csv`.
-
-## 3. AI round reflection
-
-Function: `generate_ai_round_reflection(...)`.
-
-When it runs:
-
-- After every round ends, before the human types their own feedback.
-
-System prompt (`REFLECTION_SYSTEM_PROMPT`):
-
-```text
-You are an AI teammate writing a short reflection at the end of one round of a cooperative word game. Your reader is the human player.
-
-Your reflection should:
-1. If you gave the clues, explain plainly why each clue was meant for which targets, what link you used (category, metaphor, idiom, image), and how you tried to keep the bombs and neutrals safe. Acknowledge any guess that went wrong.
-2. If the human gave the clues, compare their marked intended targets to your guesses. Where you misread, say what association pulled you the wrong way. Where you guessed right, say what clicked.
-3. Mention any skips and what made the clue feel risky.
-4. End with one specific, actionable suggestion the team can apply in the next round.
-5. Be warm, plain, and concrete. No empty praise. Maximum 180 words.
+```json
+{
+  "relationship_type": "short category label",
+  "explanation": "one general sentence without board-card names"
+}
 ```
 
-User prompt:
+The application checks the explanation against all board words. Invalid responses are retried; if generation remains invalid, a safe fallback is stored with a validation flag and block reason.
 
-```text
-Round role: {role}
-Word type: {word_type}
-Targets: {target_words}
-Neutral words: {neutral_words}
-Bombs: {bomb_words}
-All targets found: {round_success}
-Bomb hit: {round_bomb_hit}
-Medal: {round_medal}
+Adaptive may show the sanitized explanation to the human. Baseline stores it but does not show or reuse it.
 
-Interaction history with intended targets and explanations:
-{format_interaction_history(history)}
+Stored fields include raw/sanitized explanation, validity, block reason, relationship type, and reflection source.
+
+## 4. AI end-of-round reflection
+
+Function:
+
+```python
+generate_ai_round_reflection(...)
 ```
 
-Call settings: `temperature=0.4`. The response is post-trimmed to a maximum of 200 words as a safety net.
+The model summarizes clue interpretation, successes, errors, skips, and one actionable improvement. Maximum requested length is 180 words; returned text is capped at 200 words.
 
-Storage: the reflection is saved in `data/game_rounds.csv` (`ai_round_reflection`) and is also placed in the round memory passed to the next round's prompts.
+- Temperature: `0.4`.
+- Adaptive context may contain full interaction history.
+- Baseline context uses fact-only history and therefore excludes human/AI explanation exchange.
+- Adaptive displays the reflection and may reuse it in later memory.
+- Baseline stores it without displaying or reusing it.
 
-## 4. Human hint validation
+## 5. Human-input validation relevant to prompts
 
-Local validation (no AI call):
+Human clues are validated locally before any AI call:
 
-- `validate_human_hint(hint, board_words)`
-- `validate_human_hint_with_history(hint, board_words, history, used_hints=None)`
+- exactly one English word;
+- not equal or morphologically close to a board card;
+- not previously used in the round.
 
-Checks:
+Human explanation inputs are also local validations:
 
-- Clue is not empty.
-- Clue is exactly one English word.
-- Clue is not the same as, or morphologically too close to, a board word (matches on raw string, simple stem, and 4+ character prefix overlap).
-- Clue has not already been used in this round.
+- ASCII English text with at least one English letter;
+- guess rationale: 3–30 words;
+- human clue explanation: 3–20 words;
+- end-of-round feedback: 3–200 words;
+- board-card names are blocked in turn explanation while hidden information remains relevant;
+- after a bomb ends the round, card names are permitted.
 
-## 5. Saved fields
+Invalid raw text and its block reason can be retained for research audit, while sanitized fields remain empty.
 
-Round-level CSV (`data/game_rounds.csv`) columns:
+## 6. Prompt/data audit fields
 
-```
-session_id, timestamp_utc, participant_id, round, role, word_type, board, targets, bomb,
-neutral_words, clues_used, guesses, turns, skips, targets_found, any_target_correct,
-all_targets_found, bomb_hit, medal, score_change, round_duration_sec, perception_rating_end,
-ai_round_reflection, human_round_feedback
-```
+The normalized `turns.csv` includes model and prompt audit columns:
 
-Interaction-level CSV (`data/game_interactions.csv`) columns:
+- `llm_model`;
+- `llm_temperature`;
+- `llm_prompt_version`;
+- `llm_system_prompt_version`;
+- `llm_response_raw`;
+- `llm_response_parsed`;
+- `llm_error`;
+- `llm_latency_seconds`;
+- `repair_applied_to_next_prompt`;
+- `repair_context_used`.
 
-```
-session_id, timestamp_utc, participant_id, round, role, word_type, turn, clue_giver, guesser,
-hint, hint_number, intended_targets, hint_explanation, guesses, correct_guesses,
-missed_intended_targets, extra_correct_guesses, neutral_guesses, bomb_guess, outcome,
-skipped, skipped_by, bomb_hit, round_medal, round_success, ai_understanding_rating_before,
-ai_understanding_rating_after, hint_response_time_sec, hint_attempts, hint_used_fallback,
-guess_response_time_sec, hint_raw_response, guess_raw_response, interaction_recorded_at
-```
+All datasets include `condition`. Researchers should use the normalized tables for analysis and treat `game_rounds.csv` / `game_interactions.csv` as backward-compatible wide exports.
 
-- `session_id` is a UUID assigned per game session and links all of a participant's rows together.
-- `hint_explanation` contains the AI's "reasoning" field for AI-generated clues and is empty for human-generated clues. It is never shown to the player in the UI.
-- `hint_raw_response` and `guess_raw_response` capture the model's full raw response per turn for after-the-fact analysis.
-- List-valued fields are stored as semicolon-separated strings, which load cleanly with `pandas.read_csv(...)` and `df[col].str.split(";")`.
+## 7. Safety and reproducibility notes
+
+- Model outputs remain stochastic; raw responses and latency are retained for audit.
+- Fallback use and repair attempts must be included as covariates when relevant.
+- Baseline leakage tests should inject sentinel explanation strings and assert that they do not occur in either initial or repair prompts.
+- Prompt changes should be versioned in code before production data collection; the current generic prompt-version fields are not a substitute for release tags or commit hashes.

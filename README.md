@@ -1,136 +1,197 @@
-# Human–AI Cooperative Word Game (Inspired by *Codenames*)
+# Human–AI Cooperative Word Game
 
-This project implements a cooperative word association game where a human player and an AI model take turns giving clues and guessing target words. It is designed to study collaboration, shared strategy formation, and interaction quality between humans and large language models in a controlled, lightweight environment.
+A Streamlit research application for studying shared understanding between a human participant and an AI teammate in a constrained, Codenames-inspired word-association task.
 
-## 🎮 Game features
+The study has two automatically balanced conditions. Both collect the same behavioral, performance, rating, and explanation data. They differ only in whether explanation and reflection information is exchanged and reused during collaboration.
 
-- Four fixed 16-word boards, with 5 targets, 2 bombs, and 9 neutral cards randomized each run
-- Two gameplay modes: **abstract words** and **concrete words**
-- Turn-taking between human and AI
-- AI-generated clues using OpenAI's API (JSON-mode prompts with chain-of-thought reasoning saved for analysis only)
-- Scoring system, medal tiers, and round-based structure
-- Before/after AI-guess ratings plus end-of-round AI reflection and human feedback
-- AI clue *reasoning* is **never shown to the player during the game** — it is saved per turn for post-hoc research analysis
-- Mobile-first responsive UI with the Inter font family and a consistent color system
+## Study design
 
-## 🧠 AI prompts
+Each session contains four rounds. The human and AI alternate between clue-giver and guesser roles; the starting role is randomized per session.
 
-All AI prompts are documented in `AI_PROMPTS.md`.
+Each round uses a 16-card mixed board:
 
-- Hints, guesses, and end-of-round reflections all use `gpt-4o` by default (configurable in `core/constants.py`).
-- The clue-giver uses structured JSON output (`response_format={"type": "json_object"}`) with retries — this eliminates the parse failures that previously made the AI output literal placeholders.
-- Each turn captures the raw model response, response time, retry count, and whether a fallback was used.
+- 5 target cards;
+- 9 neutral cards;
+- 2 bomb cards;
+- a controlled abstract/concrete composition determined by board template A or B;
+- no word reuse within the same four-round session.
 
-## 📦 Data storage
+The clue-giver supplies one English clue and a number `N`. The guesser may select up to `N` cards. A bomb ends the round immediately. A round also ends when all targets are found or four turns have been used.
 
-Two CSV files are written under `data/`:
+Medals are awarded only when all five targets are found without a bomb:
 
-| File | Granularity |
-| --- | --- |
-| `data/game_rounds.csv` | One row per round |
-| `data/game_interactions.csv` | One row per turn (clue, guess, or skip) |
+| Turns used | Medal | Score |
+| --- | --- | ---: |
+| 1–2 | Gold | 5 |
+| 3 | Silver | 4 |
+| 4 | Bronze | 3 |
+| Unfinished or bomb | None | 0 |
 
-Both files include a `session_id` (UUID generated per game) so all rows for one play-through can be joined together.
+## Experimental conditions
 
-### `game_rounds.csv` columns
+Conditions are assigned when a participant profile is registered, not on ordinary Streamlit reruns. Assignment alternates persistently using `data/sessions.csv`:
 
-```
-session_id, timestamp_utc, participant_id, round, role, word_type, board, targets, bomb,
-neutral_words, clues_used, guesses, turns, skips, targets_found, any_target_correct,
-all_targets_found, bomb_hit, medal, score_change, round_duration_sec, perception_rating_end,
-ai_round_reflection, human_round_feedback
+```text
+adaptive → baseline → adaptive → baseline → ...
 ```
 
-### `game_interactions.csv` columns
+The first/default condition remains `adaptive`. Every output table includes `condition`, allowing all session-, round-, turn-, and event-level records to be joined and analyzed by treatment.
 
+| Behavior | `adaptive` | `baseline` |
+| --- | --- | --- |
+| Collect human rationales and reflections | Yes | Yes |
+| Collect AI reasoning and explanations | Yes | Yes |
+| Show AI explanations/reasoning to the human | Yes | No |
+| Pass human explanations/ratings to later AI prompts | Yes | No |
+| Pass persistent teammate-model memory to AI | Yes | No |
+| Pass ordinary game facts (clue, N, guesses, correctness, skips, bomb outcome) | Yes | Yes |
+
+Baseline prompt construction uses dedicated fact-only history formatters. Intended cards, expected guesses, rationales, ratings, explanations, and end-of-round feedback are excluded from baseline model context.
+
+## Interaction flow
+
+### AI clue-giver / human guesser
+
+- In round 1, the participant presses **Ask AI for a clue**, giving them time to inspect the initial board.
+- In later rounds, AI clues are generated automatically when the screen loads.
+- Before selecting cards, the participant writes a 3–30 word English rationale.
+- After the turn, a rating is required. If the human was the clue-giver, a 3–20 word English clue explanation is also required.
+
+### Human clue-giver / AI guesser
+
+- The participant enters a one-word English clue and `N`.
+- The participant marks intended targets, predicts the AI guesses, and rates expected understanding.
+- The AI returns guesses plus a research rationale.
+- The result is previewed in History and is committed with **Save this turn**.
+
+### Full and partial skips
+
+At most two skips are available per round, and a skip is unavailable on the final possible turn.
+
+- **Full skip:** no card is selected; the clue is abandoned; one full skip is consumed.
+- **Partial skip:** one or more guesses are retained, their correctness is recorded, the remaining guesses are abandoned, and one full skip is consumed.
+
+Humans can stop mid-turn with **Stop guessing and use 1 skip**. The AI may return `action="partial_skip"` with fewer than `N` strong guesses when the remaining choices are dangerously uncertain. Partial skip is preferred over a serious bomb risk, but is accepted only when a skip remains and `0 < completed guesses < N`.
+
+## Input validation
+
+- Human clues must be exactly one English word.
+- Clues may not equal or closely match a board word and may not repeat within a round.
+- Human rationales and reflections must contain English ASCII text; Persian, Arabic, Japanese, mixed-script, and other non-ASCII responses are rejected.
+- Guess rationales require 3–30 words.
+- Turn-level human clue explanations require 3–20 words and normally may not name board cards.
+- The board-word restriction is removed after a bomb ends the round because hidden information is no longer at risk.
+- End-of-round human feedback requires 3–200 English words.
+
+## Architecture
+
+```text
+app.py                    Streamlit entry point and screen routing
+core/
+  ai_service.py           Prompt construction, OpenAI calls, parsing, retries
+  constants.py            Models, scoring, limits, and data paths
+  game_logic.py           Board generation, turns, skips, scoring, summaries
+  state.py                Session-state initialization and resets
+  storage.py              CSV schemas, migration, local logging, GitHub mirror
+  validation.py           Board-word detection for explanations
+  words.py                Abstract/concrete word banks and board templates
+ui/
+  components.py           Board, hint, status, and History components
+  screens.py              Consent, profile, gameplay, reflection, and results
+  study_documents.py      Information sheet, consent, and debriefing text
+  styles.py               Responsive CSS and visual tokens
+AI_PROMPTS.md              Prompt and condition-isolation documentation
+data/                      Runtime CSV output
 ```
-session_id, timestamp_utc, participant_id, round, role, word_type, turn, clue_giver, guesser,
-hint, hint_number, intended_targets, hint_explanation, guesses, correct_guesses,
-missed_intended_targets, extra_correct_guesses, neutral_guesses, bomb_guess, outcome,
-skipped, skipped_by, bomb_hit, round_medal, round_success, ai_understanding_rating_before,
-ai_understanding_rating_after, hint_response_time_sec, hint_attempts, hint_used_fallback,
-guess_response_time_sec, hint_raw_response, guess_raw_response, interaction_recorded_at
-```
 
-List-valued columns (`board`, `targets`, `bomb`, `neutral_words`, `intended_targets`, `guesses`, etc.) are stored as `;`-separated strings, which loads cleanly with `pandas`:
+## Data model
 
-```python
-import pandas as pd
-df = pd.read_csv("data/game_interactions.csv")
-df["intended_targets"] = df["intended_targets"].fillna("").str.split(";")
-```
+Six CSV files are maintained under `data/`:
 
-`hint_raw_response` and `guess_raw_response` contain the model's full raw output for that turn (intended for analysis, never displayed in the UI).
+| File | Grain | Purpose |
+| --- | --- | --- |
+| `sessions.csv` | one row per session | participant profile, condition, completion, final questionnaire |
+| `rounds.csv` | one row per round | normalized board, role, outcome, score, timing |
+| `turns.csv` | one row per turn | normalized guesses, alignment, timing, reflection, model metadata |
+| `events.csv` | one row per event | timestamped UI/game audit trail with JSON payload |
+| `game_rounds.csv` | one row per round | wide backward-compatible research export |
+| `game_interactions.csv` | one row per turn | wide backward-compatible interaction export |
 
-## ☁️ Data storage on Streamlit Cloud
+`session_id`, `participant_id`, `condition`, `round_number`, and `turn_number` are the primary join keys. Exact schemas are defined by the field lists in `core/storage.py`; these lists are the source of truth.
 
-Streamlit Cloud's local filesystem is not durable, so production CSV data is also written to GitHub through repository secrets.
+Important turn-level fields include:
 
-Add these secrets in Streamlit Cloud:
+- clue, `N`, intended cards, expected guesses, actual guess order;
+- correct, incorrect, neutral, and bomb selections;
+- `outcome`, alignment status, error type, and score contribution;
+- `skipped`, `skipped_by`, `partial_skip`, `completed_guesses`, and `skipped_guesses`;
+- raw and sanitized human/AI explanations plus validation status and block reason;
+- reflection rating and timing;
+- raw LLM response, parsed response, model, temperature, retries, fallback flag, and latency;
+- `repair_applied_to_next_prompt` and condition-specific repair context.
+
+### Serialization conventions
+
+- Normalized tables (`sessions.csv`, `rounds.csv`, `turns.csv`, `events.csv`) use JSON strings for nested arrays/objects where appropriate.
+- Legacy wide exports use semicolon-separated values for many list columns and JSON for ordered structures such as `guess_order_json`.
+- Booleans are written consistently as `true`/`false` in normalized dict-based tables; legacy exports retain integer-compatible `0`/`1` fields where required.
+- Timestamps are recorded as UTC ISO-8601 strings. Older rows may be timezone-naive but are UTC by convention.
+- Raw invalid explanations are retained for audit; sanitized fields are blank when validation fails.
+
+`storage.py` includes schema migration and a repair path for legacy `game_interactions.csv` rows that were historically written with two duplicated values. Existing recoverable rows are realigned before the current schema is written.
+
+## Durable storage
+
+Local CSV files are always written. On Streamlit Community Cloud, local storage is ephemeral, so `game_rounds.csv` and `game_interactions.csv` can also be mirrored to GitHub.
+
+Configure `.streamlit/secrets.toml`:
 
 ```toml
-GITHUB_TOKEN = "github_pat_or_classic_token_with_repo_contents_write"
-GITHUB_REPO = "your-username/your-repo"
+OPENAI_API_KEY = "your-openai-key"
+
+GITHUB_TOKEN = "token-with-repository-contents-write-access"
+GITHUB_REPO = "owner/repository"
 GITHUB_BRANCH = "main"
 GITHUB_ROUND_CSV_PATH = "data/game_rounds.csv"
 GITHUB_INTERACTION_CSV_PATH = "data/game_interactions.csv"
+GITHUB_SESSIONS_CSV_PATH = "data/sessions.csv"
 ```
 
-The app still writes local CSV files as a fallback, but GitHub CSV logging is the durable path for public tests and Amazon Mechanical Turk. The token must have repository contents write access.
+Condition allocation uses the remote sessions file as an optimistic transaction when GitHub is configured, so a Streamlit instance restart does not reset alternation. On the first deployment of `sessions.csv`, the allocator seeds itself from the last condition in the existing remote round export. Completed session snapshots preserve demographics and final-questionnaire values remotely. Round and interaction exports are mirrored after every completed round.
 
-## 🌐 Online version
+GitHub Contents API writes use optimistic retries for update conflicts. For high-volume or multi-instance production data collection, a transactional database/object store is preferable to GitHub-backed CSV because GitHub is not an atomic multi-table database. Normalized `rounds.csv`, `turns.csv`, and `events.csv` remain local in the current implementation; their durable equivalents are the remote wide exports plus remote session snapshots.
 
-The game is deployed on Streamlit Cloud and can be played directly in the browser:
+## Installation and local execution
 
-👉 **https://human-ai-word-game-inspired-by-codenames.streamlit.app/**
+Python 3.11+ is recommended.
 
-No installation is required.
-
-## 🛠 Running locally
-
-1. Create a folder named `.streamlit` inside the project root.
-2. Inside it, create a file named `secrets.toml`.
-3. Add your OpenAI API key:
-   ```toml
-   OPENAI_API_KEY = "your-key-here"
-   ```
-4. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-5. Run the app:
-   ```bash
-   streamlit run app.py
-   ```
-
-## 📁 Project structure
-
-```
-.
-├── app.py                  # Streamlit entrypoint
-├── requirements.txt
-├── AI_PROMPTS.md           # Full prompt documentation
-├── core/
-│   ├── ai_service.py       # All OpenAI calls and JSON parsing
-│   ├── constants.py        # Models, scoring, file paths
-│   ├── game_logic.py       # Round flow, interaction recording
-│   ├── state.py            # Streamlit session state defaults
-│   ├── storage.py          # CSV schema and GitHub mirroring
-│   └── words.py            # The four fixed boards
-├── ui/
-│   ├── components.py       # Board, history, hint cards
-│   ├── screens.py          # Welcome, clue-giver, guesser, summary, game-over
-│   └── styles.py           # CSS tokens, fonts, mobile breakpoints
-└── data/                   # Local CSV output (created at runtime)
+```bash
+python -m venv .venv
+# Activate the environment for your operating system
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-## 🎓 Research context
+Set `OPENAI_API_KEY` in `.streamlit/secrets.toml`. The default models are configured in `core/constants.py` and currently use `gpt-4o` for clue generation, guessing, turn explanation, and round reflection.
 
-This project is part of a Master's thesis and aims to investigate:
+## Verification
 
-- Human–AI cooperative behavior
-- How language models generate clues in constrained tasks
-- Differences between abstract and concrete word associations
-- User experience and perceived collaboration quality
+At minimum, run:
 
-The game provides a controlled environment for studying interaction patterns and shared decision-making between humans and AI systems.
+```bash
+python -m compileall app.py core ui
+```
+
+Recommended study-release checks additionally include:
+
+- schema field uniqueness;
+- schema/row length equality for both legacy exports;
+- a synthetic round write through all local CSV writers;
+- baseline prompt leak tests using sentinel rationale/reflection values;
+- adaptive/baseline alternation tests;
+- full-skip, partial-skip, bomb, all-targets-found, and four-turn termination scenarios;
+- desktop and mobile Streamlit smoke tests.
+
+## Research purpose
+
+The application supports a Master's thesis on intersubjective alignment in human–AI collaboration. Its central comparison is whether exchanging and reusing short explanations improves subsequent coordination relative to a baseline that collects the same explanation data without sharing it between teammates.
