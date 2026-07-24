@@ -1,0 +1,43 @@
+session_id,timestamp_utc,participant_id,condition,starting_role,round,round_number,round_role,role,word_type,board_template_type,board_id,word_type_per_card,target_word_types,neutral_word_types,bomb_word_types,turn,turn_number,clue_giver,guesser,hint,clue,hint_number,clue_number,intended_targets,intended_cards,expected_guesses,expected_guess_cards,expected_guess_word_types,guess_rationale,guess_rationale_word_count,hint_explanation,guesses,guessed_cards,guess_order,guess_order_json,guessed_word_types,correct_guesses,correct_guess_word_types,incorrect_guesses,incorrect_guess_word_types,missed_intended_targets,extra_correct_guesses,neutral_guesses,bomb_guess,outcome,alignment_status,error_type,skipped,skipped_by,partial_skip,skip_interpreted_cards,skip_interpreted_word_types,skip_interpreted_count,wrong_guess_replacements,wrong_guess_replacement_word_types,wrong_guess_replacement_count,wrong_guess_replacement_actor,wrong_guess_replacement_raw_response,wrong_guess_replacement_response_time_sec,wrong_guess_replacement_attempts,completed_guesses,skipped_guesses,bomb_hit,round_medal,round_success,ai_understanding_rating_before,ai_understanding_rating_after,hint_response_time_sec,hint_time_sec,hint_attempts,hint_used_fallback,guess_response_time_sec,guess_time_sec,hint_raw_response,guess_raw_response,human_understanding_rating,human_relationship_type,human_explanation_raw,human_explanation_sanitized,human_explanation_is_valid,human_explanation_blocked_reason,ai_relationship_type,ai_explanation_raw,ai_explanation_sanitized,ai_explanation_is_valid,ai_explanation_blocked_reason,ai_explanation,reflection_source,reflection_rating,reflection_relationship_type,reflection_explanation_raw,reflection_explanation_is_valid,reflection_blocked_reason,reflection_start_time,reflection_end_time,reflection_time_sec,interaction_recorded_at
+3460d2d5-c8f0-4f47-89bf-449fe81e1a5b,2026-07-24T12:04:31.662422,BHL,adaptive,human_clue,1,1,human_clue,human_clue,mixed,A,round-1-template-A-9a846e1fb5,"{""Castle"": ""concrete"", ""Illness"": ""abstract"", ""Memory"": ""abstract"", ""Angel"": ""abstract"", ""Ship"": ""concrete"", ""Cake"": ""concrete"", ""Chair"": ""concrete"", ""Time"": ""abstract"", ""Stadium"": ""concrete"", ""Ball"": ""concrete"", ""Penguin"": ""concrete"", ""Point"": ""abstract"", ""Death"": ""abstract"", ""Air"": ""abstract"", ""Dance"": ""abstract"", ""Mouse"": ""concrete""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,health,health,2,2,Death;Illness,Death;Illness,Illness;Air,Illness;Air,abstract;abstract,Illness is directly related to health as its opposite or concern. Death is linked as a health outcome.,18,,Illness;Death,Illness;Death,1:Illness;2:Death,"[{""position"": 1, ""word"": ""Illness""}, {""position"": 2, ""word"": ""Death""}]",abstract;abstract,Illness;Death,abstract;abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,2,0,0,silver,1,4,,,125.366,,0,4.648,4.649,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Illness is directly related to health as its opposite or concern. Death is linked as a health outcome."",
+  ""guesses"": [""Illness"", ""Death""],
+  ""interpreted_cards"": [""Illness"", ""Death""]
+}
+```
+
+<repair_response>
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Illness is directly related to health as its opposite or concern. Death is linked as a health outcome."",
+  ""guesses"": [""Illness"", ""Death""]
+}",5,,health is related to sickness which can turn out bad,health is related to sickness which can turn out bad,True,,,,,,,,human_clue_giver,5,,health is related to sickness which can turn out bad,True,,2026-07-24T11:51:54.773980,2026-07-24T11:52:54.245706,59.472,2026-07-24T11:51:54.664759
+3460d2d5-c8f0-4f47-89bf-449fe81e1a5b,2026-07-24T12:04:31.662422,BHL,adaptive,human_clue,1,1,human_clue,human_clue,mixed,A,round-1-template-A-9a846e1fb5,"{""Castle"": ""concrete"", ""Illness"": ""abstract"", ""Memory"": ""abstract"", ""Angel"": ""abstract"", ""Ship"": ""concrete"", ""Cake"": ""concrete"", ""Chair"": ""concrete"", ""Time"": ""abstract"", ""Stadium"": ""concrete"", ""Ball"": ""concrete"", ""Penguin"": ""concrete"", ""Point"": ""abstract"", ""Death"": ""abstract"", ""Air"": ""abstract"", ""Dance"": ""abstract"", ""Mouse"": ""concrete""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,travel,travel,2,2,Ship;Air,Ship;Air,Ship;Time,Ship;Time,concrete;abstract,Ship is directly associated with travel as a mode of transportation. Air is linked to travel through air travel.,19,,Ship;Air,Ship;Air,1:Ship;2:Air,"[{""position"": 1, ""word"": ""Ship""}, {""position"": 2, ""word"": ""Air""}]",concrete;abstract,Ship;Air,concrete;abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,2,0,0,silver,1,4,,,40.210,,0,2.663,2.664,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Ship is directly associated with travel as a mode of transportation. Air is linked to travel through air travel."",
+  ""guesses"": [""Ship"", ""Air""],
+  ""interpreted_cards"": [""Ship"", ""Air""]
+}
+```
+
+<repair_response>
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Ship is directly associated with travel as a mode of transportation. Air is linked to travel through air travel."",
+  ""guesses"": [""Ship"", ""Air""],
+  ""interpreted_cards"": [""Ship"", ""Air""]
+}",5,,travel with vehicle through sky,travel with vehicle through sky,True,,,,,,,,human_clue_giver,5,,travel with vehicle through sky,True,,2026-07-24T11:53:50.736192,2026-07-24T11:56:35.701754,164.966,2026-07-24T11:53:50.617961
+3460d2d5-c8f0-4f47-89bf-449fe81e1a5b,2026-07-24T12:04:31.662422,BHL,adaptive,human_clue,1,1,human_clue,human_clue,mixed,A,round-1-template-A-9a846e1fb5,"{""Castle"": ""concrete"", ""Illness"": ""abstract"", ""Memory"": ""abstract"", ""Angel"": ""abstract"", ""Ship"": ""concrete"", ""Cake"": ""concrete"", ""Chair"": ""concrete"", ""Time"": ""abstract"", ""Stadium"": ""concrete"", ""Ball"": ""concrete"", ""Penguin"": ""concrete"", ""Point"": ""abstract"", ""Death"": ""abstract"", ""Air"": ""abstract"", ""Dance"": ""abstract"", ""Mouse"": ""concrete""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,sphere,sphere,1,1,Ball,Ball,Ball,Ball,concrete,Ball is directly associated with sphere as it is a spherical object.,12,,Ball,Ball,1:Ball,"[{""position"": 1, ""word"": ""Ball""}]",concrete,Ball,concrete,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,1,0,0,silver,1,5,,,59.149,,0,2.221,2.222,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Ball is directly associated with sphere as it is a spherical object."",
+  ""guesses"": [""Ball""],
+  ""interpreted_cards"": [""Ball""]
+}
+```
+
+<repair_response>
+{""action"":""guess"",""reasoning"":""Ball is directly associated with sphere as it is a spherical object."",""guesses"":[""Ball""],""interpreted_cards"":[""Ball""]}",5,,its a geometrical shape,its a geometrical shape,True,,,,,,,,human_clue_giver,5,,its a geometrical shape,True,,2026-07-24T11:57:42.564668,2026-07-24T11:57:54.248674,11.684,2026-07-24T11:57:42.458699
