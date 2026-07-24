@@ -1,5 +1,6 @@
 ﻿from datetime import datetime
 from html import escape
+from pathlib import Path
 import re
 
 import streamlit as st
@@ -9,6 +10,7 @@ from core.ai_service import (
     generate_ai_round_reflection,
     generate_ai_hint,
     generate_ai_turn_explanation,
+    generate_ai_wrong_guess_replacements,
     remaining_target_count,
     validate_human_hint_with_history,
 )
@@ -98,10 +100,17 @@ BOARD_WORD_ERROR = (
     "Your explanation mentions a board word. Please describe the relationship without naming specific cards."
 )
 ENGLISH_ONLY_ERROR = "Please write your explanation in English only."
+ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
 
 def screen_consent():
     with st.container(key="consent_document"):
+        with st.container(key="consent_logos"):
+            colaps_col, university_col = st.columns(2, gap="large", vertical_alignment="center")
+            with colaps_col:
+                st.image(str(ASSETS_DIR / "colaps.png"), width=300)
+            with university_col:
+                st.image(str(ASSETS_DIR / "university_duisburg_essen.png"), width=255)
         st.markdown(CONSENT_DOCUMENT)
     with st.container(border=True, key="consent_action_panel"):
         agreed = st.checkbox(
@@ -152,7 +161,7 @@ def screen_welcome():
                     <ol start="4">
                         <li><strong>Avoid bombs:</strong> If anyone picks a bomb, the round ends immediately.</li>
                         <li><strong>4 turns only:</strong> You have a maximum of 4 turns per round to find all {TARGET_COUNT} targets.</li>
-                        <li><strong>Skip:</strong> If the remaining guesses feel too risky, the guesser may stop mid-turn. Correct guesses already made are kept, the remaining guesses are abandoned, and one full skip is consumed.</li>
+                        <li><strong>Skip:</strong> If the remaining guesses feel too risky, the guesser may stop mid-turn. Before skipping, they mark the cards they think the clue probably meant. Correct guesses already made are kept, the remaining guesses are abandoned, and one full skip is consumed.</li>
                     </ol>
                 </div>
                 <div class="guide-card guide-medals">
@@ -242,6 +251,9 @@ def _history_with_pending_ai_guess(pending_review):
             "skipped": bool(pending_review.get("partial_skip")),
             "skipped_by": "ai" if pending_review.get("partial_skip") else "",
             "partial_skip": bool(pending_review.get("partial_skip")),
+            "skip_interpreted_cards": list(
+                pending_review.get("skip_interpreted_cards", [])
+            ),
         }
     )
     return history
@@ -544,6 +556,11 @@ def _sync_reflection_to_round_summary(item):
                     "ai_explanation_blocked_reason",
                     "ai_explanation",
                     "reflection_source",
+                    "wrong_guess_replacements",
+                    "wrong_guess_replacement_actor",
+                    "wrong_guess_replacement_raw_response",
+                    "wrong_guess_replacement_response_time_sec",
+                    "wrong_guess_replacement_attempts",
                 ]:
                     summary_item[key] = item.get(key, "")
 
@@ -582,6 +599,40 @@ def _save_turn_reflection(item, rating, relationship_type, explanation):
     st.session_state.pending_reflection_turn = None
 
 
+def _attach_ai_wrong_guess_replacements(item):
+    if (
+        not item
+        or item.get("bomb_hit")
+        or item.get("guesser") != "ai"
+        or not item.get("neutral_guesses")
+    ):
+        return
+    result = generate_ai_wrong_guess_replacements(
+        st.session_state.board,
+        st.session_state.guesses,
+        item.get("hint", ""),
+        item.get("neutral_guesses", []),
+    )
+    item["wrong_guess_replacements"] = result.get("cards", [])
+    item["wrong_guess_replacement_actor"] = "ai"
+    item["wrong_guess_replacement_raw_response"] = result.get("raw_response", "")
+    item["wrong_guess_replacement_response_time_sec"] = result.get(
+        "response_time_sec", ""
+    )
+    item["wrong_guess_replacement_attempts"] = result.get("attempts", "")
+    _sync_reflection_to_round_summary(item)
+    log_event(
+        "wrong_guess_replacements_recorded",
+        {
+            "actor": "ai",
+            "wrong_guesses": item.get("neutral_guesses", []),
+            "replacement_cards": item.get("wrong_guess_replacements", []),
+            "required_count": len(item.get("neutral_guesses", [])),
+        },
+        turn_number=item.get("turn", ""),
+    )
+
+
 def render_turn_reflection():
     item = _current_pending_reflection_item()
     if not item:
@@ -597,6 +648,11 @@ def render_turn_reflection():
     round_is_closed = bool(
         round_ended_by_bomb or st.session_state.get("round_finished", False)
     )
+    replacement_count = (
+        len(item.get("neutral_guesses", []))
+        if item.get("guesser") == "human" and not round_ended_by_bomb
+        else 0
+    )
     if not item.get("reflection_shown_logged"):
         reflection_start = _now_iso()
         st.session_state.current_reflection_start_time = reflection_start
@@ -611,23 +667,27 @@ def render_turn_reflection():
     render_top_status()
     with st.container(border=True, key="reflection_panel"):
         ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
-        header_body = (
-            escape(ai_explanation)
-            if _share_explanations() and not human_clue_giver and ai_explanation
-            else "Rate the shared understanding and add the general link."
-        )
-        reflection_title = (
-            "Your clue explanation" if human_clue_giver else "AI's clue explanation"
-        )
-        st.markdown(
-            f"""
-            <div class="glass-card compact-card reflection-ai-explanation reflection-compact-head">
-                <div class="panel-title">{reflection_title}</div>
-                <p class="subtle-text" style="margin:0;">{header_body}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        show_reflection_header = human_clue_giver or _share_explanations()
+        if show_reflection_header:
+            header_body = (
+                escape(ai_explanation)
+                if not human_clue_giver and ai_explanation
+                else "Rate the shared understanding and add the general link."
+            )
+            reflection_title = (
+                "Your clue explanation"
+                if human_clue_giver
+                else "AI's clue explanation"
+            )
+            st.markdown(
+                f"""
+                <div class="glass-card compact-card reflection-ai-explanation reflection-compact-head">
+                    <div class="panel-title">{reflection_title}</div>
+                    <p class="subtle-text" style="margin:0;">{header_body}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         explanation_key = f"reflection_explanation_{st.session_state.round}_{item.get('turn')}"
         rating_col = st.container()
 
@@ -652,11 +712,39 @@ def render_turn_reflection():
                 placeholder="Example: Both ideas connect through luck and success.",
                 key=explanation_key,
             )
+        replacement_key = (
+            f"wrong_guess_replacements_{st.session_state.round}_{item.get('turn')}"
+        )
+        replacement_cards = []
+        if replacement_count:
+            replacement_cards = st.multiselect(
+                (
+                    f"If you could choose {replacement_count} other card"
+                    f"{'s' if replacement_count != 1 else ''}, which would you choose?"
+                ),
+                options=[
+                    word
+                    for word in st.session_state.board
+                    if word not in st.session_state.guesses
+                ],
+                max_selections=replacement_count,
+                placeholder=f"Select exactly {replacement_count} replacement card(s)...",
+                key=replacement_key,
+                help=(
+                    "Choose the cards you would have selected instead of your "
+                    "wrong card(s)."
+                ),
+            )
 
         if st.button("Continue", type="primary", use_container_width=True):
             rating = st.session_state[f"reflection_rating_{st.session_state.round}_{item.get('turn')}"]
             if rating is None:
                 st.error("Please select a rating before continuing.")
+                return True
+            if replacement_count and len(replacement_cards) != replacement_count:
+                st.error(
+                    f"Please select exactly {replacement_count} replacement card(s)."
+                )
                 return True
             reflection_end_time = _now_iso()
             reflection_start_time = item.get("reflection_start_time") or st.session_state.get(
@@ -741,6 +829,22 @@ def render_turn_reflection():
                     st.error(BOARD_WORD_ERROR)
                     return True
 
+            if replacement_count:
+                item["wrong_guess_replacements"] = list(replacement_cards)
+                item["wrong_guess_replacement_actor"] = "human"
+                item["wrong_guess_replacement_raw_response"] = ""
+                item["wrong_guess_replacement_response_time_sec"] = ""
+                item["wrong_guess_replacement_attempts"] = ""
+                log_event(
+                    "wrong_guess_replacements_recorded",
+                    {
+                        "actor": "human",
+                        "wrong_guesses": item.get("neutral_guesses", []),
+                        "replacement_cards": replacement_cards,
+                        "required_count": replacement_count,
+                    },
+                    turn_number=item.get("turn", ""),
+                )
             _save_turn_reflection(item, rating, relationship_type, explanation)
             log_event(
                 "reflection_submitted",
@@ -798,6 +902,14 @@ def screen_human_clue():
                 guess_response_time_sec=pending_review.get("guess_response_time_sec"),
                 partial_skip=pending_review.get("partial_skip", False),
                 skipped_by="ai" if pending_review.get("partial_skip") else None,
+                skip_interpreted_cards=pending_review.get(
+                    "skip_interpreted_cards", []
+                ),
+            )
+            _attach_ai_wrong_guess_replacements(
+                st.session_state.interaction_history[-1]
+                if st.session_state.interaction_history
+                else None
             )
             if pending_review.get("partial_skip"):
                 log_event(
@@ -811,6 +923,9 @@ def screen_human_clue():
                             - len(pending_review.get("guesses", [])),
                         ),
                         "guessed_cards": pending_review.get("guesses", []),
+                        "skip_interpreted_cards": pending_review.get(
+                            "skip_interpreted_cards", []
+                        ),
                     },
                     turn_number=st.session_state.round_interactions,
                 )
@@ -990,6 +1105,9 @@ def screen_human_clue():
                 {
                     "action": action,
                     "guesses": guess_result.get("guesses", []),
+                    "skip_interpreted_cards": guess_result.get(
+                        "skip_interpreted_cards", []
+                    ),
                     "guess_rationale": guess_result.get("guess_rationale", ""),
                     "raw_response": guess_result.get("raw_response", ""),
                 },
@@ -1011,9 +1129,22 @@ def screen_human_clue():
                     hint_explanation=st.session_state.get("hint_explanation", ""),
                     hint_time_sec=hint_time_sec,
                     skipped_by="ai",
+                    skip_interpreted_cards=guess_result.get(
+                        "skip_interpreted_cards", []
+                    ),
                     guess_raw_response=guess_result.get("raw_response", ""),
                     guess_time_sec=guess_time_sec,
                     guess_response_time_sec=guess_result.get("response_time_sec"),
+                )
+                log_event(
+                    "skip_used",
+                    {
+                        "skipped_by": "ai",
+                        "skip_interpreted_cards": guess_result.get(
+                            "skip_interpreted_cards", []
+                        ),
+                    },
+                    turn_number=st.session_state.round_interactions,
                 )
                 _clear_current_clue()
                 st.info("AI chose not to risk this clue. One turn was used; please give the next clue.")
@@ -1033,6 +1164,9 @@ def screen_human_clue():
                     "guess_time_sec": guess_time_sec,
                     "guess_response_time_sec": guess_result.get("response_time_sec"),
                     "partial_skip": action == "partial_skip",
+                    "skip_interpreted_cards": guess_result.get(
+                        "skip_interpreted_cards", []
+                    ),
                 }
                 st.rerun()
 
@@ -1185,13 +1319,45 @@ def screen_human_guesser():
                 st.rerun()
 
     if st.session_state.hint:
+        skip_interpretation = []
+        if can_skip_current_clue():
+            remaining_guess_slots = max(
+                1,
+                int(st.session_state.hint_number or 1)
+                - len(st.session_state.pending_guesses),
+            )
+            unavailable_cards = set(st.session_state.guesses).union(
+                st.session_state.pending_guesses
+            )
+            skip_interpretation = st.multiselect(
+                "Before skipping, which card(s) do you think this clue was meant for?",
+                options=[
+                    word
+                    for word in st.session_state.board
+                    if word not in unavailable_cards
+                ],
+                max_selections=remaining_guess_slots,
+                placeholder=(
+                    f"Select up to {remaining_guess_slots} likely remaining card(s)..."
+                ),
+                key=(
+                    f"skip_interpretation_{st.session_state.round}_"
+                    f"{st.session_state.round_interactions}"
+                ),
+                help=(
+                    "Choose your best interpretation even if you are not confident. "
+                    "This does not count as an additional guess."
+                ),
+            )
         if st.button(
             "Stop guessing and use 1 skip",
             use_container_width=True,
             disabled=not can_skip_current_clue(),
         ):
             pending_meta = st.session_state.get("pending_hint_meta") or {}
-            if st.session_state.pending_guesses and not rationale_is_valid:
+            if not skip_interpretation:
+                st.error("Please select at least one card you think the clue was meant for.")
+            elif st.session_state.pending_guesses and not rationale_is_valid:
                 st.error("Please write a valid 3-30 word English explanation before using a partial skip.")
             else:
                 submitted_guesses = list(st.session_state.pending_guesses)
@@ -1214,6 +1380,7 @@ def screen_human_guesser():
                         expected_guesses=st.session_state.get("hint_expected_guesses", []),
                         partial_skip=True,
                         skipped_by="human",
+                        skip_interpreted_cards=skip_interpretation,
                         **common,
                     )
                     _attach_ai_explanation_to_latest_turn()
@@ -1224,6 +1391,7 @@ def screen_human_guesser():
                             "completed_guesses": len(submitted_guesses),
                             "skipped_guesses": max(0, st.session_state.hint_number - len(submitted_guesses)),
                             "guessed_cards": submitted_guesses,
+                            "skip_interpreted_cards": skip_interpretation,
                         },
                         turn_number=st.session_state.round_interactions,
                     )
@@ -1234,7 +1402,16 @@ def screen_human_guesser():
                         st.session_state.hint_targets,
                         st.session_state.get("hint_expected_guesses", []),
                         skipped_by="human",
+                        skip_interpreted_cards=skip_interpretation,
                         **common,
+                    )
+                    log_event(
+                        "skip_used",
+                        {
+                            "skipped_by": "human",
+                            "skip_interpreted_cards": skip_interpretation,
+                        },
+                        turn_number=st.session_state.round_interactions,
                     )
                     _attach_ai_explanation_to_latest_turn()
                 _clear_current_clue()

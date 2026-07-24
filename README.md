@@ -73,6 +73,10 @@ At most two skips are available per round, and a skip is unavailable on the fina
 
 Humans can stop mid-turn with **Stop guessing and use 1 skip**. The AI may return `action="partial_skip"` with fewer than `N` strong guesses when the remaining choices are dangerously uncertain. Partial skip is preferred over a serious bomb risk, but is accepted only when a skip remains and `0 < completed guesses < N`.
 
+Before either a human or the AI uses a full or partial skip, it records the remaining unselected cards it believes the clue-giver most likely intended. Already selected cards are excluded, and the maximum selection count equals the number of abandoned guesses. These `skip_interpreted_cards` are stored separately from completed guesses. Adaptive sessions may show and reuse this interpretation; baseline sessions collect it for analysis but never display it or include it in later prompts.
+
+After a non-bomb turn containing one or more wrong neutral guesses, the guesser also records exactly the same number of alternative cards they would choose instead. Humans answer this in the reflection step; the AI answers through a separate post-outcome call after learning which of its choices were wrong. Adaptive sessions share and reuse these alternatives, while baseline sessions only store them.
+
 ## Input validation
 
 - Human clues must be exactly one English word.
@@ -125,6 +129,8 @@ Important turn-level fields include:
 - correct, incorrect, neutral, and bomb selections;
 - `outcome`, alignment status, error type, and score contribution;
 - `skipped`, `skipped_by`, `partial_skip`, `completed_guesses`, and `skipped_guesses`;
+- `skip_interpreted_cards`, their word types, and interpretation count;
+- counterfactual wrong-guess replacements, actor, word types, count, and AI-call metadata;
 - raw and sanitized human/AI explanations plus validation status and block reason;
 - reflection rating and timing;
 - raw LLM response, parsed response, model, temperature, retries, fallback flag, and latency;

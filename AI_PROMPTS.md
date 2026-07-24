@@ -142,7 +142,7 @@ ai_guess(...)
 
 The AI sees only available card labels, the human clue, `N`, skip availability, and condition-appropriate history. It never receives the current hidden roles while acting as guesser.
 
-### Normal and partial-skip JSON
+### Normal and skip JSON
 
 ```json
 {
@@ -158,7 +158,8 @@ or:
 {
   "action": "partial_skip",
   "reasoning": "The first two are strong; the remaining choice risks a bomb.",
-  "guesses": ["Exact board card", "Exact board card"]
+  "guesses": ["Exact board card", "Exact board card"],
+  "interpreted_cards": ["Likely intended card", "Another likely intended card"]
 }
 ```
 
@@ -171,33 +172,29 @@ A partial skip is accepted only when:
 
 Completed guesses are retained and scored; the remaining guesses are abandoned; one full skip is consumed.
 
-### Literal control responses
+For both `action="skip"` and `action="partial_skip"`, `interpreted_cards` contains only unselected exact board cards that the AI thinks the clue-giver probably meant. Its maximum length equals the number of abandoned guesses (`N - completed guesses`). It is stored separately from cards the AI actually committed as guesses.
 
-The model may instead return:
+### Control responses
+
+The model may instead return the reroll literal:
 
 ```text
 REROLL_HINT
 ```
 
-or:
-
-```text
-SKIP_CLUE
-```
-
-`SKIP_CLUE` is a full skip with no completed guesses. Control responses are honored only when the corresponding action remains available.
+Full skip is represented by JSON `action="skip"` with no completed guesses and a non-empty `interpreted_cards` list. Actions are honored only when the corresponding action remains available.
 
 ### Parsing and repair
 
-1. Recognize literal reroll/full-skip tokens.
+1. Recognize the literal reroll token.
 2. Parse JSON and filter guesses against exact available board cards.
-3. Read `action` as `guess` or `partial_skip`.
+3. Read `action` as `guess`, `partial_skip`, or `skip`.
 4. If JSON fails, attempt conservative comma/newline token parsing.
 5. If a normal response contains fewer than `N` usable guesses, make one JSON repair call at temperature `0.0`.
 6. Do not repair a valid partial skip into unsafe filler guesses.
 7. If no guesses remain usable, fall back to an allowed full skip/reroll rather than inventing cards.
 
-Primary-call temperature is `0.2`; forced JSON mode is disabled so literal control tokens remain possible.
+Primary-call temperature is `0.2`; forced JSON mode is disabled so the reroll literal remains possible.
 
 ### Condition-specific visibility
 
@@ -212,6 +209,8 @@ Primary-call temperature is `0.2`; forced JSON mode is disabled so literal contr
 - response and total guess timing;
 - retry/repair metadata;
 - full/partial skip fields and actor;
+- the guesser's separate `skip_interpreted_cards`, word types, and count;
+- post-outcome replacement cards for non-bomb wrong guesses, including raw-response and timing metadata;
 - completed and abandoned guess counts;
 - correctness, alignment, error type, and bomb outcome.
 

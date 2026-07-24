@@ -157,6 +157,8 @@ def format_interaction_history(history):
             f"clue=\"{item.get('hint', '')}\" N={item.get('hint_number', '')} | "
             f"intended=[{', '.join(item.get('intended_targets', [])) or 'none'}] | "
             f"expected_guesses=[{', '.join(item.get('expected_guesses', [])) or 'none'}] | "
+            f"skip_interpretation=[{', '.join(item.get('skip_interpreted_cards', [])) or 'none'}] | "
+            f"wrong_guess_replacements=[{', '.join(item.get('wrong_guess_replacements', [])) or 'none'}] | "
             f"guessed=[{guesses}] | correct=[{correct_guesses}] | outcome={outcome}"
         )
     return "\n".join(lines)
@@ -322,6 +324,12 @@ def format_round_memory(round_summaries):
                     "bomb_guess": item.get("bomb_guess"),
                     "outcome": item.get("outcome"),
                     "skipped": item.get("skipped", False),
+                    "skip_interpreted_cards": item.get(
+                        "skip_interpreted_cards", []
+                    ),
+                    "wrong_guess_replacements": item.get(
+                        "wrong_guess_replacements", []
+                    ),
                 }
                 for item in summary.get("interactions", [])
             ],
@@ -349,6 +357,12 @@ def _memory_interaction_lines(interactions, round_label="current"):
         ) or "none"
         correct = ", ".join(item.get("correct_guesses", [])) or "none"
         neutral = ", ".join(item.get("neutral_guesses", [])) or "none"
+        skip_interpretation = (
+            ", ".join(item.get("skip_interpreted_cards", [])) or "none"
+        )
+        wrong_replacements = (
+            ", ".join(item.get("wrong_guess_replacements", [])) or "none"
+        )
         rationale = str(item.get("guess_rationale", "") or "").strip()
         human_rating = item.get("human_understanding_rating")
         human_relationship = str(item.get("human_relationship_type", "") or "").strip()
@@ -370,6 +384,14 @@ def _memory_interaction_lines(interactions, round_label="current"):
         ]
         if rationale:
             parts.append(f'  guesser rationale: "{rationale}"')
+        if item.get("skipped") or item.get("outcome") in {"skip", "partial_skip"}:
+            parts.append(
+                f"  guesser's likely intended cards at skip=[{skip_interpretation}]"
+            )
+        if item.get("wrong_guess_replacements"):
+            parts.append(
+                f"  guesser would replace wrong choices with=[{wrong_replacements}]"
+            )
         if human_rating:
             parts.append(f"  human understanding rating: {human_rating}/5")
         if human_relationship or human_explanation:
@@ -888,19 +910,21 @@ PERSISTENT TEAMMATE MEMORY
 
 WHEN TO REFUSE
 - Output exactly REROLL_HINT only if the clue is genuinely meaningless or unrelated to every available board word. Last resort.
-- Output exactly SKIP_CLUE only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort.
+- Use action="skip" only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort.
 - If one or more guesses are strong but the remaining guesses would be unsafe, return action="partial_skip" with only the strong guesses. This consumes one full skip, but is better than risking a bomb.
+- For action="skip", include up to N unselected cards in "interpreted_cards".
+- For action="partial_skip", include only cards you have NOT already guessed, with at most N minus the number of completed guesses. These are the remaining cards you think the clue-giver most likely meant.
 
 OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON. Schema:
 {
-  "action": "guess" or "partial_skip",
+  "action": "guess", "partial_skip", or "skip",
   "reasoning": "<3 to 30 words explaining the direct link for each guess and, if useful, a close alternative you rejected; shown to the player and logged>",
-  "guesses": ["<exact board word>", "..."]
+  "guesses": ["<exact board word>", "..."],
+  "interpreted_cards": ["<exact board word you think the clue was meant for>", "..."]
 }
 
-OR, instead of JSON, exactly one of these two literal tokens on a single line:
+OR, instead of JSON, exactly this literal token on a single line:
 REROLL_HINT
-SKIP_CLUE
 """
 
 BASELINE_GUESS_SYSTEM_PROMPT = GUESS_SYSTEM_PROMPT.replace(
@@ -973,8 +997,8 @@ def build_guess_user_prompt(
         f"{round_memory}"
         f"{teammate_memory}\n\n"
         f"{feedback_block}\n\n"
-        "Default to guessing. REROLL_HINT and SKIP_CLUE are last resorts. "
-        "Respond with the JSON object OR a single literal token."
+        "Default to guessing. REROLL_HINT and action=skip are last resorts. "
+        "Respond with the JSON object or the REROLL_HINT literal."
     )
 
 
@@ -1043,7 +1067,93 @@ def parse_guess_action(raw_text):
     if not isinstance(data, dict):
         return "guess"
     action = str(data.get("action", "guess") or "guess").strip().lower()
-    return action if action in {"guess", "partial_skip"} else "guess"
+    return action if action in {"guess", "partial_skip", "skip"} else "guess"
+
+
+def parse_interpreted_cards(raw_text, available_board, max_cards):
+    try:
+        data = json.loads(raw_text)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    values = data.get("interpreted_cards", []) or []
+    if not isinstance(values, list):
+        return []
+    board_lookup = {word.lower(): word for word in available_board}
+    interpreted = []
+    seen = set()
+    for value in values:
+        key = str(value).strip().lower()
+        if key in board_lookup and key not in seen:
+            interpreted.append(board_lookup[key])
+            seen.add(key)
+        if len(interpreted) >= max_cards:
+            break
+    return interpreted
+
+
+WRONG_GUESS_REPLACEMENT_SYSTEM_PROMPT = """You are the AI guesser in a cooperative word-association game.
+The result of your completed turn has now revealed that one or more of your selected cards were wrong neutral cards. No bomb was selected.
+
+Choose exactly the requested number of different replacement cards that you would have selected instead, using only the available card labels provided. Do not choose any card already selected in that turn.
+
+Return strict JSON only:
+{"replacement_cards": ["<exact available card>", "..."]}
+"""
+
+
+def generate_ai_wrong_guess_replacements(
+    board,
+    previous_guesses,
+    hint,
+    wrong_guesses,
+):
+    replacement_count = len(wrong_guesses or [])
+    available_cards = [
+        word for word in board if word not in set(previous_guesses or [])
+    ]
+    meta = {
+        "cards": [],
+        "raw_response": "",
+        "response_time_sec": 0.0,
+        "attempts": 0,
+    }
+    if replacement_count <= 0 or not available_cards:
+        return meta
+    try:
+        raw, elapsed = call_openai_chat(
+            WRONG_GUESS_REPLACEMENT_SYSTEM_PROMPT,
+            (
+                f'Clue: "{hint}"\n'
+                f"Wrong cards from your completed turn: {', '.join(wrong_guesses)}\n"
+                f"Available replacement cards: {', '.join(available_cards)}\n"
+                f"Number of replacement cards required: {replacement_count}\n"
+            ),
+            temperature=0.0,
+            model=GUESS_MODEL_NAME,
+            json_mode=True,
+        )
+        meta["raw_response"] = raw
+        meta["response_time_sec"] = round(elapsed, 3)
+        meta["attempts"] = 1
+        data = json.loads(raw)
+        values = data.get("replacement_cards", []) if isinstance(data, dict) else []
+        lookup = {word.lower(): word for word in available_cards}
+        cards = []
+        seen = set()
+        for value in values if isinstance(values, list) else []:
+            key = str(value).strip().lower()
+            if key in lookup and key not in seen:
+                cards.append(lookup[key])
+                seen.add(key)
+            if len(cards) >= replacement_count:
+                break
+        meta["cards"] = cards if len(cards) == replacement_count else []
+    except Exception as error:
+        meta["raw_response"] = f"<replacement_error: {error}>"
+        meta["attempts"] = max(1, meta["attempts"])
+    return meta
 
 
 def ai_guess(
@@ -1100,14 +1210,27 @@ def ai_guess(
             return {"action": "skip", "guesses": [], "guess_rationale": "", **meta}
 
         valid_guesses, guess_rationale = parse_guess_json(raw, available_board, max_guesses)
+        interpreted_cards = parse_interpreted_cards(raw, available_board, max_guesses)
         requested_action = parse_guess_action(raw)
+        if (
+            requested_action == "skip"
+            and can_skip
+            and remaining_skips > 0
+            and interpreted_cards
+        ):
+            return {
+                "action": "skip",
+                "guesses": [],
+                "skip_interpreted_cards": interpreted_cards,
+                "guess_rationale": guess_rationale,
+                **meta,
+            }
         partial_skip_is_valid = (
             requested_action == "partial_skip"
             and can_skip
             and remaining_skips > 0
             and 0 < len(valid_guesses) < min(max_guesses, len(available_board))
         )
-
         if not valid_guesses:
             tokens = [
                 token.strip().lower()
@@ -1147,6 +1270,9 @@ def ai_guess(
                 repaired_guesses, repair_rationale = parse_guess_json(
                     repair_raw, available_board, max_guesses
                 )
+                repaired_interpretation = parse_interpreted_cards(
+                    repair_raw, available_board, max_guesses
+                )
                 meta["raw_response"] = f"{raw}\n\n<repair_response>\n{repair_raw}"
                 meta["response_time_sec"] = round(
                     (meta["response_time_sec"] or 0.0) + repair_elapsed, 3
@@ -1155,6 +1281,8 @@ def ai_guess(
                 if len(repaired_guesses) > len(valid_guesses):
                     valid_guesses = repaired_guesses
                     guess_rationale = repair_rationale or guess_rationale
+                if len(repaired_interpretation) > len(interpreted_cards):
+                    interpreted_cards = repaired_interpretation
             except Exception as error:
                 meta["raw_response"] = (
                     f"{meta['raw_response']}\n\n<repair_error: {error}>"
@@ -1179,6 +1307,12 @@ def ai_guess(
             )
 
         if valid_guesses:
+            if partial_skip_is_valid:
+                selected = set(valid_guesses)
+                remaining_slots = max(0, required_guess_count - len(valid_guesses))
+                interpreted_cards = [
+                    card for card in interpreted_cards if card not in selected
+                ][:remaining_slots]
             if not guess_rationale:
                 guess_rationale = (
                     f"I chose {', '.join(valid_guesses[:max_guesses])} because they seemed closest to the clue {hint}."
@@ -1190,6 +1324,9 @@ def ai_guess(
                     else "guess"
                 ),
                 "guesses": valid_guesses[:max_guesses],
+                "skip_interpreted_cards": (
+                    interpreted_cards if partial_skip_is_valid else []
+                ),
                 "guess_rationale": guess_rationale,
                 **meta,
             }

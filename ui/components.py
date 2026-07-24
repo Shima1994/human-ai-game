@@ -210,6 +210,8 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
     rows = []
     for index, item in enumerate(history, start=1):
         guesses = item.get("guesses", [])
+        skip_interpreted_cards = item.get("skip_interpreted_cards", [])
+        wrong_guess_replacements = item.get("wrong_guess_replacements", [])
         correct_guesses = item.get("correct_guesses", [])
         intended_targets = item.get("intended_targets", [])
         expected_guesses = item.get("expected_guesses", [])
@@ -218,6 +220,10 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
         clue_giver = escape((item.get("clue_giver") or "-").title())
         guesser = escape((item.get("guesser") or "-").title())
         is_skip = item.get("outcome") == "skip" or item.get("skipped")
+        is_partial_skip = bool(
+            item.get("partial_skip") or item.get("outcome") == "partial_skip"
+        )
+        is_full_skip = bool(is_skip and not is_partial_skip)
         if item.get("bomb_hit"):
             outcome = "Bomb"
             outcome_class = "history-outcome-bomb"
@@ -269,7 +275,23 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
                 return "neutral"
             return ""
 
-        guesses_row = chip_row("Guesses", guesses, class_for_value=guess_class)
+        guesses_row = (
+            ""
+            if is_full_skip
+            else chip_row("Guesses", guesses, class_for_value=guess_class)
+        )
+        skip_interpretation_row = (
+            chip_row("Guesser thought", skip_interpreted_cards)
+            if share_explanations and is_skip and skip_interpreted_cards
+            else ""
+        )
+        replacement_row = (
+            chip_row("Would choose instead", wrong_guess_replacements)
+            if share_explanations
+            and not item.get("bomb_hit")
+            and wrong_guess_replacements
+            else ""
+        )
         rationale_row = ""
         if share_explanations and guess_rationale:
             rationale_row = (
@@ -281,14 +303,17 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
         skip_note = ""
         if is_skip:
             skipped_by = escape((item.get("skipped_by") or guesser).title())
-            if item.get("partial_skip") or item.get("outcome") == "partial_skip":
+            if is_partial_skip:
                 remaining = item.get("skipped_guesses", max(0, int(item.get("hint_number", 0) or 0) - len(guesses)))
                 skip_note = (
                     f"<div class='history-skip-note'>{skipped_by} kept the completed guesses and skipped "
                     f"{remaining} remaining guess(es). One full skip was used.</div>"
                 )
             else:
-                skip_note = f"<div class='history-skip-note'>{skipped_by} asked for the next clue. One full skip was used.</div>"
+                skip_note = (
+                    f"<div class='history-skip-note'>{skipped_by} selected no cards, "
+                    "asked for the next clue, and used one full skip.</div>"
+                )
 
         rows.append(
             "<div class='history-row'>"
@@ -305,6 +330,8 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
             f"{intended_row if share_explanations and (show_ai_intended or item.get('clue_giver') == 'human') else ''}"
             f"{expected_row if share_explanations and expected_guesses and (show_ai_intended or item.get('clue_giver') == 'human') else ''}"
             f"{guesses_row}"
+            f"{skip_interpretation_row}"
+            f"{replacement_row}"
             f"{rationale_row}"
             f"{skip_note}"
             "</div>"

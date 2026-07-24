@@ -475,11 +475,28 @@ def inject_css():
         .st-key-consent_document [data-testid="stMarkdownContainer"] > h1,
         .st-key-debriefing_document [data-testid="stMarkdownContainer"] > h1 {
             font-family: var(--font-sans);
-            font-size: clamp(1.65rem, 3vw, 2.35rem);
-            line-height: 1.18;
+            font-size: clamp(1.55rem, 2.5vw, 2.05rem);
+            line-height: 1.22;
             letter-spacing: -0.035em;
-            margin: 0 0 0.85rem 0;
+            margin: 0 auto 0.85rem auto;
             color: #12395f;
+            text-align: center;
+            text-wrap: balance;
+        }
+        .st-key-consent_logos {
+            margin: 0 auto 1.25rem auto;
+            padding-bottom: 1.15rem;
+            border-bottom: 1px solid rgba(29, 94, 168, 0.14);
+        }
+        .st-key-consent_logos [data-testid="stImage"] {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 112px;
+        }
+        .st-key-consent_logos img {
+            max-width: 100%;
+            height: auto;
         }
         .st-key-consent_document [data-testid="stMarkdownContainer"] > h2,
         .st-key-debriefing_document [data-testid="stMarkdownContainer"] > h2 {
@@ -500,6 +517,12 @@ def inject_css():
         .st-key-consent_document [data-testid="stMarkdownContainer"] p,
         .st-key-debriefing_document [data-testid="stMarkdownContainer"] p {
             margin: 0 0 1rem 0;
+        }
+        .st-key-consent_document [data-testid="stMarkdownContainer"] > h2:first-of-type + p {
+            text-align: center;
+            line-height: 1.65;
+            margin-left: auto;
+            margin-right: auto;
         }
         .st-key-consent_document [data-testid="stMarkdownContainer"] li,
         .st-key-debriefing_document [data-testid="stMarkdownContainer"] li {

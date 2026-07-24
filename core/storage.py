@@ -145,6 +145,16 @@ INTERACTION_LOG_FIELDS = [
     "skipped",
     "skipped_by",
     "partial_skip",
+    "skip_interpreted_cards",
+    "skip_interpreted_word_types",
+    "skip_interpreted_count",
+    "wrong_guess_replacements",
+    "wrong_guess_replacement_word_types",
+    "wrong_guess_replacement_count",
+    "wrong_guess_replacement_actor",
+    "wrong_guess_replacement_raw_response",
+    "wrong_guess_replacement_response_time_sec",
+    "wrong_guess_replacement_attempts",
     "completed_guesses",
     "skipped_guesses",
     "bomb_hit",
@@ -294,6 +304,16 @@ TURNS_LOG_FIELDS = [
     "turn_end_time",
     "turn_duration_seconds",
     "partial_skip",
+    "skip_interpreted_cards",
+    "skip_interpreted_word_types",
+    "skip_interpreted_count",
+    "wrong_guess_replacements",
+    "wrong_guess_replacement_word_types",
+    "wrong_guess_replacement_count",
+    "wrong_guess_replacement_actor",
+    "wrong_guess_replacement_raw_response",
+    "wrong_guess_replacement_response_time_sec",
+    "wrong_guess_replacement_attempts",
     "completed_guesses",
     "skipped_guesses",
     "reflection_shown",
@@ -693,6 +713,24 @@ def clean_interaction_history(history):
                 "skipped": bool(item.get("skipped", False)),
                 "skipped_by": item.get("skipped_by", ""),
                 "partial_skip": bool(item.get("partial_skip", False)),
+                "skip_interpreted_cards": list(
+                    item.get("skip_interpreted_cards", [])
+                ),
+                "wrong_guess_replacements": list(
+                    item.get("wrong_guess_replacements", [])
+                ),
+                "wrong_guess_replacement_actor": item.get(
+                    "wrong_guess_replacement_actor", ""
+                ),
+                "wrong_guess_replacement_raw_response": item.get(
+                    "wrong_guess_replacement_raw_response", ""
+                ),
+                "wrong_guess_replacement_response_time_sec": item.get(
+                    "wrong_guess_replacement_response_time_sec", ""
+                ),
+                "wrong_guess_replacement_attempts": item.get(
+                    "wrong_guess_replacement_attempts", ""
+                ),
                 "completed_guesses": item.get("completed_guesses", len(guesses)),
                 "skipped_guesses": item.get("skipped_guesses", 0),
                 "bomb_hit": bool(item.get("bomb_hit", False)),
@@ -1130,6 +1168,34 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "turn_end_time": item.get("turn_end_time", ""),
         "turn_duration_seconds": _format_optional_float(item.get("turn_duration_seconds", "")),
         "partial_skip": str(bool(item.get("partial_skip", False))).lower(),
+        "skip_interpreted_cards": _json(item.get("skip_interpreted_cards", [])),
+        "skip_interpreted_word_types": _json(
+            _types_for_words(item.get("skip_interpreted_cards", []), word_type_per_card)
+        ),
+        "skip_interpreted_count": len(item.get("skip_interpreted_cards", [])),
+        "wrong_guess_replacements": _json(
+            item.get("wrong_guess_replacements", [])
+        ),
+        "wrong_guess_replacement_word_types": _json(
+            _types_for_words(
+                item.get("wrong_guess_replacements", []), word_type_per_card
+            )
+        ),
+        "wrong_guess_replacement_count": len(
+            item.get("wrong_guess_replacements", [])
+        ),
+        "wrong_guess_replacement_actor": item.get(
+            "wrong_guess_replacement_actor", ""
+        ),
+        "wrong_guess_replacement_raw_response": item.get(
+            "wrong_guess_replacement_raw_response", ""
+        ),
+        "wrong_guess_replacement_response_time_sec": _format_optional_float(
+            item.get("wrong_guess_replacement_response_time_sec", "")
+        ),
+        "wrong_guess_replacement_attempts": item.get(
+            "wrong_guess_replacement_attempts", ""
+        ),
         "completed_guesses": item.get("completed_guesses", len(guessed)),
         "skipped_guesses": item.get("skipped_guesses", 0),
         "reflection_shown": str(bool(item.get("reflection_source"))).lower(),
@@ -1404,6 +1470,22 @@ def log_round(participant_id):
                 int(item["skipped"]),
                 item["skipped_by"],
                 int(item["partial_skip"]),
+                ";".join(item.get("skip_interpreted_cards", [])),
+                _join_word_types(
+                    item.get("skip_interpreted_cards", []), word_type_per_card
+                ),
+                len(item.get("skip_interpreted_cards", [])),
+                ";".join(item.get("wrong_guess_replacements", [])),
+                _join_word_types(
+                    item.get("wrong_guess_replacements", []), word_type_per_card
+                ),
+                len(item.get("wrong_guess_replacements", [])),
+                item.get("wrong_guess_replacement_actor", ""),
+                item.get("wrong_guess_replacement_raw_response", ""),
+                _format_optional_float(
+                    item.get("wrong_guess_replacement_response_time_sec", "")
+                ),
+                item.get("wrong_guess_replacement_attempts", ""),
                 item["completed_guesses"],
                 item["skipped_guesses"],
                 int(item["bomb_hit"]),

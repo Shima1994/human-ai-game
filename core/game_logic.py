@@ -313,9 +313,11 @@ def record_interaction(
     guess_response_time_sec=None,
     partial_skip=False,
     skipped_by=None,
+    skip_interpreted_cards=None,
 ):
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
+    skip_interpreted_cards = skip_interpreted_cards or []
     guess_rationale = (guess_rationale or "").strip()
     guess_order = [
         {"position": position, "word": guess}
@@ -411,6 +413,12 @@ def record_interaction(
             "skipped": bool(partial_skip),
             "skipped_by": (skipped_by or guesser) if partial_skip else "",
             "partial_skip": bool(partial_skip),
+            "skip_interpreted_cards": skip_interpreted_cards if partial_skip else [],
+            "wrong_guess_replacements": [],
+            "wrong_guess_replacement_actor": "",
+            "wrong_guess_replacement_raw_response": "",
+            "wrong_guess_replacement_response_time_sec": "",
+            "wrong_guess_replacement_attempts": "",
             "completed_guesses": len(guesses),
             "skipped_guesses": max(0, int(hint_number or 0) - len(guesses)) if partial_skip else 0,
             "alignment_status": alignment_status,
@@ -491,9 +499,11 @@ def record_skip(
     guess_raw_response="",
     guess_time_sec=None,
     guess_response_time_sec=None,
+    skip_interpreted_cards=None,
 ):
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
+    skip_interpreted_cards = skip_interpreted_cards or []
     guess_rationale = (guess_rationale or "").strip()
     guess_order = []
     turn_end = datetime.utcnow()
@@ -537,6 +547,12 @@ def record_skip(
             "skipped": True,
             "skipped_by": skipped_by,
             "partial_skip": False,
+            "skip_interpreted_cards": skip_interpreted_cards,
+            "wrong_guess_replacements": [],
+            "wrong_guess_replacement_actor": "",
+            "wrong_guess_replacement_raw_response": "",
+            "wrong_guess_replacement_response_time_sec": "",
+            "wrong_guess_replacement_attempts": "",
             "completed_guesses": 0,
             "skipped_guesses": int(hint_number or 0),
             "ai_understanding_rating_before": None,
@@ -676,6 +692,22 @@ def append_ai_round_summary():
                     "skipped": bool(item.get("skipped", False)),
                     "skipped_by": item.get("skipped_by"),
                     "partial_skip": bool(item.get("partial_skip", False)),
+                    "skip_interpreted_cards": list(item.get("skip_interpreted_cards", [])),
+                    "wrong_guess_replacements": list(
+                        item.get("wrong_guess_replacements", [])
+                    ),
+                    "wrong_guess_replacement_actor": item.get(
+                        "wrong_guess_replacement_actor", ""
+                    ),
+                    "wrong_guess_replacement_raw_response": item.get(
+                        "wrong_guess_replacement_raw_response", ""
+                    ),
+                    "wrong_guess_replacement_response_time_sec": item.get(
+                        "wrong_guess_replacement_response_time_sec", ""
+                    ),
+                    "wrong_guess_replacement_attempts": item.get(
+                        "wrong_guess_replacement_attempts", ""
+                    ),
                     "completed_guesses": item.get("completed_guesses", len(item.get("guesses", []))),
                     "skipped_guesses": item.get("skipped_guesses", 0),
                     "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),

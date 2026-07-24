@@ -3,8 +3,10 @@ CONSENT_DOCUMENT = """
 
 ## Investigating Intersubjective Alignment in Human–AI Collaboration Through a Word Association Game
 
-Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)<br>
-Department of Human-centered Computing and Cognitive Science<br>
+Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)
+
+Department of Human-centered Computing and Cognitive Science
+
 July 2026
 
 ## Information for Participants
@@ -42,7 +44,7 @@ The study will collect anonymous interaction data generated during the game, inc
 - game condition and session ID;
 - round and turn numbers;
 - assigned roles of human and AI;
-- clues, clue numbers, guesses, intended cards, and selected cards;
+- clues, clue numbers, guesses, intended cards, selected cards, likely intended cards reported when a skip is used, and alternative cards reported after non-bomb wrong guesses;
 - performance measures such as correct guesses, errors, score, and medals;
 - alignment measures between intended cards and guessed cards;
 - short rating responses and required reflection texts during relevant game steps;
@@ -76,18 +78,11 @@ This study is considered low risk. You will interact with a word association gam
 
 ### 10. Who can I contact if I have questions?
 
-If you have any questions about the study, please contact:<br>
-Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)
+If you have any questions about the study, please use the contact details listed at the top of this information sheet.
 
 ---
 
-# CONSENT FORM
-
-## Investigating Intersubjective Alignment in Human–AI Collaboration Through a Word Association Game
-
-Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)<br>
-Department of Human-centered Computing and Cognitive Science<br>
-July 2026
+## Consent Form
 
 ## PARTICIPATION IN THIS RESEARCH STUDY IS VOLUNTARY
 
@@ -102,17 +97,10 @@ July 2026
 - I understand that no directly identifying personal information will be collected in the game data.
 - I understand that anonymized data may be used for academic analysis, the Master’s thesis, possible academic publications, and future research.
 - I consent voluntarily to participate in this study.
-
-For information, please contact:<br>
-Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)
 """
 
 
 DEBRIEFING_DOCUMENT = """
-Contact Information:<br>
-Shima Ghasempour - [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)<br>
-Department of Human-centered Computing and Cognitive Science
-
 # Debriefing
 
 ## Study: “Investigating Intersubjective Alignment in Human–AI Collaboration Through a Word Association Game”
@@ -139,10 +127,6 @@ Yes. Participants were assigned to one of two technical versions of the game:
 The core game mechanics were intentionally identical across conditions. Participants were not told which technical condition they were assigned to during the study to avoid influencing their behaviour.
 
 ### What happens to your data?
-
-Contact Information:<br>
-Shima Ghasempour - [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)<br>
-Department of Human-centered Computing and Cognitive Science
 
 All data has been anonymized and will be used exclusively for research purposes. Anonymized data may be shared via open data repositories (e.g. zenodo) to promote open science.
 
