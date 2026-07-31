@@ -6,6 +6,7 @@ import re
 import streamlit as st
 
 from core.ai_service import (
+    AIClueGenerationError,
     ai_guess,
     generate_ai_round_reflection,
     generate_ai_hint,
@@ -380,18 +381,32 @@ def _clear_current_clue():
 
 def _generate_and_store_ai_hint():
     hint_start_time = _now_iso()
-    st.session_state.current_hint_start_time = hint_start_time
-    with st.spinner("AI is generating a clue..."):
-        hint_result = generate_ai_hint(
-            st.session_state.target_words,
-            st.session_state.bomb_words,
-            st.session_state.neutral_words,
-            st.session_state.word_type,
-            st.session_state.interaction_history,
-            st.session_state.used_hints,
-            st.session_state.ai_round_summaries,
-            condition=st.session_state.get("condition", "adaptive"),
+    try:
+        with st.spinner("AI is generating a clue..."):
+            hint_result = generate_ai_hint(
+                st.session_state.target_words,
+                st.session_state.bomb_words,
+                st.session_state.neutral_words,
+                st.session_state.word_type,
+                st.session_state.interaction_history,
+                st.session_state.used_hints,
+                st.session_state.ai_round_summaries,
+                condition=st.session_state.get("condition", "adaptive"),
+            )
+    except AIClueGenerationError as error:
+        st.session_state.current_hint_start_time = ""
+        log_event(
+            "ai_clue_generation_failed",
+            {
+                "error": str(error),
+                "attempts": error.attempts,
+                "last_raw_response": error.last_raw,
+                "response_time_sec": error.response_time_sec,
+            },
+            turn_number=st.session_state.round_interactions + 1,
         )
+        st.error("Failed to generate a valid AI clue after 3 attempts. Please try again.")
+        return False
     hint_end_time = _now_iso()
     hint_time_sec = _seconds_between(hint_start_time, hint_end_time)
     st.session_state.hint = hint_result.get("hint", "")
@@ -399,6 +414,7 @@ def _generate_and_store_ai_hint():
     st.session_state.hint_targets = hint_result.get("intended_targets", [])
     st.session_state.hint_expected_guesses = hint_result.get("expected_guesses", [])
     st.session_state.hint_explanation = hint_result.get("explanation", "")
+    st.session_state.current_hint_start_time = hint_start_time
     st.session_state.current_turn_start_time = hint_start_time
     st.session_state.current_guess_start_time = hint_end_time
     st.session_state.pending_hint_meta = {
@@ -406,8 +422,8 @@ def _generate_and_store_ai_hint():
         "hint_time_sec": hint_time_sec,
         "response_time_sec": hint_result.get("response_time_sec"),
         "attempts": hint_result.get("attempts"),
-        "used_fallback": hint_result.get("used_fallback", False),
     }
+    return True
 
 
 def _attach_ai_explanation_to_latest_turn():
@@ -1201,11 +1217,15 @@ def screen_human_guesser():
                 )
                 st.session_state.ai_clue_intro_seen = True
             if st.button("Ask AI for a clue", type="primary", use_container_width=True):
-                _generate_and_store_ai_hint()
-                st.rerun()
+                if _generate_and_store_ai_hint():
+                    st.rerun()
+                return
         else:
-            _generate_and_store_ai_hint()
-            st.rerun()
+            if _generate_and_store_ai_hint():
+                st.rerun()
+            if st.button("Try generating the AI clue again", use_container_width=True):
+                st.rerun()
+            return
     else:
         render_hint_panel(
             st.session_state.hint,
@@ -1263,7 +1283,6 @@ def screen_human_guesser():
                         hint_time_sec=pending_meta.get("hint_time_sec"),
                         hint_response_time_sec=pending_meta.get("response_time_sec"),
                         hint_attempts=pending_meta.get("attempts"),
-                        hint_used_fallback=pending_meta.get("used_fallback", False),
                         guess_time_sec=guess_time_sec,
                     )
                     log_event(
@@ -1320,17 +1339,19 @@ def screen_human_guesser():
 
     if st.session_state.hint:
         skip_interpretation = []
+        remaining_guess_slots = (
+            int(st.session_state.hint_number)
+            - len(st.session_state.pending_guesses)
+        )
         if can_skip_current_clue():
-            remaining_guess_slots = max(
-                1,
-                int(st.session_state.hint_number or 1)
-                - len(st.session_state.pending_guesses),
-            )
             unavailable_cards = set(st.session_state.guesses).union(
                 st.session_state.pending_guesses
             )
             skip_interpretation = st.multiselect(
-                "Before skipping, which card(s) do you think this clue was meant for?",
+                (
+                    f"Before skipping, select exactly {remaining_guess_slots} card(s) "
+                    "you think this clue was meant for."
+                ),
                 options=[
                     word
                     for word in st.session_state.board
@@ -1338,15 +1359,15 @@ def screen_human_guesser():
                 ],
                 max_selections=remaining_guess_slots,
                 placeholder=(
-                    f"Select up to {remaining_guess_slots} likely remaining card(s)..."
+                    f"Select exactly {remaining_guess_slots} remaining card(s)..."
                 ),
                 key=(
                     f"skip_interpretation_{st.session_state.round}_"
                     f"{st.session_state.round_interactions}"
                 ),
                 help=(
-                    "Choose your best interpretation even if you are not confident. "
-                    "This does not count as an additional guess."
+                    f"Select exactly {remaining_guess_slots} card(s), even if you are "
+                    "not confident. These are stored separately and do not count as guesses."
                 ),
             )
         if st.button(
@@ -1355,8 +1376,10 @@ def screen_human_guesser():
             disabled=not can_skip_current_clue(),
         ):
             pending_meta = st.session_state.get("pending_hint_meta") or {}
-            if not skip_interpretation:
-                st.error("Please select at least one card you think the clue was meant for.")
+            if len(skip_interpretation) != remaining_guess_slots:
+                st.error(
+                    f"Please select exactly {remaining_guess_slots} card(s) before skipping."
+                )
             elif st.session_state.pending_guesses and not rationale_is_valid:
                 st.error("Please write a valid 3-30 word English explanation before using a partial skip.")
             else:
@@ -1368,7 +1391,6 @@ def screen_human_guesser():
                     "hint_time_sec": pending_meta.get("hint_time_sec"),
                     "hint_response_time_sec": pending_meta.get("response_time_sec"),
                     "hint_attempts": pending_meta.get("attempts"),
-                    "hint_used_fallback": pending_meta.get("used_fallback", False),
                     "guess_time_sec": _seconds_between(st.session_state.get("current_guess_start_time", "")),
                 }
                 if submitted_guesses:

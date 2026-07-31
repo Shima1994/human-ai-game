@@ -17,40 +17,13 @@ from core.validation import mentions_board_word
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-FALLBACK_HINTS = [
-    "signal",
-    "pattern",
-    "linkage",
-    "shared",
-    "thread",
-    "aspect",
-    "angle",
-    "bridge",
-    "field",
-    "motion",
-    "shape",
-    "anchor",
-    "path",
-    "zone",
-    "core",
-    "trace",
-    "frame",
-    "bond",
-    "spark",
-    "source",
-    "guide",
-    "match",
-    "route",
-    "sense",
-    "theme",
-    "point",
-    "circle",
-    "focus",
-    "origin",
-    "logic",
-    "union",
-    "vector",
-]
+
+class AIClueGenerationError(RuntimeError):
+    def __init__(self, message, *, attempts, last_raw, response_time_sec):
+        super().__init__(message)
+        self.attempts = attempts
+        self.last_raw = last_raw
+        self.response_time_sec = response_time_sec
 
 
 def call_openai_chat(
@@ -477,9 +450,12 @@ OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON.
 }
 
 CONSTRAINTS
-- "number" must equal the length of "targets".
-- "targets" must be a subset of the remaining target words listed in the user message.
-- "expected_guesses" must contain exactly "number" words from the available board words listed in the user message. Include the cards you realistically expect the human guesser to choose, even if one could be neutral or a bomb risk.
+- Return exactly "number" intended targets in "targets". Do not return fewer or more items.
+- Return exactly "number" expected guesses in "expected_guesses". Do not return fewer or more items.
+- Do not return duplicates in either "targets" or "expected_guesses".
+- Every item in "targets" must be an exact remaining target word listed in the user message.
+- Every item in "expected_guesses" must be an exact currently available board word listed in the user message. Do not return unavailable or unknown board words.
+- Include the cards you realistically expect the human guesser to choose, even if one could be neutral or a bomb risk.
 - "clue" must not appear on the board nor be a morphological variant.
 - "reasoning" is logged for research analysis and is NEVER shown to the player during gameplay.
 """
@@ -567,68 +543,51 @@ def build_hint_user_prompt(
     )
 
 
-def parse_hint_json(raw_text, fallback_n, remaining_targets, available_board=None):
+def parse_hint_json(raw_text, remaining_targets, available_board=None):
     try:
         data = json.loads(raw_text)
     except (json.JSONDecodeError, TypeError):
-        return "", fallback_n, [], [], ""
+        return "", 0, [], [], ""
 
     if not isinstance(data, dict):
-        return "", fallback_n, [], [], ""
+        return "", 0, [], [], ""
 
     clue_raw = str(data.get("clue", "") or "").strip().lower()
-    clue = re.sub(r"[^a-z-]", "", clue_raw)
-    if clue and not re.fullmatch(r"[a-z]+(-[a-z]+)*", clue):
-        clue = ""
+    clue = clue_raw if re.fullmatch(r"[a-z]+(-[a-z]+)*", clue_raw) else ""
 
-    try:
-        hint_number = int(data.get("number", fallback_n))
-    except (TypeError, ValueError):
-        hint_number = fallback_n
-    hint_number = max(1, min(MAX_HINT_NUMBER, hint_number))
+    raw_number = data.get("number")
+    if (
+        not isinstance(raw_number, int)
+        or isinstance(raw_number, bool)
+        or raw_number <= 0
+        or raw_number > MAX_HINT_NUMBER
+    ):
+        return "", 0, [], [], ""
+    hint_number = raw_number
 
-    target_lookup = {word.lower(): word for word in remaining_targets}
-    raw_targets = data.get("targets", []) or []
-    if not isinstance(raw_targets, list):
-        raw_targets = []
+    raw_targets = data.get("targets")
+    raw_expected_guesses = data.get("expected_guesses")
+    if not isinstance(raw_targets, list) or not isinstance(raw_expected_guesses, list):
+        return "", 0, [], [], ""
+    if len(raw_targets) != hint_number or len(raw_expected_guesses) != hint_number:
+        return "", 0, [], [], ""
+    if not all(isinstance(value, str) for value in raw_targets + raw_expected_guesses):
+        return "", 0, [], [], ""
+    if len(set(raw_targets)) != hint_number or len(set(raw_expected_guesses)) != hint_number:
+        return "", 0, [], [], ""
+    if any(value not in remaining_targets for value in raw_targets):
+        return "", 0, [], [], ""
+    available_board = available_board or []
+    if any(value not in available_board for value in raw_expected_guesses):
+        return "", 0, [], [], ""
 
-    intended_targets = []
-    seen = set()
-    for value in raw_targets:
-        key = str(value).strip().lower()
-        if key in target_lookup and key not in seen:
-            intended_targets.append(target_lookup[key])
-            seen.add(key)
-
-    board_lookup = {word.lower(): word for word in available_board or []}
-    raw_expected_guesses = data.get("expected_guesses", []) or []
-    if not isinstance(raw_expected_guesses, list):
-        raw_expected_guesses = []
-
-    expected_guesses = []
-    seen = set()
-    for value in raw_expected_guesses:
-        key = str(value).strip().lower()
-        if key in board_lookup and key not in seen:
-            expected_guesses.append(board_lookup[key])
-            seen.add(key)
+    intended_targets = list(raw_targets)
+    expected_guesses = list(raw_expected_guesses)
 
     explanation = str(data.get("reasoning", "") or "").strip()
     explanation = limit_words(explanation, 60)
 
     return clue, hint_number, intended_targets, expected_guesses, explanation
-
-
-def choose_fallback_hint(used_hints, board_words=None):
-    used_hint_set = set(used_hints or [])
-    board_words = board_words or []
-    for hint in FALLBACK_HINTS:
-        if hint not in used_hint_set and not is_hint_too_close_to_board(hint, board_words):
-            return hint
-    for hint in ["marker", "north", "south", "east", "west"]:
-        if hint not in used_hint_set and not is_hint_too_close_to_board(hint, board_words):
-            return hint
-    return "signal"
 
 
 AI_TURN_EXPLANATION_SYSTEM_PROMPT = """You explain your own clue in a cooperative word association game after the human has already guessed.
@@ -739,7 +698,6 @@ def _generate_hint_with_forbidden(
     used_hints,
     round_summaries,
     forbidden_hint=None,
-    fallback_size_cap=2,
     condition="adaptive",
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
@@ -748,7 +706,6 @@ def _generate_hint_with_forbidden(
     if forbidden_hint:
         used_hint_set.add(forbidden_hint.lower())
     board_words = target_words + neutral_words + list(bomb_words)
-    fallback_number = remaining_target_count(target_words, history)
     found_targets = {
         guess
         for item in history
@@ -793,15 +750,8 @@ def _generate_hint_with_forbidden(
         last_raw = raw
         total_time += elapsed
         hint, hint_number, intended_targets, expected_guesses, explanation = parse_hint_json(
-            raw, fallback_number, remaining_targets, available_board
+            raw, remaining_targets, available_board
         )
-        if not intended_targets:
-            intended_targets = remaining_targets[:hint_number]
-        hint_number = min(hint_number, len(intended_targets), fallback_number)
-        intended_targets = intended_targets[:hint_number]
-        expected_guesses = expected_guesses[:hint_number]
-        if len(expected_guesses) < hint_number:
-            expected_guesses = (expected_guesses + intended_targets)[:hint_number]
         if (
             hint
             and hint not in used_hint_set
@@ -817,21 +767,14 @@ def _generate_hint_with_forbidden(
                 "raw_response": last_raw,
                 "response_time_sec": round(total_time, 3),
                 "attempts": attempts,
-                "used_fallback": False,
             }
 
-    fallback_targets = remaining_targets[: min(fallback_size_cap, fallback_number)]
-    return {
-        "hint": choose_fallback_hint(used_hint_set, board_words),
-        "hint_number": max(1, len(fallback_targets)),
-        "intended_targets": fallback_targets,
-        "expected_guesses": fallback_targets,
-        "explanation": "Fallback clue selected because the model did not return a usable JSON clue after retries.",
-        "raw_response": last_raw,
-        "response_time_sec": round(total_time, 3),
-        "attempts": attempts,
-        "used_fallback": True,
-    }
+    raise AIClueGenerationError(
+        "Failed to generate a valid AI clue after 3 attempts.",
+        attempts=attempts,
+        last_raw=last_raw,
+        response_time_sec=round(total_time, 3),
+    )
 
 
 def generate_ai_hint(
@@ -853,7 +796,6 @@ def generate_ai_hint(
         used_hints or [],
         round_summaries or [],
         forbidden_hint=None,
-        fallback_size_cap=2,
         condition=condition,
     )
 
@@ -878,7 +820,6 @@ def generate_ai_hint_reroll(
         used_hints or [],
         round_summaries or [],
         forbidden_hint=previous_hint,
-        fallback_size_cap=1,
         condition=condition,
     )
 

@@ -133,7 +133,7 @@ Important turn-level fields include:
 - counterfactual wrong-guess replacements, actor, word types, count, and AI-call metadata;
 - raw and sanitized human/AI explanations plus validation status and block reason;
 - reflection rating and timing;
-- raw LLM response, parsed response, model, temperature, retries, fallback flag, and latency;
+- raw LLM response, parsed response, model, temperature, retries, and latency;
 - `repair_applied_to_next_prompt` and condition-specific repair context.
 
 ### Serialization conventions

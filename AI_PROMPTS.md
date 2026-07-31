@@ -112,13 +112,15 @@ Both conditions receive:
 
 Adaptive additionally receives participant feedback and persistent teammate memory. Baseline receives fact-only memory.
 
-### Call and fallback
+### Call and failure handling
 
 - Temperature: `0.55`.
 - JSON mode: enabled.
 - Maximum initial attempts: three.
-- A reroll forbids the rejected clue and uses a more conservative fallback cap.
-- If all model attempts fail validation, a curated fallback clue is selected after board-word filtering.
+- A reroll forbids the rejected clue and uses the same strict validation rules.
+- Invalid JSON, schema violations, invalid clues, API errors, and timeouts consume an attempt.
+- After three failed attempts, clue generation raises an error. No clue, intended targets, or expected guesses are fabricated, and the UI asks the participant to try again.
+- The failure event retains the attempt count, last raw response/error, and elapsed response time for debugging.
 
 ### Stored fields
 
@@ -127,8 +129,7 @@ Adaptive additionally receives participant feedback and persistent teammate memo
 - `hint_explanation` (the parsed reasoning);
 - `hint_raw_response`;
 - `hint_response_time_sec` and total hint time;
-- `hint_attempts`;
-- `hint_used_fallback`.
+- `hint_attempts`.
 
 The raw clue-generation reasoning is research data and is not directly rendered as the gameplay clue explanation.
 
