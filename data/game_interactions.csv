@@ -93,3 +93,57 @@ e662ebf6-7152-420a-afdd-dc7ecc2af247,2026-08-07T11:27:37.775860,nick,baseline,hu
   ""guesses"": [""Lens"", ""Memory""],
   ""interpreted_cards"": [""Lens"", ""Memory""]
 }",4,,camera requires glassess and saves moments,camera requires glassess and saves moments,True,,,,,,,,human_clue_giver,4,,camera requires glassess and saves moments,True,,2026-08-07T11:26:49.311559,2026-08-07T11:27:08.562634,19.251,2026-08-07T11:26:49.231906
+12ee155e-f7be-4575-9401-5b566e8874d8,2026-08-07T11:43:38.699643,big nick,adaptive,human_clue,1,1,human_clue,human_clue,mixed,A,round-1-template-A-7bdb0958ad,"{""Time"": ""abstract"", ""Chocolate"": ""concrete"", ""Sea"": ""concrete"", ""Reason"": ""abstract"", ""Ball"": ""concrete"", ""Illness"": ""abstract"", ""Clock"": ""concrete"", ""Shell"": ""concrete"", ""Spider"": ""concrete"", ""Air"": ""abstract"", ""Freedom"": ""abstract"", ""Day"": ""abstract"", ""Bottle"": ""concrete"", ""Theater"": ""concrete"", ""Space"": ""abstract"", ""Game"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,sick,sick,2,2,Air;Sea,Air;Sea,Illness;Sea,Illness;Sea,abstract;concrete,Illness is directly linked to 'sick'. Reason is a plausible secondary link as it can relate to causes of sickness.,20,,Illness;Reason,Illness;Reason,1:Illness;2:Reason,"[{""position"": 1, ""word"": ""Illness""}, {""position"": 2, ""word"": ""Reason""}]",abstract;abstract,Illness,abstract,Reason,abstract,Air;Sea,Illness,Reason,,correct,misaligned,neutral,0,,0,,,0,Air,abstract,1,ai,"{""replacement_cards"": [""Air""]}",0.862,1,2,0,0,bronze,1,4,,,73.463,,3.834,3.839,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Illness is directly linked to 'sick'. Spider is a plausible secondary link due to associations with venom and bites causing sickness."",
+  ""guesses"": [""Illness"", ""Spider""],
+  ""interpreted_cards"": [""Illness"", ""Spider""]
+}
+```
+
+<repair_response>
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Illness is directly linked to 'sick'. Reason is a plausible secondary link as it can relate to causes of sickness."",
+  ""guesses"": [""Illness"", ""Reason""],
+  ""interpreted_cards"": [""Illness"", ""Reason""]
+}",2,,ocean and sky travel cause sickness,ocean and sky travel cause sickness,True,,,,,,,,human_clue_giver,2,,ocean and sky travel cause sickness,True,,2026-08-07T11:38:07.260585,2026-08-07T11:39:02.152890,54.892,2026-08-07T11:38:06.199414
+12ee155e-f7be-4575-9401-5b566e8874d8,2026-08-07T11:43:38.699643,big nick,adaptive,human_clue,1,1,human_clue,human_clue,mixed,A,round-1-template-A-7bdb0958ad,"{""Time"": ""abstract"", ""Chocolate"": ""concrete"", ""Sea"": ""concrete"", ""Reason"": ""abstract"", ""Ball"": ""concrete"", ""Illness"": ""abstract"", ""Clock"": ""concrete"", ""Shell"": ""concrete"", ""Spider"": ""concrete"", ""Air"": ""abstract"", ""Freedom"": ""abstract"", ""Day"": ""abstract"", ""Bottle"": ""concrete"", ""Theater"": ""concrete"", ""Space"": ""abstract"", ""Game"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,elements,elements,2,2,Air;Sea,Air;Sea,Sea;Air,Sea;Air,concrete;abstract,"Sea and Air are elements in nature, directly linking to the clue 'elements'.",13,,Sea;Air,Sea;Air,1:Sea;2:Air,"[{""position"": 1, ""word"": ""Sea""}, {""position"": 2, ""word"": ""Air""}]",concrete;abstract,Sea;Air,concrete;abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,2,0,0,bronze,1,4,,,50.185,,3.496,3.498,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Sea and Air are elements in nature, directly linking to the clue 'elements'."",
+  ""guesses"": [""Sea"", ""Air""],
+  ""interpreted_cards"": [""Sea"", ""Air""]
+}
+```
+
+<repair_response>
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Sea and Air are elements in nature, directly linking to the clue 'elements'."",
+  ""guesses"": [""Sea"", ""Air""],
+  ""interpreted_cards"": [""Sea"", ""Air""]
+}",5,,they are the basic elements,they are the basic elements,True,,,,,,,,human_clue_giver,5,,they are the basic elements,True,,2026-08-07T11:40:03.665996,2026-08-07T11:40:20.356588,16.691,2026-08-07T11:40:03.473757
+12ee155e-f7be-4575-9401-5b566e8874d8,2026-08-07T11:43:38.699643,big nick,adaptive,human_clue,1,1,human_clue,human_clue,mixed,A,round-1-template-A-7bdb0958ad,"{""Time"": ""abstract"", ""Chocolate"": ""concrete"", ""Sea"": ""concrete"", ""Reason"": ""abstract"", ""Ball"": ""concrete"", ""Illness"": ""abstract"", ""Clock"": ""concrete"", ""Shell"": ""concrete"", ""Spider"": ""concrete"", ""Air"": ""abstract"", ""Freedom"": ""abstract"", ""Day"": ""abstract"", ""Bottle"": ""concrete"", ""Theater"": ""concrete"", ""Space"": ""abstract"", ""Game"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,unbound,unbound,1,1,Freedom,Freedom,Freedom,Freedom,abstract,Freedom is directly linked to 'unbound' as it represents being free and unrestricted.,13,,Freedom,Freedom,1:Freedom,"[{""position"": 1, ""word"": ""Freedom""}]",abstract,Freedom,abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,1,0,0,bronze,1,5,,,76.843,,2.096,2.098,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Freedom is directly linked to 'unbound' as it represents the state of being free and unrestricted."",
+  ""guesses"": [""Freedom""],
+  ""interpreted_cards"": [""Freedom""]
+}
+```
+
+<repair_response>
+{""action"":""guess"",""reasoning"":""Freedom is directly linked to 'unbound' as it represents being free and unrestricted."",""guesses"":[""Freedom""]}",5,,not being grounded,not being grounded,True,,,,,,,,human_clue_giver,5,,not being grounded,True,,2026-08-07T11:41:55.776727,2026-08-07T11:42:09.660403,13.884,2026-08-07T11:41:55.584995
+12ee155e-f7be-4575-9401-5b566e8874d8,2026-08-07T11:43:38.699643,big nick,adaptive,human_clue,1,1,human_clue,human_clue,mixed,A,round-1-template-A-7bdb0958ad,"{""Time"": ""abstract"", ""Chocolate"": ""concrete"", ""Sea"": ""concrete"", ""Reason"": ""abstract"", ""Ball"": ""concrete"", ""Illness"": ""abstract"", ""Clock"": ""concrete"", ""Shell"": ""concrete"", ""Spider"": ""concrete"", ""Air"": ""abstract"", ""Freedom"": ""abstract"", ""Day"": ""abstract"", ""Bottle"": ""concrete"", ""Theater"": ""concrete"", ""Space"": ""abstract"", ""Game"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,4,4,human,ai,device,device,1,1,Clock,Clock,Ball,Ball,concrete,Clock is a direct association with 'device' as it is a mechanical or electronic instrument for measuring time.,18,,Clock,Clock,1:Clock,"[{""position"": 1, ""word"": ""Clock""}]",concrete,Clock,concrete,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,1,0,0,bronze,1,5,,,16.857,,2.137,2.139,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Clock is a direct association with 'device' as it is a mechanical or electronic instrument for measuring time."",
+  ""guesses"": [""Clock""],
+  ""interpreted_cards"": [""Clock""]
+}
+```
+
+<repair_response>
+{""action"":""guess"",""reasoning"":""Clock is a direct association with 'device' as it is a mechanical or electronic instrument for measuring time."",""guesses"":[""Clock""]}",5,,the only mechanical thing here,the only mechanical thing here,True,,,,,,,,human_clue_giver,5,,the only mechanical thing here,True,,2026-08-07T11:42:36.796647,2026-08-07T11:42:51.597828,14.801,2026-08-07T11:42:36.595379
