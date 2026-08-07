@@ -256,3 +256,42 @@ b5881f86-0719-46fd-bd51-d47cebaf4034,2026-08-07T12:16:55.045516,participant_ebaf
   ""targets"": [""Illness""],
   ""expected_guesses"": [""Illness""]
 }",,5,,,,True,,Category / shared type,"The clue relates to a condition affecting health, commonly associated with sickness or disease.","The clue relates to a condition affecting health, commonly associated with sickness or disease.",True,,"The clue relates to a condition affecting health, commonly associated with sickness or disease.",ai_clue_giver,5,,,True,,2026-08-07T12:11:57.454870,2026-08-07T12:12:02.466598,5.012,2026-08-07T12:11:55.072134
+b5881f86-0719-46fd-bd51-d47cebaf4034,2026-08-07T12:23:08.018612,participant_ebaf4034,baseline,ai_clue,2,2,human_clue,human_clue,mixed,B,round-2-template-B-ce802f2185,"{""Good"": ""abstract"", ""Air"": ""abstract"", ""Spirit"": ""abstract"", ""Lens"": ""concrete"", ""Spider"": ""concrete"", ""Customs"": ""abstract"", ""Cake"": ""concrete"", ""Fox"": ""concrete"", ""Year"": ""abstract"", ""Blue"": ""abstract"", ""Map"": ""concrete"", ""King"": ""concrete"", ""Chair"": ""concrete"", ""Time"": ""abstract"", ""Resolution"": ""abstract"", ""Bottle"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,birthday,birthday,2,2,Cake;Good,Cake;Good,Cake;Year,Cake;Year,concrete;abstract,"Cake is a common item at birthdays, often used for celebrations. Year is linked to birthdays as they mark the passage of another year in a person's life.",28,,Cake;Year,Cake;Year,1:Cake;2:Year,"[{""position"": 1, ""word"": ""Cake""}, {""position"": 2, ""word"": ""Year""}]",concrete;abstract,Cake,concrete,Year,abstract,Good,,Year,,correct,partial,neutral,0,,0,,,0,Bottle,concrete,1,ai,"{""replacement_cards"": [""Bottle""]}",0.637,1,2,0,0,bronze,1,4,,,124.136,,2.589,2.591,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Cake is a common item at birthdays, often used for celebrations. Year is linked to birthdays as they mark the passage of another year in a person's life."",
+  ""guesses"": [""Cake"", ""Year""],
+  ""interpreted_cards"": [""Cake"", ""Year""]
+}
+```
+
+<repair_response>
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Cake is a common item at birthdays, often used for celebrations. Year is linked to birthdays as they mark the passage of another year in a person's life."",
+  ""guesses"": [""Cake"", ""Year""],
+  ""interpreted_cards"": [""Cake"", ""Year""]
+}",3,,I think you anderstand in birthday which feel...,I think you anderstand in birthday which feel...,True,,,,,,,,human_clue_giver,3,,I think you anderstand in birthday which feel...,True,,2026-08-07T12:19:12.500173,2026-08-07T12:19:44.057356,31.557,2026-08-07T12:19:11.645374
+b5881f86-0719-46fd-bd51-d47cebaf4034,2026-08-07T12:23:08.018612,participant_ebaf4034,baseline,ai_clue,2,2,human_clue,human_clue,mixed,B,round-2-template-B-ce802f2185,"{""Good"": ""abstract"", ""Air"": ""abstract"", ""Spirit"": ""abstract"", ""Lens"": ""concrete"", ""Spider"": ""concrete"", ""Customs"": ""abstract"", ""Cake"": ""concrete"", ""Fox"": ""concrete"", ""Year"": ""abstract"", ""Blue"": ""abstract"", ""Map"": ""concrete"", ""King"": ""concrete"", ""Chair"": ""concrete"", ""Time"": ""abstract"", ""Resolution"": ""abstract"", ""Bottle"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,glass,glass,2,2,Blue;Lens,Blue;Lens,Lens;Bottle,Lens;Bottle,concrete;concrete,"Lens is made of glass, and Bottle often is too. Both have strong material links to 'glass'.",17,,Lens;Bottle,Lens;Bottle,1:Lens;2:Bottle,"[{""position"": 1, ""word"": ""Lens""}, {""position"": 2, ""word"": ""Bottle""}]",concrete;concrete,Lens,concrete,Bottle,concrete,Blue,,Bottle,,correct,partial,neutral,0,,0,,,0,Blue,abstract,1,ai,"{""replacement_cards"": [""Blue""]}",1.864,1,2,0,0,bronze,1,3,,,44.672,,4.158,4.159,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Lens is made of glass, and Bottle often is too. Both have strong material links to 'glass'."",
+  ""guesses"": [""Lens"", ""Bottle""],
+  ""interpreted_cards"": [""Lens"", ""Bottle""]
+}
+```
+
+<repair_response>
+{""action"":""guess"",""reasoning"":""Lens is made of glass, and Bottle often is too. Both have strong material links to 'glass'."",""guesses"":[""Lens"",""Bottle""],""interpreted_cards"":[""Lens"",""Bottle""]}",4,,I dont know,I dont know,True,,,,,,,,human_clue_giver,4,,I dont know,True,,2026-08-07T12:20:39.262466,2026-08-07T12:21:04.914756,25.652,2026-08-07T12:20:37.188271
+b5881f86-0719-46fd-bd51-d47cebaf4034,2026-08-07T12:23:08.018612,participant_ebaf4034,baseline,ai_clue,2,2,human_clue,human_clue,mixed,B,round-2-template-B-ce802f2185,"{""Good"": ""abstract"", ""Air"": ""abstract"", ""Spirit"": ""abstract"", ""Lens"": ""concrete"", ""Spider"": ""concrete"", ""Customs"": ""abstract"", ""Cake"": ""concrete"", ""Fox"": ""concrete"", ""Year"": ""abstract"", ""Blue"": ""abstract"", ""Map"": ""concrete"", ""King"": ""concrete"", ""Chair"": ""concrete"", ""Time"": ""abstract"", ""Resolution"": ""abstract"", ""Bottle"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,red,red,2,2,Blue;Fox,Blue;Fox,Spider;Fox,Spider;Fox,concrete;concrete,"Red is commonly associated with Fox due to the red fox species, and Blue as a contrasting color term.",19,,Fox;Blue,Fox;Blue,1:Fox;2:Blue,"[{""position"": 1, ""word"": ""Fox""}, {""position"": 2, ""word"": ""Blue""}]",concrete;abstract,Fox;Blue,concrete;abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,2,0,0,bronze,1,3,,,46.219,,2.361,2.362,,"{
+  ""action"": ""guess"",
+  ""reasoning"": ""Red is commonly associated with Fox due to the red fox species, and Blue as a contrasting color term."",
+  ""guesses"": [""Fox"", ""Blue""],
+  ""interpreted_cards"": [""Fox"", ""Blue""]
+}",5,,pefekt thanks u,pefekt thanks u,True,,,,,,,,human_clue_giver,5,,pefekt thanks u,True,,2026-08-07T12:21:58.238568,2026-08-07T12:22:14.613980,16.375,2026-08-07T12:21:58.035972
+b5881f86-0719-46fd-bd51-d47cebaf4034,2026-08-07T12:23:08.018612,participant_ebaf4034,baseline,ai_clue,2,2,human_clue,human_clue,mixed,B,round-2-template-B-ce802f2185,"{""Good"": ""abstract"", ""Air"": ""abstract"", ""Spirit"": ""abstract"", ""Lens"": ""concrete"", ""Spider"": ""concrete"", ""Customs"": ""abstract"", ""Cake"": ""concrete"", ""Fox"": ""concrete"", ""Year"": ""abstract"", ""Blue"": ""abstract"", ""Map"": ""concrete"", ""King"": ""concrete"", ""Chair"": ""concrete"", ""Time"": ""abstract"", ""Resolution"": ""abstract"", ""Bottle"": ""concrete""}",abstract;abstract;concrete;concrete;concrete,abstract;abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete,abstract;concrete,4,4,human,ai,nice,nice,1,1,Good,Good,Good,Good,abstract,"Nice is synonymous with good, making Good the strongest association. Other words like Spirit or Air are too abstract or unrelated.",21,,Good,Good,1:Good,"[{""position"": 1, ""word"": ""Good""}]",abstract,Good,abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,1,0,0,bronze,1,5,,,19.909,,2.024,2.027,,"{
+  ""action"": ""guess"",
+  ""reasoning"": ""Nice is synonymous with good, making Good the strongest association. Other words like Spirit or Air are too abstract or unrelated."",
+  ""guesses"": [""Good""],
+  ""interpreted_cards"": []
+}",5,,thnaks we get Model,thnaks we get Model,True,,,,,,,,human_clue_giver,5,,thnaks we get Model,True,,2026-08-07T12:22:40.421512,2026-08-07T12:22:55.939795,15.518,2026-08-07T12:22:40.207004
