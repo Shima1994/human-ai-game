@@ -162,3 +162,41 @@ e662ebf6-7152-420a-afdd-dc7ecc2af247,2026-08-07T11:27:37.775860,nick,baseline,hu
   ""targets"": [""Hospital"", ""Chair""],
   ""expected_guesses"": [""Hospital"", ""Chair""]
 }",,4,,,,True,,Theme / shared situation,Both are commonly associated with places or situations where people spend time waiting.,Both are commonly associated with places or situations where people spend time waiting.,True,,Both are commonly associated with places or situations where people spend time waiting.,ai_clue_giver,4,,,True,,2026-08-07T11:46:52.260611,2026-08-07T11:47:13.580448,21.320,2026-08-07T11:46:51.107005
+12ee155e-f7be-4575-9401-5b566e8874d8,2026-08-07T11:55:15.930884,big nick,adaptive,human_clue,3,3,human_clue,human_clue,mixed,A,round-3-template-A-7a5e3baf88,"{""Blue"": ""abstract"", ""Ship"": ""concrete"", ""East"": ""abstract"", ""Means"": ""abstract"", ""Dance"": ""abstract"", ""Ice"": ""concrete"", ""Relocation"": ""abstract"", ""Tower"": ""concrete"", ""Stadium"": ""concrete"", ""Fox"": ""concrete"", ""Fire"": ""abstract"", ""Snowman"": ""concrete"", ""Pen"": ""concrete"", ""Economy"": ""abstract"", ""Honey"": ""concrete"", ""Association"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,1,1,human,ai,performance,performance,2,2,Stadium;Dance,Stadium;Dance,Dance;Stadium,Dance;Stadium,abstract;concrete,Dance is a direct form of performance art. Stadium is a common venue for performances.,15,,Dance;Stadium,Dance;Stadium,1:Dance;2:Stadium,"[{""position"": 1, ""word"": ""Dance""}, {""position"": 2, ""word"": ""Stadium""}]",abstract;concrete,Dance;Stadium,abstract;concrete,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,2,0,0,silver,1,4,,,59.724,,2.636,2.638,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Stadium is a direct link to 'performance' as performances often occur in stadiums. Dance is strongly associated with performance as it is a form of performing art."",
+  ""guesses"": [""Stadium"", ""Dance""],
+  ""interpreted_cards"": [""Stadium"", ""Dance""]
+}
+```
+
+<repair_response>
+{""action"": ""guess"", ""reasoning"": ""Dance is a direct form of performance art. Stadium is a common venue for performances."", ""guesses"": [""Dance"", ""Stadium""], ""interpreted_cards"": [""Dance"", ""Stadium""]}",5,,you performance in a stage,you performance in a stage,True,,,,,,,,human_clue_giver,5,,you performance in a stage,True,,2026-08-07T11:52:49.514462,2026-08-07T11:53:09.698081,20.184,2026-08-07T11:52:49.290467
+12ee155e-f7be-4575-9401-5b566e8874d8,2026-08-07T11:55:15.930884,big nick,adaptive,human_clue,3,3,human_clue,human_clue,mixed,A,round-3-template-A-7a5e3baf88,"{""Blue"": ""abstract"", ""Ship"": ""concrete"", ""East"": ""abstract"", ""Means"": ""abstract"", ""Dance"": ""abstract"", ""Ice"": ""concrete"", ""Relocation"": ""abstract"", ""Tower"": ""concrete"", ""Stadium"": ""concrete"", ""Fox"": ""concrete"", ""Fire"": ""abstract"", ""Snowman"": ""concrete"", ""Pen"": ""concrete"", ""Economy"": ""abstract"", ""Honey"": ""concrete"", ""Association"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,2,2,human,ai,travel,travel,2,2,Ship;Relocation,Ship;Relocation,Ship;Relocation,Ship;Relocation,concrete;abstract,"Ship is a common mode of travel. Relocation involves moving, often linked to travel.",14,,Ship;Relocation,Ship;Relocation,1:Ship;2:Relocation,"[{""position"": 1, ""word"": ""Ship""}, {""position"": 2, ""word"": ""Relocation""}]",concrete;abstract,Ship;Relocation,concrete;abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,2,0,0,silver,1,3,,,41.603,,4.148,4.151,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Ship is directly linked to travel as a common mode of transportation. Relocation involves moving from one place to another, often associated with travel."",
+  ""guesses"": [""Ship"", ""Relocation""],
+  ""interpreted_cards"": [""Ship"", ""Relocation""]
+}
+```
+
+<repair_response>
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Ship is a common mode of travel. Relocation involves moving, often linked to travel."",
+  ""guesses"": [""Ship"", ""Relocation""],
+  ""interpreted_cards"": [""Ship"", ""Relocation""]
+}",5,,movement and mode of it,movement and mode of it,True,,,,,,,,human_clue_giver,5,,movement and mode of it,True,,2026-08-07T11:53:59.762509,2026-08-07T11:54:21.445085,21.683,2026-08-07T11:53:59.584920
+12ee155e-f7be-4575-9401-5b566e8874d8,2026-08-07T11:55:15.930884,big nick,adaptive,human_clue,3,3,human_clue,human_clue,mixed,A,round-3-template-A-7a5e3baf88,"{""Blue"": ""abstract"", ""Ship"": ""concrete"", ""East"": ""abstract"", ""Means"": ""abstract"", ""Dance"": ""abstract"", ""Ice"": ""concrete"", ""Relocation"": ""abstract"", ""Tower"": ""concrete"", ""Stadium"": ""concrete"", ""Fox"": ""concrete"", ""Fire"": ""abstract"", ""Snowman"": ""concrete"", ""Pen"": ""concrete"", ""Economy"": ""abstract"", ""Honey"": ""concrete"", ""Association"": ""abstract""}",abstract;abstract;abstract;concrete;concrete,abstract;abstract;abstract;abstract;concrete;concrete;concrete;concrete;concrete,abstract;concrete,3,3,human,ai,organisation,organisation,1,1,Association,Association,Association,Association,abstract,Association is directly linked to 'organisation' as it often refers to a group or body organized for a purpose.,19,,Association,Association,1:Association,"[{""position"": 1, ""word"": ""Association""}]",abstract,Association,abstract,,,,,,,correct,perfect,none,0,,0,,,0,,,0,,,,,1,0,0,silver,1,5,,,20.470,,3.841,3.842,,"```json
+{
+  ""action"": ""guess"",
+  ""reasoning"": ""Association is directly linked to 'organisation' as it often refers to a group or body organized for a purpose."",
+  ""guesses"": [""Association""],
+  ""interpreted_cards"": [""Association""]
+}
+```
+
+<repair_response>
+{""action"": ""guess"", ""reasoning"": ""Association is directly linked to 'organisation' as it often refers to a group or body organized for a purpose."", ""guesses"": [""Association""], ""interpreted_cards"": [""Association""]}",5,,collective noun for a guild,collective noun for a guild,True,,,,,,,,human_clue_giver,5,,collective noun for a guild,True,,2026-08-07T11:54:50.230862,2026-08-07T11:55:02.221274,11.990,2026-08-07T11:54:50.024522
