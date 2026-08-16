@@ -16,7 +16,7 @@ Each round uses a 16-card mixed board:
 - a controlled abstract/concrete composition determined by board template A or B;
 - no word reuse within the same four-round session.
 
-The clue-giver supplies one English clue and a number `N`. The guesser may select up to `N` cards. A bomb ends the round immediately. A round also ends when all targets are found or four turns have been used.
+The clue-giver supplies one English clue and a number `N`. The guesser may select up to `N` cards. A bomb ends the round immediately. A round also ends when all targets are found or three turns have been used.
 
 Medals are awarded only when all five targets are found without a bomb:
 
@@ -67,6 +67,8 @@ Baseline prompt construction uses dedicated fact-only history formatters. Intend
 ### Full and partial skips
 
 At most two skips are available per round, and a skip is unavailable on the final possible turn.
+Each active clue has a configurable countdown (currently 120 seconds). A timeout consumes the turn without submitting guesses or consuming a skip.
+When a human skips an AI clue, the AI's next clue retries the same unresolved intended targets with a different clue. Adaptive sessions may use the participant's recorded interpretation and reflection to improve that repair; baseline sessions retry the targets without receiving reflection context.
 
 - **Full skip:** no card is selected; the clue is abandoned; one full skip is consumed.
 - **Partial skip:** one or more guesses are retained, their correctness is recorded, the remaining guesses are abandoned, and one full skip is consumed.

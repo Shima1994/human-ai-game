@@ -211,6 +211,8 @@ Primary-call temperature is `0.2`; forced JSON mode is disabled so the reroll li
 - retry/repair metadata;
 - full/partial skip fields and actor;
 - the guesser's separate `skip_interpreted_cards`, word types, and count;
+- skip-repair linkage (`repair_required`, source turn/targets, repair-attempt and same-target flags, and repair success);
+- per-clue timer duration/start, timeout timestamp/status, repair-timeout status, and unsubmitted selected cards retained for analysis;
 - post-outcome replacement cards for non-bomb wrong guesses, including raw-response and timing metadata;
 - completed and abandoned guess counts;
 - correctness, alignment, error type, and bomb outcome.
@@ -224,6 +226,8 @@ generate_ai_turn_explanation(...)
 ```
 
 After a human finishes guessing an AI clue—including a full or partial skip—the AI produces a short general explanation of its own clue relationship.
+
+If the human fully or partially skips an AI clue, the next AI clue is a mandatory repair for the unresolved intended targets. The previous clue is forbidden and model output is accepted only if its target set exactly matches the unresolved set. Adaptive prompts may include the stored skip interpretation, guess reasoning, and participant reflection. Baseline prompts include only the skipped turn, old clue, and required unresolved targets; adaptive-only interpretation and reflection are excluded.
 
 Output schema:
 

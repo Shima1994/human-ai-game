@@ -1,6 +1,8 @@
 from html import escape
+import math
 
 import streamlit as st
+import streamlit.components.v1 as st_components
 
 from core.constants import (
     BOARD_SIZE,
@@ -86,6 +88,36 @@ def render_round_chip(text):
     st.markdown(
         f"<div class='round-chip'>{escape(text)}</div>",
         unsafe_allow_html=True,
+    )
+
+
+def render_clue_timer(remaining_seconds):
+    remaining = max(0, int(math.ceil(remaining_seconds or 0)))
+    st_components.html(
+        f"""
+        <div style="font-family:system-ui;text-align:center;font-weight:700;font-size:1.05rem;"
+             aria-live="polite">
+          Time remaining: <span id="clue-timer">{remaining // 60:02d}:{remaining % 60:02d}</span>
+        </div>
+        <script>
+          let remaining = {remaining};
+          let reloaded = false;
+          const el = document.getElementById('clue-timer');
+          const tick = () => {{
+            remaining = Math.max(0, remaining - 1);
+            const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
+            const seconds = String(remaining % 60).padStart(2, '0');
+            el.textContent = `${{minutes}}:${{seconds}}`;
+            el.style.color = remaining <= 15 ? '#b42318' : 'inherit';
+            if (remaining === 0 && !reloaded) {{
+              reloaded = true;
+              window.parent.location.reload();
+            }}
+          }};
+          if (remaining > 0) window.setInterval(tick, 1000);
+        </script>
+        """,
+        height=42,
     )
 
 
@@ -227,6 +259,9 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
         if item.get("bomb_hit"):
             outcome = "Bomb"
             outcome_class = "history-outcome-bomb"
+        elif item.get("timed_out") or item.get("outcome") == "timeout":
+            outcome = "Timed out"
+            outcome_class = "history-outcome-wrong"
         elif is_skip:
             outcome = "Skipped"
             outcome_class = "history-outcome-skip"

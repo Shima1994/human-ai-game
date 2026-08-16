@@ -83,6 +83,9 @@ def init_session_state():
         "current_hint_start_time": "",
         "current_guess_start_time": "",
         "current_reflection_start_time": "",
+        "clue_timer_started_at": "",
+        "clue_timer_duration_seconds": 0,
+        "clue_timer_timeout_consumed": False,
         "consent_given": False,
         "consent_timestamp": "",
         "debriefing_acknowledged": False,
@@ -150,6 +153,9 @@ def reset_round_state():
     st.session_state.current_hint_start_time = ""
     st.session_state.current_guess_start_time = ""
     st.session_state.current_reflection_start_time = ""
+    st.session_state.clue_timer_started_at = ""
+    st.session_state.clue_timer_duration_seconds = 0
+    st.session_state.clue_timer_timeout_consumed = False
     st.session_state.perception_rating = None
     st.session_state.ai_understanding_rating_before = None
     st.session_state.ai_understanding_rating_after = None

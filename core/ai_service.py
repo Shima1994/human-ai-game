@@ -119,6 +119,8 @@ def format_interaction_history(history):
         correct_guesses = ", ".join(item.get("correct_guesses", [])) or "none"
         if item.get("bomb_hit"):
             outcome = "BOMB HIT"
+        elif item.get("timed_out") or item.get("outcome") == "timeout":
+            outcome = "timed out"
         elif item.get("outcome") == "skip" or item.get("skipped"):
             outcome = f"skipped by {item.get('skipped_by') or item.get('guesser') or 'guesser'}"
         elif item.get("correct"):
@@ -148,6 +150,8 @@ def format_baseline_history(history):
         incorrect = ", ".join(item.get("incorrect_guesses", [])) or "none"
         if item.get("bomb_hit"):
             outcome = "BOMB HIT"
+        elif item.get("timed_out") or item.get("outcome") == "timeout":
+            outcome = "timed out"
         elif item.get("outcome") == "skip" or item.get("skipped"):
             outcome = "skipped"
         elif item.get("correct"):
@@ -479,6 +483,7 @@ def build_hint_user_prompt(
     used_hints=None,
     forbidden_hint=None,
     condition="adaptive",
+    repair_context=None,
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []
@@ -523,6 +528,27 @@ def build_hint_user_prompt(
         if condition == "adaptive"
         else ""
     )
+    repair_block = ""
+    if repair_context:
+        repair_targets = repair_context.get("unresolved_targets", [])
+        repair_block = (
+            "\n\nMANDATORY SKIP REPAIR:\n"
+            f"Turn {repair_context.get('skipped_turn')} was skipped. Generate a NEW clue for exactly "
+            f"these same unresolved targets: {', '.join(repair_targets)}.\n"
+            f"Do not repeat the skipped clue \"{repair_context.get('skipped_hint', '')}\". "
+            "Do not replace, add, or drop targets. Set number to the target count and return exactly "
+            "this target set in targets.\n"
+        )
+        if condition == "adaptive":
+            interpretation = repair_context.get("participant_interpretation", [])
+            reasoning = str(repair_context.get("participant_reasoning", "") or "").strip()
+            reflection = str(repair_context.get("participant_reflection", "") or "").strip()
+            repair_block += (
+                "Participant context from the skipped interaction (use it to change the communicative angle):\n"
+                f"- interpreted cards: {', '.join(interpretation) or '(none)'}\n"
+                f"- guess reasoning: {reasoning or '(none)'}\n"
+                f"- reflection: {reflection or '(none)'}\n"
+            )
 
     return (
         f"Word type for this round: {word_type}\n"
@@ -539,6 +565,7 @@ def build_hint_user_prompt(
         f"{round_memory}"
         f"{teammate_memory}\n\n"
         f"{feedback_block}\n\n"
+        f"{repair_block}\n\n"
         "Produce the best one-word clue you can, then explain (in the reasoning field) the link and why each neutral and both bombs are safe. Respond with the JSON object only."
     )
 
@@ -699,6 +726,7 @@ def _generate_hint_with_forbidden(
     round_summaries,
     forbidden_hint=None,
     condition="adaptive",
+    repair_context=None,
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []
@@ -712,6 +740,7 @@ def _generate_hint_with_forbidden(
         for guess in item.get("correct_guesses", [])
     }
     remaining_targets = [word for word in target_words if word not in found_targets]
+    required_targets = list((repair_context or {}).get("unresolved_targets", []))
     already_guessed = {
         guess
         for item in history
@@ -737,6 +766,7 @@ def _generate_hint_with_forbidden(
                     used_hints,
                     forbidden_hint,
                     condition,
+                    repair_context,
                 ),
                 temperature=0.55,
                 model=HINT_MODEL_NAME,
@@ -757,6 +787,8 @@ def _generate_hint_with_forbidden(
             and hint not in used_hint_set
             and not is_hint_too_close_to_board(hint, board_words)
             and intended_targets
+            and (not required_targets or set(intended_targets) == set(required_targets))
+            and (not required_targets or hint_number == len(required_targets))
         ):
             return {
                 "hint": hint,
@@ -786,6 +818,7 @@ def generate_ai_hint(
     used_hints=None,
     round_summaries=None,
     condition="adaptive",
+    repair_context=None,
 ):
     return _generate_hint_with_forbidden(
         target_words,
@@ -795,8 +828,9 @@ def generate_ai_hint(
         history or [],
         used_hints or [],
         round_summaries or [],
-        forbidden_hint=None,
+        forbidden_hint=(repair_context or {}).get("skipped_hint"),
         condition=condition,
+        repair_context=repair_context,
     )
 
 
@@ -821,6 +855,7 @@ def generate_ai_hint_reroll(
         round_summaries or [],
         forbidden_hint=previous_hint,
         condition=condition,
+        repair_context=None,
     )
 
 

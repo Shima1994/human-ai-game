@@ -12,12 +12,45 @@ from core.constants import (
     MEDAL_POINTS,
     N_ROUNDS,
     TARGET_COUNT,
+    CLUE_TIMER_SECONDS,
 )
 from core.words import BOARD_TEMPLATES, WORD_BANKS
 
 
 class BoardGenerationError(ValueError):
     pass
+
+
+def start_clue_timer(started_at=None):
+    """Start a deadline for a newly active clue; ordinary reruns never call this."""
+    started_at = started_at or datetime.utcnow().isoformat()
+    st.session_state.clue_timer_started_at = started_at
+    st.session_state.clue_timer_duration_seconds = CLUE_TIMER_SECONDS
+    st.session_state.clue_timer_timeout_consumed = False
+    return started_at
+
+
+def clear_clue_timer():
+    st.session_state.clue_timer_started_at = ""
+    st.session_state.clue_timer_duration_seconds = 0
+
+
+def clue_timer_remaining(now=None):
+    started_raw = st.session_state.get("clue_timer_started_at", "")
+    if not started_raw:
+        return None
+    try:
+        started = datetime.fromisoformat(started_raw)
+    except (TypeError, ValueError):
+        return 0.0
+    now = now or datetime.utcnow()
+    duration = st.session_state.get("clue_timer_duration_seconds") or CLUE_TIMER_SECONDS
+    return max(0.0, float(duration) - (now - started).total_seconds())
+
+
+def clue_timer_expired(now=None):
+    remaining = clue_timer_remaining(now)
+    return remaining is not None and remaining <= 0
 
 
 def get_word_type_for_round(round_number):
@@ -259,6 +292,7 @@ def setup_new_round():
     st.session_state.current_hint_start_time = ""
     st.session_state.current_guess_start_time = ""
     st.session_state.current_reflection_start_time = ""
+    clear_clue_timer()
     st.session_state.last_score_change = 0
     st.session_state.round_medal = "none"
     st.session_state.round_success = False
@@ -313,10 +347,14 @@ def record_interaction(
     partial_skip=False,
     skipped_by=None,
     skip_interpreted_cards=None,
+    repair_context=None,
+    clue_timer_started_at=None,
+    timer_duration_seconds=None,
 ):
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
     skip_interpreted_cards = skip_interpreted_cards or []
+    repair_context = repair_context or {}
     guess_rationale = (guess_rationale or "").strip()
     guess_order = [
         {"position": position, "word": guess}
@@ -413,6 +451,22 @@ def record_interaction(
             "skipped_by": (skipped_by or guesser) if partial_skip else "",
             "partial_skip": bool(partial_skip),
             "skip_interpreted_cards": skip_interpreted_cards if partial_skip else [],
+            "repair_required": bool(partial_skip and clue_giver == "ai" and skipped_by == "human"),
+            "repair_source_turn": repair_context.get("skipped_turn", ""),
+            "repair_source_targets": list(repair_context.get("unresolved_targets", [])),
+            "repair_attempt": bool(repair_context),
+            "repair_same_targets_retried": bool(
+                repair_context and set(intended_targets) == set(repair_context.get("unresolved_targets", []))
+            ),
+            "repair_success": bool(
+                repair_context and set(repair_context.get("unresolved_targets", [])).issubset(set(correct_guesses))
+            ),
+            "timer_duration_seconds": timer_duration_seconds if timer_duration_seconds is not None else st.session_state.get("clue_timer_duration_seconds", CLUE_TIMER_SECONDS),
+            "clue_timer_started_at": clue_timer_started_at if clue_timer_started_at is not None else st.session_state.get("clue_timer_started_at", ""),
+            "timeout_timestamp": "",
+            "timed_out": False,
+            "timeout_repair_attempt": False,
+            "timeout_selected_cards": [],
             "wrong_guess_replacements": [],
             "wrong_guess_replacement_actor": "",
             "wrong_guess_replacement_raw_response": "",
@@ -497,10 +551,16 @@ def record_skip(
     guess_time_sec=None,
     guess_response_time_sec=None,
     skip_interpreted_cards=None,
+    repair_context=None,
+    timed_out=False,
+    timeout_timestamp="",
+    timeout_selected_cards=None,
 ):
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
     skip_interpreted_cards = skip_interpreted_cards or []
+    repair_context = repair_context or {}
+    timeout_selected_cards = timeout_selected_cards or []
     guess_rationale = (guess_rationale or "").strip()
     guess_order = []
     turn_end = datetime.utcnow()
@@ -515,7 +575,8 @@ def record_skip(
     skipped_by = skipped_by or guesser
 
     st.session_state.round_interactions += 1
-    st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
+    if not timed_out:
+        st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
     if normalized_hint and normalized_hint not in st.session_state.used_hints:
         st.session_state.used_hints.append(normalized_hint)
     st.session_state.interaction_history.append(
@@ -538,13 +599,27 @@ def record_skip(
             "bomb_guesses": [],
             "bomb_guess": None,
             "bomb_hit": False,
-            "outcome": "skip",
+            "outcome": "timeout" if timed_out else "skip",
             "alignment_status": "",
-            "error_type": "none",
-            "skipped": True,
-            "skipped_by": skipped_by,
+            "error_type": "timeout" if timed_out else "none",
+            "skipped": not timed_out,
+            "skipped_by": "" if timed_out else skipped_by,
             "partial_skip": False,
             "skip_interpreted_cards": skip_interpreted_cards,
+            "repair_required": bool(not timed_out and clue_giver == "ai" and skipped_by == "human"),
+            "repair_source_turn": repair_context.get("skipped_turn", ""),
+            "repair_source_targets": list(repair_context.get("unresolved_targets", [])),
+            "repair_attempt": bool(repair_context),
+            "repair_same_targets_retried": bool(
+                repair_context and set(intended_targets) == set(repair_context.get("unresolved_targets", []))
+            ),
+            "repair_success": False,
+            "timer_duration_seconds": st.session_state.get("clue_timer_duration_seconds", CLUE_TIMER_SECONDS),
+            "clue_timer_started_at": st.session_state.get("clue_timer_started_at", ""),
+            "timeout_timestamp": timeout_timestamp if timed_out else "",
+            "timed_out": bool(timed_out),
+            "timeout_repair_attempt": bool(timed_out and repair_context),
+            "timeout_selected_cards": list(timeout_selected_cards) if timed_out else [],
             "wrong_guess_replacements": [],
             "wrong_guess_replacement_actor": "",
             "wrong_guess_replacement_raw_response": "",
@@ -602,10 +677,53 @@ def record_skip(
             "reflection_source": "",
         }
     )
-    st.session_state.pending_reflection_turn = st.session_state.round_interactions
+    st.session_state.pending_reflection_turn = (
+        None if timed_out else st.session_state.round_interactions
+    )
 
     if st.session_state.round_interactions >= MAX_INTERACTIONS_PER_ROUND:
         finish_round()
+
+
+def record_timeout(
+    hint,
+    hint_number,
+    intended_targets=None,
+    expected_guesses=None,
+    guess_rationale="",
+    hint_explanation="",
+    timeout_selected_cards=None,
+    skip_interpreted_cards=None,
+    repair_context=None,
+    hint_raw_response="",
+    hint_time_sec=None,
+    ai_understanding_rating_before=None,
+):
+    if st.session_state.get("clue_timer_timeout_consumed", False):
+        return None
+    st.session_state.clue_timer_timeout_consumed = True
+    timeout_timestamp = datetime.utcnow().isoformat()
+    record_skip(
+        hint,
+        hint_number,
+        intended_targets,
+        expected_guesses,
+        guess_rationale=guess_rationale,
+        hint_explanation=hint_explanation,
+        skipped_by="",
+        hint_raw_response=hint_raw_response,
+        hint_time_sec=hint_time_sec,
+        skip_interpreted_cards=skip_interpreted_cards,
+        repair_context=repair_context,
+        timed_out=True,
+        timeout_timestamp=timeout_timestamp,
+        timeout_selected_cards=timeout_selected_cards,
+    )
+    if st.session_state.get("interaction_history"):
+        st.session_state.interaction_history[-1]["ai_understanding_rating_before"] = (
+            ai_understanding_rating_before
+        )
+    return timeout_timestamp
 
 
 def finish_round():

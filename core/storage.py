@@ -148,6 +148,18 @@ INTERACTION_LOG_FIELDS = [
     "skip_interpreted_cards",
     "skip_interpreted_word_types",
     "skip_interpreted_count",
+    "repair_required",
+    "repair_source_turn",
+    "repair_source_targets",
+    "repair_attempt",
+    "repair_same_targets_retried",
+    "repair_success",
+    "timer_duration_seconds",
+    "clue_timer_started_at",
+    "timeout_timestamp",
+    "timed_out",
+    "timeout_repair_attempt",
+    "timeout_selected_cards",
     "wrong_guess_replacements",
     "wrong_guess_replacement_word_types",
     "wrong_guess_replacement_count",
@@ -334,6 +346,18 @@ TURNS_LOG_FIELDS = [
     "ai_explanation",
     "repair_applied_to_next_prompt",
     "repair_context_used",
+    "repair_required",
+    "repair_source_turn",
+    "repair_source_targets",
+    "repair_attempt",
+    "repair_same_targets_retried",
+    "repair_success",
+    "timer_duration_seconds",
+    "clue_timer_started_at",
+    "timeout_timestamp",
+    "timed_out",
+    "timeout_repair_attempt",
+    "timeout_selected_cards",
     "llm_model",
     "llm_temperature",
     "llm_prompt_version",
@@ -715,6 +739,18 @@ def clean_interaction_history(history):
                 "skip_interpreted_cards": list(
                     item.get("skip_interpreted_cards", [])
                 ),
+                "repair_required": bool(item.get("repair_required", False)),
+                "repair_source_turn": item.get("repair_source_turn", ""),
+                "repair_source_targets": list(item.get("repair_source_targets", [])),
+                "repair_attempt": bool(item.get("repair_attempt", False)),
+                "repair_same_targets_retried": bool(item.get("repair_same_targets_retried", False)),
+                "repair_success": bool(item.get("repair_success", False)),
+                "timer_duration_seconds": item.get("timer_duration_seconds", ""),
+                "clue_timer_started_at": item.get("clue_timer_started_at", ""),
+                "timeout_timestamp": item.get("timeout_timestamp", ""),
+                "timed_out": bool(item.get("timed_out", False)),
+                "timeout_repair_attempt": bool(item.get("timeout_repair_attempt", False)),
+                "timeout_selected_cards": list(item.get("timeout_selected_cards", [])),
                 "wrong_guess_replacements": list(
                     item.get("wrong_guess_replacements", [])
                 ),
@@ -1213,20 +1249,30 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "ai_explanation_is_valid": str(ai_valid).lower(),
         "ai_explanation_blocked_reason": item.get("ai_explanation_blocked_reason", ""),
         "ai_explanation": ai_sanitized,
-        "repair_applied_to_next_prompt": str(
-            st.session_state.get("condition") == "adaptive" and bool(item.get("reflection_source"))
-        ).lower(),
+        "repair_applied_to_next_prompt": str(bool(item.get("repair_attempt"))).lower(),
         "repair_context_used": _json_obj(
             {
-                "source": item.get("reflection_source", ""),
-                "rating": item.get("human_understanding_rating", ""),
-                "relationship_type": item.get("human_relationship_type", "") or item.get("ai_relationship_type", ""),
-                "explanation": human_sanitized if human_valid else "",
-                "ai_explanation": ai_sanitized if ai_valid else "",
+                "source_turn": item.get("repair_source_turn", ""),
+                "source_targets": item.get("repair_source_targets", []),
+                "adaptive_reflection_available": bool(
+                    st.session_state.get("condition") == "adaptive" and item.get("repair_attempt")
+                ),
             }
-            if st.session_state.get("condition") == "adaptive"
+            if item.get("repair_attempt")
             else {}
         ),
+        "repair_required": str(bool(item.get("repair_required", False))).lower(),
+        "repair_source_turn": item.get("repair_source_turn", ""),
+        "repair_source_targets": _json(item.get("repair_source_targets", [])),
+        "repair_attempt": str(bool(item.get("repair_attempt", False))).lower(),
+        "repair_same_targets_retried": str(bool(item.get("repair_same_targets_retried", False))).lower(),
+        "repair_success": str(bool(item.get("repair_success", False))).lower(),
+        "timer_duration_seconds": item.get("timer_duration_seconds", ""),
+        "clue_timer_started_at": item.get("clue_timer_started_at", ""),
+        "timeout_timestamp": item.get("timeout_timestamp", ""),
+        "timed_out": str(bool(item.get("timed_out", False))).lower(),
+        "timeout_repair_attempt": str(bool(item.get("timeout_repair_attempt", False))).lower(),
+        "timeout_selected_cards": _json(item.get("timeout_selected_cards", [])),
         **llm_fields,
     }
 
@@ -1473,6 +1519,18 @@ def log_round(participant_id):
                     item.get("skip_interpreted_cards", []), word_type_per_card
                 ),
                 len(item.get("skip_interpreted_cards", [])),
+                int(item.get("repair_required", False)),
+                item.get("repair_source_turn", ""),
+                ";".join(item.get("repair_source_targets", [])),
+                int(item.get("repair_attempt", False)),
+                int(item.get("repair_same_targets_retried", False)),
+                int(item.get("repair_success", False)),
+                item.get("timer_duration_seconds", ""),
+                item.get("clue_timer_started_at", ""),
+                item.get("timeout_timestamp", ""),
+                int(item.get("timed_out", False)),
+                int(item.get("timeout_repair_attempt", False)),
+                ";".join(item.get("timeout_selected_cards", [])),
                 ";".join(item.get("wrong_guess_replacements", [])),
                 _join_word_types(
                     item.get("wrong_guess_replacements", []), word_type_per_card
