@@ -7,6 +7,7 @@ import streamlit as st
 from openai import OpenAI
 
 from core.constants import (
+    AI_API_TIMEOUT_SECONDS,
     DEFAULT_CONDITION,
     GUESS_MODEL_NAME,
     HINT_MODEL_NAME,
@@ -42,6 +43,7 @@ def call_openai_chat(
             {"role": "user", "content": user_prompt},
         ],
         "temperature": temperature,
+        "timeout": AI_API_TIMEOUT_SECONDS,
     }
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}

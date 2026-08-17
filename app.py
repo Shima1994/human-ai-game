@@ -23,8 +23,8 @@ st.set_page_config(
 
 
 def main():
-    inject_css()
     init_session_state()
+    inject_css()
 
     if not st.session_state.consent_given:
         render_app_header()

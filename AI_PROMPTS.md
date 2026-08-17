@@ -212,7 +212,7 @@ Primary-call temperature is `0.2`; forced JSON mode is disabled so the reroll li
 - full/partial skip fields and actor;
 - the guesser's separate `skip_interpreted_cards`, word types, and count;
 - skip-repair linkage (`repair_required`, source turn/targets, repair-attempt and same-target flags, and repair success);
-- per-clue timer duration/start, timeout timestamp/status, repair-timeout status, and unsubmitted selected cards retained for analysis;
+- participant decision-timer duration/start, human-timeout timestamp/status, repair-timeout status, and unsubmitted selected cards retained for analysis;
 - post-outcome replacement cards for non-bomb wrong guesses, including raw-response and timing metadata;
 - completed and abandoned guess counts;
 - correctness, alignment, error type, and bomb outcome.

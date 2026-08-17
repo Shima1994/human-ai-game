@@ -16,6 +16,7 @@ from core.ai_service import (
     validate_human_hint_with_history,
 )
 from core.constants import (
+    AI_API_TIMEOUT_SECONDS,
     BOARD_SIZE,
     BOMB_COUNT,
     MAX_SKIPS_PER_ROUND,
@@ -28,13 +29,13 @@ from core.constants import (
 )
 from core.game_logic import (
     can_skip_current_clue,
-    clear_clue_timer,
-    clue_timer_expired,
-    clue_timer_remaining,
+    clear_participant_decision_timer,
+    participant_decision_timer_expired,
+    participant_decision_time_remaining,
     record_interaction,
     record_skip,
     record_timeout,
-    start_clue_timer,
+    start_participant_decision_timer,
     update_current_round_summary,
 )
 from core.storage import initialize_session_log, log_event, log_round, log_session_state
@@ -384,7 +385,7 @@ def _clear_current_clue():
     st.session_state.current_reflection_start_time = ""
     st.session_state.pending_ai_guess_review = None
     st.session_state.pending_hint_meta = None
-    clear_clue_timer()
+    clear_participant_decision_timer()
 
 
 def _log_timeout(timeout_timestamp, repair_context):
@@ -397,10 +398,18 @@ def _log_timeout(timeout_timestamp, repair_context):
                 "clue_timer_duration_seconds", CLUE_TIMER_SECONDS
             ),
             "clue_start_timestamp": st.session_state.get("clue_timer_started_at", ""),
+            "human_decision_started_at": st.session_state.get("clue_timer_started_at", ""),
+            "human_decision_ended_at": timeout_timestamp,
+            "human_decision_time_sec": _seconds_between(
+                st.session_state.get("clue_timer_started_at", ""), timeout_timestamp
+            ),
+            "human_timed_out": True,
             "timeout_timestamp": timeout_timestamp,
             "timed_out": True,
             "repair_attempt": bool(repair_context),
             "repair_source_turn": (repair_context or {}).get("skipped_turn", ""),
+            "repair_chain_id": (repair_context or {}).get("repair_chain_id", ""),
+            "repair_attempt_number": (repair_context or {}).get("repair_attempt_number", ""),
             "role": st.session_state.get("role", ""),
         },
         turn_number=st.session_state.round_interactions,
@@ -409,7 +418,7 @@ def _log_timeout(timeout_timestamp, repair_context):
 
 def _consume_human_guess_timeout():
     """Consume an expired AI-clue turn once, preserving unsubmitted analysis input."""
-    if not st.session_state.get("hint") or not clue_timer_expired():
+    if not st.session_state.get("hint") or not participant_decision_timer_expired():
         return False
     pending_meta = st.session_state.get("pending_hint_meta") or {}
     repair_context = pending_meta.get("repair_context")
@@ -436,6 +445,45 @@ def _consume_human_guess_timeout():
     return True
 
 
+def _consume_human_clue_timeout():
+    """Consume an expired human clue-form task without invoking the AI."""
+    if not participant_decision_timer_expired():
+        return False
+    turn_index = st.session_state.round_interactions
+    hint = st.session_state.get(
+        f"human_hint_{st.session_state.round}_{turn_index}", ""
+    )
+    hint_number = int(
+        st.session_state.get(
+            f"clue_count_{st.session_state.round}_{turn_index}",
+            st.session_state.get("hint_number", 1),
+        )
+        or 1
+    )
+    expected_guesses = list(
+        st.session_state.get(
+            f"expected_guesses_{st.session_state.round}_{turn_index}", []
+        )
+    )
+    rating_before = st.session_state.get(
+        f"before_ai_guess_rating_{st.session_state.round}_{turn_index}"
+    )
+    timeout_timestamp = record_timeout(
+        hint,
+        hint_number,
+        list(st.session_state.get("hint_targets", [])),
+        expected_guesses,
+        hint_time_sec=_seconds_between(
+            st.session_state.get("current_hint_start_time", "")
+        ),
+        ai_understanding_rating_before=rating_before,
+    )
+    _log_timeout(timeout_timestamp, None)
+    st.session_state.last_timeout_notice = True
+    _clear_current_clue()
+    return True
+
+
 def _pending_ai_clue_repair_context():
     """Return the latest skipped AI-clue target set until a linked retry exists."""
     history = st.session_state.get("interaction_history", [])
@@ -455,6 +503,10 @@ def _pending_ai_clue_repair_context():
         ]
         if not unresolved:
             return None
+        chain_id = item.get("repair_chain_id") or (
+            f"{st.session_state.get('session_id', '')}:"
+            f"r{st.session_state.round}:t{item.get('turn')}"
+        )
         return {
             "skipped_turn": item.get("turn"),
             "skipped_hint": item.get("hint", ""),
@@ -462,6 +514,8 @@ def _pending_ai_clue_repair_context():
             "participant_interpretation": list(item.get("skip_interpreted_cards", [])),
             "participant_reasoning": item.get("guess_rationale", ""),
             "participant_reflection": item.get("reflection_explanation_raw", ""),
+            "repair_chain_id": chain_id,
+            "repair_attempt_number": int(item.get("repair_attempt_number", 0) or 0) + 1,
         }
     return None
 
@@ -488,6 +542,7 @@ def _generate_and_store_ai_hint():
             "ai_clue_generation_failed",
             {
                 "error": str(error),
+                "technical_timeout_seconds": AI_API_TIMEOUT_SECONDS,
                 "attempts": error.attempts,
                 "last_raw_response": error.last_raw,
                 "response_time_sec": error.response_time_sec,
@@ -504,9 +559,9 @@ def _generate_and_store_ai_hint():
     st.session_state.hint_expected_guesses = hint_result.get("expected_guesses", [])
     st.session_state.hint_explanation = hint_result.get("explanation", "")
     st.session_state.current_hint_start_time = hint_start_time
-    st.session_state.current_turn_start_time = hint_start_time
+    st.session_state.current_turn_start_time = hint_end_time
     st.session_state.current_guess_start_time = hint_end_time
-    start_clue_timer(hint_end_time)
+    start_participant_decision_timer(hint_end_time)
     st.session_state.pending_hint_meta = {
         "raw_response": hint_result.get("raw_response", ""),
         "hint_time_sec": hint_time_sec,
@@ -980,6 +1035,8 @@ def screen_human_clue():
 
     if st.session_state.pop("last_timeout_notice", False):
         st.warning("Time expired. The clue used one turn and no guesses were submitted.")
+    if st.session_state.pop("ai_reroll_notice", False):
+        st.warning("The AI asked for another clue.")
 
     with st.container(border=True):
         st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
@@ -1017,6 +1074,8 @@ def screen_human_clue():
                 ),
                 clue_timer_started_at=pending_review.get("clue_timer_started_at"),
                 timer_duration_seconds=pending_review.get("timer_duration_seconds"),
+                human_decision_ended_at=pending_review.get("human_decision_ended_at"),
+                human_decision_time_sec=pending_review.get("human_decision_time_sec"),
             )
             _attach_ai_wrong_guess_replacements(
                 st.session_state.interaction_history[-1]
@@ -1066,6 +1125,18 @@ def screen_human_clue():
         unsafe_allow_html=True,
     )
     _ensure_timer("current_hint_start_time")
+    if participant_decision_time_remaining() is None:
+        start_participant_decision_timer(
+            st.session_state.get("current_hint_start_time") or _now_iso()
+        )
+        st.session_state.current_turn_start_time = st.session_state.get(
+            "current_hint_start_time", ""
+        )
+    if _consume_human_clue_timeout():
+        st.rerun()
+    participant_timer_placeholder = st.empty()
+    with participant_timer_placeholder:
+        render_clue_timer(participant_decision_time_remaining())
 
     with st.container(border=True):
         clue_col, count_col = st.columns([4.2, 1.2])
@@ -1182,6 +1253,12 @@ def screen_human_clue():
             )
             intended_targets = st.session_state.hint_targets[:]
             expected_guess_cards = st.session_state.hint_expected_guesses[:]
+            clue_timer_started_at = st.session_state.get("clue_timer_started_at", "")
+            timer_duration_seconds = st.session_state.get(
+                "clue_timer_duration_seconds", CLUE_TIMER_SECONDS
+            )
+            participant_timer_placeholder.empty()
+            clear_participant_decision_timer()
             log_event(
                 "clue_submitted",
                 {
@@ -1195,8 +1272,6 @@ def screen_human_clue():
             log_event("ai_guess_started", {"clue": st.session_state.hint}, turn_number=st.session_state.round_interactions + 1)
             guess_start_time = _now_iso()
             st.session_state.current_guess_start_time = guess_start_time
-            start_clue_timer(guess_start_time)
-            render_clue_timer(clue_timer_remaining())
             with st.spinner("AI is thinking..."):
                 guess_result = ai_guess(
                     st.session_state.board,
@@ -1213,25 +1288,18 @@ def screen_human_clue():
             guess_end_time = _now_iso()
             guess_time_sec = _seconds_between(guess_start_time, guess_end_time)
 
-            if clue_timer_expired():
-                timeout_timestamp = record_timeout(
-                    st.session_state.hint,
-                    st.session_state.hint_number,
-                    intended_targets,
-                    expected_guess_cards,
-                    hint_time_sec=hint_time_sec,
-                    ai_understanding_rating_before=rating_before,
-                )
-                _log_timeout(timeout_timestamp, None)
-                st.session_state.last_timeout_notice = True
-                _clear_current_clue()
-                st.rerun()
-
             action = guess_result.get("action", "guess")
-            clue_timer_started_at = st.session_state.get("clue_timer_started_at", "")
-            timer_duration_seconds = st.session_state.get(
-                "clue_timer_duration_seconds", CLUE_TIMER_SECONDS
-            )
+            raw_ai_response = str(guess_result.get("raw_response", "") or "")
+            if raw_ai_response.startswith("<api_error:"):
+                log_event(
+                    "ai_api_failed",
+                    {
+                        "error": raw_ai_response,
+                        "technical_timeout_seconds": AI_API_TIMEOUT_SECONDS,
+                        "human_timeout": False,
+                    },
+                    turn_number=st.session_state.round_interactions + 1,
+                )
             log_event(
                 "ai_guess_completed",
                 {
@@ -1246,12 +1314,13 @@ def screen_human_clue():
                 turn_number=st.session_state.round_interactions + 1,
             )
             if action == "reroll":
-                clear_clue_timer()
                 if st.session_state.ai_rerolls > 0:
                     st.session_state.ai_rerolls -= 1
-                    st.warning("The AI asked for another clue.")
+                    st.session_state.ai_reroll_notice = True
+                    st.session_state.current_hint_start_time = ""
                 else:
                     st.warning("No AI rerolls remain. Please adjust the clue.")
+                st.rerun()
             elif action == "skip":
                 record_skip(
                     st.session_state.hint,
@@ -1268,6 +1337,10 @@ def screen_human_clue():
                     guess_raw_response=guess_result.get("raw_response", ""),
                     guess_time_sec=guess_time_sec,
                     guess_response_time_sec=guess_result.get("response_time_sec"),
+                    clue_timer_started_at=clue_timer_started_at,
+                    timer_duration_seconds=timer_duration_seconds,
+                    human_decision_ended_at=hint_end_time,
+                    human_decision_time_sec=hint_time_sec,
                 )
                 log_event(
                     "skip_used",
@@ -1302,8 +1375,9 @@ def screen_human_clue():
                     ),
                     "clue_timer_started_at": clue_timer_started_at,
                     "timer_duration_seconds": timer_duration_seconds,
+                    "human_decision_ended_at": hint_end_time,
+                    "human_decision_time_sec": hint_time_sec,
                 }
-                clear_clue_timer()
                 st.rerun()
 
     render_interaction_history(
@@ -1353,7 +1427,7 @@ def screen_human_guesser():
                 st.rerun()
             return
     else:
-        remaining_time = clue_timer_remaining()
+        remaining_time = participant_decision_time_remaining()
         if remaining_time is not None:
             render_clue_timer(remaining_time)
         render_hint_panel(
@@ -1465,7 +1539,7 @@ def screen_human_guesser():
                         st.session_state.hint_expected_guesses = []
                         st.session_state.hint_explanation = ""
                     st.session_state.pending_hint_meta = None
-                    clear_clue_timer()
+                    clear_participant_decision_timer()
                 st.rerun()
 
     if st.session_state.hint:

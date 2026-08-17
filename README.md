@@ -66,7 +66,7 @@ Baseline prompt construction uses dedicated fact-only history formatters. Intend
 ### Full and partial skips
 
 At most two skips are available per round, and a skip is unavailable on the final possible turn.
-Each active clue has a configurable countdown (currently 120 seconds). A timeout consumes the turn without submitting guesses or consuming a skip.
+Each human clue-giving or guessing task has a configurable decision countdown (currently 120 seconds). AI/API processing uses a separate technical timeout and never reduces the participant's decision window. A human timeout consumes the turn without submitting guesses or consuming a skip.
 When a human skips an AI clue, the AI's next clue retries the same unresolved intended targets with a different clue. Adaptive sessions may use the participant's recorded interpretation and reflection to improve that repair; baseline sessions retry the targets without receiving reflection context.
 
 - **Full skip:** no card is selected; the clue is abandoned; one full skip is consumed.
@@ -122,6 +122,8 @@ Six CSV files are maintained under `data/`:
 | `game_rounds.csv` | one row per round | wide backward-compatible research export |
 | `game_interactions.csv` | one row per turn | wide backward-compatible interaction export |
 
+For primary analysis, use the normalized `sessions.csv`, `rounds.csv`, `turns.csv`, and `events.csv` tables. The `game_rounds.csv` and `game_interactions.csv` files are backward-compatible wide/audit exports (and the durable remote exports when GitHub storage is enabled); do not combine their duplicate measures with normalized rows as if they were additional observations.
+
 `session_id`, `participant_id`, `condition`, `round_number`, and `turn_number` are the primary join keys. Exact schemas are defined by the field lists in `core/storage.py`; these lists are the source of truth.
 
 Important turn-level fields include:
@@ -134,8 +136,13 @@ Important turn-level fields include:
 - counterfactual wrong-guess replacements, actor, word types, count, and AI-call metadata;
 - raw and sanitized human/AI explanations plus validation status and block reason;
 - reflection rating and timing;
+- explicit human-decision start/end/duration/timeout fields, separate from LLM latency;
 - raw LLM response, parsed response, model, temperature, retries, and latency;
-- `repair_applied_to_next_prompt` and condition-specific repair context.
+- `repair_applied_to_next_prompt`, immediate `repair_source_turn`, stable `repair_chain_id`, and `repair_attempt_number` for repeated repairs.
+
+Turn metrics use the live game outcome: `hit_rate` is target guesses divided by all submitted guesses, `target_yield` and `turn_score_delta` are newly found targets, and `jaccard_alignment` compares intended and guessed-card sets. Skip/timeout rows have zero outcome metrics because no guesses were finalized; unavailable legacy/incomplete metrics remain blank.
+
+Rating fields intentionally represent different stages. `ai_understanding_rating_before` is the human clue-giver's expectation before the AI guess. `human_understanding_rating` is the post-turn shared-understanding rating and is also retained as `reflection_rating` in the wide compatibility exports. `perception_rating_end` in `game_rounds.csv` is the latest post-turn shared-understanding rating at round end, not a separate end-of-round scale. `human_round_feedback` is the qualitative end-of-round response. The five `post_game_*` session fields are the final questionnaire items. `ai_understanding_rating_after` is retained only for backward schema compatibility and is currently non-applicable.
 
 ### Serialization conventions
 

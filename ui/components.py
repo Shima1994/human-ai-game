@@ -96,7 +96,7 @@ def render_clue_timer(remaining_seconds):
         f"""
         <div style="font-family:system-ui;text-align:center;font-weight:700;font-size:1.05rem;"
              aria-live="polite">
-          Time remaining: <span id="clue-timer">{remaining // 60:02d}:{remaining % 60:02d}</span>
+          Decision time remaining: <span id="clue-timer">{remaining // 60:02d}:{remaining % 60:02d}</span>
         </div>
         <script>
           let remaining = {remaining};
