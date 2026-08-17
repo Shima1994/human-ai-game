@@ -7,6 +7,7 @@ import streamlit as st
 from openai import OpenAI
 
 from core.constants import (
+    DEFAULT_CONDITION,
     GUESS_MODEL_NAME,
     HINT_MODEL_NAME,
     MAX_HINT_NUMBER,
@@ -482,7 +483,7 @@ def build_hint_user_prompt(
     round_summaries=None,
     used_hints=None,
     forbidden_hint=None,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
     repair_context=None,
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
@@ -725,7 +726,7 @@ def _generate_hint_with_forbidden(
     used_hints,
     round_summaries,
     forbidden_hint=None,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
     repair_context=None,
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
@@ -817,7 +818,7 @@ def generate_ai_hint(
     history=None,
     used_hints=None,
     round_summaries=None,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
     repair_context=None,
 ):
     return _generate_hint_with_forbidden(
@@ -843,7 +844,7 @@ def generate_ai_hint_reroll(
     history=None,
     used_hints=None,
     round_summaries=None,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
 ):
     return _generate_hint_with_forbidden(
         target_words,
@@ -928,7 +929,7 @@ def build_guess_user_prompt(
     round_summaries,
     remaining_skips,
     can_skip,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
 ):
     available_board = [word for word in board if word not in previous_guesses]
     word_type_per_card = st.session_state.get("word_type_per_card", {})
@@ -986,7 +987,7 @@ def build_guess_repair_prompt(
     previous_response,
     history=None,
     round_summaries=None,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
 ):
     available_board = [word for word in board if word not in previous_guesses]
     return (
@@ -1142,7 +1143,7 @@ def ai_guess(
     round_summaries=None,
     remaining_skips=0,
     can_skip=False,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
 ):
     history = history or []
     previous_guesses = previous_guesses or []
@@ -1335,7 +1336,7 @@ def generate_ai_round_reflection(
     round_success,
     round_bomb_hit,
     round_medal,
-    condition="adaptive",
+    condition=DEFAULT_CONDITION,
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
         bomb_words = [bomb_words] if bomb_words else []

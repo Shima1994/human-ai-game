@@ -736,10 +736,6 @@ def inject_css():
             background: rgba(109, 106, 99, 0.20);
             color: #403f3b;
         }
-        .medal.bronze {
-            background: rgba(142, 84, 38, 0.22);
-            color: #5f3415;
-        }
         .final-score {
             display: inline-flex;
             margin-top: 0.9rem;
@@ -1171,8 +1167,38 @@ def inject_css():
             margin: 0;
             transition: border-color 0.15s ease, background 0.15s ease;
         }
+        /* Streamlit/BaseWeb applies theme colors to nested option text. Keep
+           every radio option readable on the light option surfaces above. */
+        .stRadio [role="radiogroup"] label,
+        .stRadio [role="radiogroup"] label p,
+        .stRadio [role="radiogroup"] label span,
+        .stRadio [role="radiogroup"] label [data-testid="stMarkdownContainer"],
+        .stRadio [role="radiogroup"] label [data-testid="stMarkdownContainer"] p,
+        .stRadio [data-baseweb="radio"],
+        .stRadio [data-baseweb="radio"] p,
+        .stRadio [data-baseweb="radio"] span {
+            color: var(--color-heading) !important;
+            -webkit-text-fill-color: var(--color-heading) !important;
+        }
+        .stRadio [role="radiogroup"] label:has(input:checked),
+        .stRadio [data-baseweb="radio"]:has(input:checked) {
+            background: #EEF5FC !important;
+            border-color: rgba(29, 94, 168, 0.55) !important;
+        }
+        .stRadio [role="radiogroup"] label:has(input:disabled),
+        .stRadio [data-baseweb="radio"]:has(input:disabled) {
+            background: #F1F3F5 !important;
+            opacity: 0.72 !important;
+        }
         .stRadio label:hover {
             border-color: var(--color-primary);
+            background: #F3F7FC;
+        }
+        .stRadio [role="radiogroup"] label:focus-within,
+        .stRadio [data-baseweb="radio"]:focus-within {
+            border-color: var(--color-primary) !important;
+            box-shadow: 0 0 0 3px rgba(29, 94, 168, 0.16);
+            outline: none;
         }
         .stRadio label > div {
             justify-content: center;

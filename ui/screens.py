@@ -24,6 +24,7 @@ from core.constants import (
     TARGET_COUNT,
     TEAM_GOAL_SCORE,
     CLUE_TIMER_SECONDS,
+    DEFAULT_CONDITION,
 )
 from core.game_logic import (
     can_skip_current_clue,
@@ -215,7 +216,7 @@ def _display_player_name():
 
 
 def _share_explanations():
-    return st.session_state.get("condition", "adaptive") == "adaptive"
+    return st.session_state.get("condition", DEFAULT_CONDITION) == "adaptive"
 
 
 def _history_with_pending_ai_guess(pending_review):
@@ -478,7 +479,7 @@ def _generate_and_store_ai_hint():
                 st.session_state.interaction_history,
                 st.session_state.used_hints,
                 st.session_state.ai_round_summaries,
-                condition=st.session_state.get("condition", "adaptive"),
+                condition=st.session_state.get("condition", DEFAULT_CONDITION),
                 repair_context=repair_context,
             )
     except AIClueGenerationError as error:
@@ -750,7 +751,7 @@ def render_turn_reflection():
     )
     # Once the round is closed, no further guesses can be influenced by the
     # reflection. Card names are therefore safe to mention regardless of why
-    # the round ended (bomb, all targets found, or the fourth turn used).
+    # the round ended (bomb, all targets found, or the final turn used).
     round_is_closed = bool(
         round_ended_by_bomb or st.session_state.get("round_finished", False)
     )
@@ -1207,7 +1208,7 @@ def screen_human_clue():
                     st.session_state.ai_round_summaries,
                     MAX_SKIPS_PER_ROUND - st.session_state.get("round_skips", 0),
                     can_skip_current_clue(),
-                    condition=st.session_state.get("condition", "adaptive"),
+                    condition=st.session_state.get("condition", DEFAULT_CONDITION),
                 )
             guess_end_time = _now_iso()
             guess_time_sec = _seconds_between(guess_start_time, guess_end_time)
@@ -1628,7 +1629,7 @@ def screen_round_summary():
                     st.session_state.round_success,
                     st.session_state.round_bomb_hit,
                     st.session_state.round_medal,
-                    condition=st.session_state.get("condition", "adaptive"),
+                    condition=st.session_state.get("condition", DEFAULT_CONDITION),
                 )
                 update_current_round_summary()
 
@@ -1735,7 +1736,7 @@ def screen_game_over():
         f"""
         <div class="glass-card game-over-card celebration-card">
             <div class="celebration-medals">
-                <span>&#129351;</span><span>&#129352;</span><span>&#129353;</span>
+                <span>&#129351;</span><span>&#129352;</span>
             </div>
             <div class="panel-title">Final result</div>
             <h2 style="margin-top:0; margin-bottom:0.45rem;">{title}</h2>
@@ -1747,7 +1748,7 @@ def screen_game_over():
         unsafe_allow_html=True,
     )
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     medal_counts = st.session_state.medal_counts
     col1.markdown(
         f"<div class='summary-stat'><strong>&#129351; Gold</strong><br>{medal_counts.get('gold', 0)}</div>",
@@ -1757,11 +1758,6 @@ def screen_game_over():
         f"<div class='summary-stat'><strong>&#129352; Silver</strong><br>{medal_counts.get('silver', 0)}</div>",
         unsafe_allow_html=True,
     )
-    col3.markdown(
-        f"<div class='summary-stat'><strong>&#129353; Bronze</strong><br>{medal_counts.get('bronze', 0)}</div>",
-        unsafe_allow_html=True,
-    )
-
     if not st.session_state.get("post_game_questionnaire_submitted"):
         with st.container(border=True, key="post_game_questionnaire_panel"):
             st.markdown(

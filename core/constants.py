@@ -6,6 +6,9 @@ REFLECTION_MODEL_NAME = "gpt-4o"
 
 MODEL_NAME = HINT_MODEL_NAME
 
+VALID_CONDITIONS = frozenset({"baseline", "adaptive"})
+DEFAULT_CONDITION = "adaptive"
+
 N_ROUNDS = 4
 MAX_TEAM_SCORE = 20
 TEAM_GOAL_SCORE = 12
@@ -19,7 +22,6 @@ CLUE_TIMER_SECONDS = 120
 MEDAL_POINTS = {
     "gold": 5,
     "silver": 4,
-    "bronze": 3,
     "none": 0,
 }
 AI_REROLLS_PER_GAME = 2

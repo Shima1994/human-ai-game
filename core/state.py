@@ -4,10 +4,12 @@ from datetime import datetime
 
 import streamlit as st
 
-from core.constants import AI_REROLLS_PER_GAME, HUMAN_REROLLS_PER_GAME
-
-VALID_CONDITIONS = {"baseline", "adaptive"}
-DEFAULT_CONDITION = "baseline"
+from core.constants import (
+    AI_REROLLS_PER_GAME,
+    DEFAULT_CONDITION,
+    HUMAN_REROLLS_PER_GAME,
+    VALID_CONDITIONS,
+)
 
 
 def _new_session_id():
@@ -111,7 +113,7 @@ def init_session_state():
         "round_medal": "none",
         "round_success": False,
         "round_bomb_hit": False,
-        "medal_counts": {"gold": 0, "silver": 0, "bronze": 0, "none": 0},
+        "medal_counts": {"gold": 0, "silver": 0, "none": 0},
         "remote_log_status": "",
         "remote_log_error": "",
         "pending_hint_meta": None,
@@ -218,7 +220,7 @@ def restart_game(keep_participant=False):
     st.session_state.ai_rerolls = AI_REROLLS_PER_GAME
     st.session_state.human_rerolls = HUMAN_REROLLS_PER_GAME
     st.session_state.game_over = False
-    st.session_state.medal_counts = {"gold": 0, "silver": 0, "bronze": 0, "none": 0}
+    st.session_state.medal_counts = {"gold": 0, "silver": 0, "none": 0}
     st.session_state.used_hints = []
     st.session_state.used_board_words = []
     st.session_state.used_board_words_by_type = {"abstract": [], "concrete": []}

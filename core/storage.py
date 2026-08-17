@@ -11,6 +11,7 @@ import streamlit as st
 
 from core.constants import (
     DATA_FILE,
+    DEFAULT_CONDITION,
     EVENTS_DATA_FILE,
     GUESS_MODEL_NAME,
     HINT_MODEL_NAME,
@@ -20,15 +21,12 @@ from core.constants import (
     ROUNDS_DATA_FILE,
     SESSIONS_DATA_FILE,
     TURNS_DATA_FILE,
+    VALID_CONDITIONS,
 )
 from core.game_logic import compute_score_change
 
 
 CONDITION_ASSIGNMENT_LOCK = threading.RLock()
-VALID_CONDITIONS = {"baseline", "adaptive"}
-DEFAULT_CONDITION = "adaptive"
-
-
 ROUND_LOG_FIELDS = [
     "session_id",
     "timestamp_utc",
@@ -855,7 +853,7 @@ def _session_row(completed=False):
         "ai_experience": st.session_state.get("ai_experience", ""),
         "codenames_experience": st.session_state.get("codenames_experience", ""),
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "adaptive"),
+        "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "starting_role": st.session_state.get("starting_role", ""),
         "start_time": st.session_state.get("session_start_time", ""),
         "end_time": st.session_state.get("session_end_time", "") if completed else "",
@@ -996,7 +994,7 @@ def log_event(event_type, payload=None, round_number=None, turn_number=None):
     row = {
         "participant_id": st.session_state.get("participant_id", ""),
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "adaptive"),
+        "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "timestamp": _iso_now(),
         "event_type": event_type,
         "round_number": round_number if round_number is not None else st.session_state.get("round", ""),
@@ -1070,7 +1068,7 @@ def _round_analysis_row(participant_id, timestamp, score_change):
     return {
         "participant_id": participant_id,
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "adaptive"),
+        "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "round_number": st.session_state.round,
         "round_role": st.session_state.role,
         "clue_giver": clue_giver,
@@ -1104,7 +1102,7 @@ def _round_analysis_row(participant_id, timestamp, score_change):
 
 def _llm_fields_for_turn(item):
     clue_giver = item.get("clue_giver", "")
-    condition = st.session_state.get("condition", "adaptive")
+    condition = st.session_state.get("condition", DEFAULT_CONDITION)
     if clue_giver == "ai":
         raw = item.get("hint_raw_response", "")
         latency = item.get("hint_response_time_sec")
@@ -1159,7 +1157,7 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
     return {
         "participant_id": participant_id,
         "session_id": st.session_state.get("session_id", ""),
-        "condition": st.session_state.get("condition", "adaptive"),
+        "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "round_number": st.session_state.round,
         "turn_number": item.get("turn", ""),
         "clue_giver": item.get("clue_giver", ""),
@@ -1378,7 +1376,7 @@ def log_round(participant_id):
     )
 
     session_id = st.session_state.get("session_id", "")
-    condition = st.session_state.get("condition", "adaptive")
+    condition = st.session_state.get("condition", DEFAULT_CONDITION)
     starting_role = st.session_state.get("starting_role", "")
     round_role = st.session_state.get("role", "")
     word_type_per_card = st.session_state.get("word_type_per_card", {})

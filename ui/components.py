@@ -16,7 +16,6 @@ from core.constants import (
 MEDAL_LABELS = {
     "gold": "&#129351; Gold",
     "silver": "&#129352; Silver",
-    "bronze": "&#129353; Bronze",
     "none": "None",
 }
 
@@ -72,7 +71,7 @@ def render_top_status():
             <div class="top-status">
                 <div class="status-pill"><div class="status-label">Player</div><div class="status-value">{escape(str(player_name))}</div></div>
                 <div class="status-pill"><div class="status-label">Round</div><div class="status-value">{st.session_state.round} / {N_ROUNDS}</div></div>
-                <div class="status-pill medal-pill"><div class="status-label">Medals</div><div class="status-value medal-row"><span class="medal gold">&#129351; {medals.get("gold", 0)}</span><span class="medal silver">&#129352; {medals.get("silver", 0)}</span><span class="medal bronze">&#129353; {medals.get("bronze", 0)}</span></div></div>
+                <div class="status-pill medal-pill"><div class="status-label">Medals</div><div class="status-value medal-row"><span class="medal gold">&#129351; {medals.get("gold", 0)}</span><span class="medal silver">&#129352; {medals.get("silver", 0)}</span></div></div>
                 <div class="status-pill"><div class="status-label">Target words</div><div class="status-value">{found} / {TARGET_COUNT}</div></div>
                 <div class="status-pill"><div class="status-label">Turns</div><div class="status-value">{interactions} / {MAX_INTERACTIONS_PER_ROUND}</div></div>
                 <div class="status-pill"><div class="status-label">Next clue</div><div class="status-value">{skips} / {MAX_SKIPS_PER_ROUND}</div></div>

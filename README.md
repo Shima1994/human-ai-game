@@ -24,7 +24,6 @@ Medals are awarded only when all five targets are found without a bomb:
 | --- | --- | ---: |
 | 1–2 | Gold | 5 |
 | 3 | Silver | 4 |
-| 4 | Bronze | 3 |
 | Unfinished or bomb | None | 0 |
 
 ## Experimental conditions

@@ -310,8 +310,6 @@ def get_medal_for_round(interactions, success, bomb_hit):
         return "gold"
     if interactions == 3:
         return "silver"
-    if interactions == 4:
-        return "bronze"
     return "none"
 
 
