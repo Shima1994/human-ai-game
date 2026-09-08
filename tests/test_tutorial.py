@@ -20,6 +20,7 @@ from core.tutorial import (
     tutorial_clue_is_valid,
     tutorial_comprehension_is_correct,
     tutorial_rationale_is_valid,
+    tutorial_repair_clue,
     tutorial_selection_is_correct,
     tutorial_time_remaining,
 )
@@ -56,6 +57,12 @@ class TutorialTests(unittest.TestCase):
         self.assertTrue(tutorial_clue_is_valid("Animals"))
         self.assertFalse(tutorial_clue_is_valid("two words"))
 
+    def test_repair_clues_follow_the_unresolved_target_set(self):
+        self.assertEqual(tutorial_repair_clue({"Cat", "Dog"}, 1), ("Companion", 2))
+        self.assertEqual(tutorial_repair_clue({"Cat", "Dog"}, 2), ("Animals", 2))
+        self.assertEqual(tutorial_repair_clue({"Cat"}, 1), ("Feline", 1))
+        self.assertEqual(tutorial_repair_clue({"Dog"}, 1), ("Canine", 1))
+
     def test_second_round_uses_a_distinct_board_and_targets(self):
         self.assertEqual(
             TUTORIAL_ROUND_2_BOARD,
@@ -85,8 +92,13 @@ class TutorialTests(unittest.TestCase):
         self.assertIn("How well do you expect the AI to understand your clue?", source)
         self.assertIn("After the guesses, how well do you think", source)
         self.assertIn('clickable=not bool(st.session_state.get("tutorial_practice_result"))', source)
-        self.assertIn('key_prefix="tutorial_board_button"', source)
+        self.assertIn('key_prefix=f"tutorial_board_button_{repair_attempt}"', source)
         self.assertIn('key_prefix="tutorial_hint_target"', source)
+        self.assertIn("selectable_words=tutorial_target_options", source)
+        self.assertIn("Stop guessing and use 1 skip", source)
+        self.assertIn("tutorial_skip_interpretation_", source)
+        self.assertIn("MAX_SKIPS_PER_ROUND", source)
+        self.assertIn("MAX_INTERACTIONS_PER_ROUND", source)
         ai_round = source[source.index('if step == "ai_clue_round"'):source.index('if step == "human_clue_round"')]
         self.assertLess(ai_round.index("Why do these cards fit the clue?"), ai_round.index("render_board("))
 

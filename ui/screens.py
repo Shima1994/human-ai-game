@@ -17,12 +17,10 @@ from core.ai_service import (
 )
 from core.constants import (
     AI_API_TIMEOUT_SECONDS,
-    BOARD_SIZE,
-    BOMB_COUNT,
+    MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
     MAX_TEAM_SCORE,
     N_ROUNDS,
-    TARGET_COUNT,
     TEAM_GOAL_SCORE,
     CLUE_TIMER_SECONDS,
     DEFAULT_CONDITION,
@@ -59,6 +57,7 @@ from core.tutorial import (
     TUTORIAL_WORD_ROLES,
     simulated_ai_guesses,
     tutorial_selection_is_correct,
+    tutorial_repair_clue,
     tutorial_time_remaining,
 )
 from core.validation import validate_general_link, validate_guess_rationale
@@ -73,6 +72,15 @@ from ui.components import (
     render_interaction_history,
     render_round_chip,
     render_top_status,
+)
+from ui.game_guide import (
+    CLUE_GIVER_INTRO,
+    CLUE_GIVER_OUTRO,
+    CLUE_GIVER_STEPS,
+    GUIDE_OVERVIEW,
+    GUIDE_REMINDERS,
+    GUIDE_ROLE,
+    GUIDE_SECTIONS,
 )
 from ui.study_documents import (
     INFORMATION_SHEET_CONTACT,
@@ -110,7 +118,6 @@ GENDER_OPTIONS = [
     "Female",
     "Male",
     "Non-binary",
-    "Prefer to self-describe",
     "Prefer not to say",
 ]
 ENGLISH_PROFICIENCY_OPTIONS = [
@@ -145,9 +152,9 @@ def screen_consent():
         with st.container(key="consent_logos"):
             university_col, colaps_col = st.columns(2, gap="large", vertical_alignment="center")
             with university_col:
-                st.image(str(ASSETS_DIR / "university_duisburg_essen.png"), width=255)
+                st.image(str(ASSETS_DIR / "university_duisburg_essen.png"), width=190)
             with colaps_col:
-                st.image(str(ASSETS_DIR / "colaps.png"), width=240)
+                st.image(str(ASSETS_DIR / "colaps.png"), width=180)
         st.markdown(
             f"""
             <section class="information-hero">
@@ -215,67 +222,101 @@ def screen_consent():
 
 
 def screen_welcome():
-    st.markdown(
-        f"""
-        <div class="guide-shell">
-            <div class="glass-card guide-intro">
-                <div class="panel-title">Game Guide: Team Up with AI</div>
-                <p class="subtle-text">This is a cooperative word association game. You and the AI are on the same team, trying to find hidden target cards while avoiding bomb cards.</p>
-            </div>
-            <div class="guide-grid">
-                <div class="guide-card guide-goal">
-                    <h3>The Goal</h3>
-                    <p>There are 4 rounds in total. Each round has a 4 by 4 board with a mix of abstract and concrete words. Hidden behind the cards are:</p>
-                    <ul>
-                        <li>{TARGET_COUNT} target cards to find</li>
-                        <li>{BOMB_COUNT} bomb cards to avoid</li>
-                        <li>{BOARD_SIZE - TARGET_COUNT - BOMB_COUNT} neutral cards that are wrong but safe</li>
-                    </ul>
-                </div>
-                <div class="guide-card">
-                    <h3>How to Play</h3>
-                    <ol>
-                        <li><strong>Roles:</strong> Across rounds, you may alternate between clue-giver and guesser.</li>
-                        <li><strong>Give a clue:</strong> The clue-giver gives one word and one number.</li>
-                        <li><strong>Guess cards:</strong> The guesser chooses the cards that seem connected to the clue.</li>
-                    </ol>
-                    <p class="guide-example">Example: If two target cards are linked by food, the clue could be "meal, 2".</p>
-                    <ol start="4">
-                        <li><strong>Avoid bombs:</strong> If anyone picks a bomb, the round ends immediately.</li>
-                        <li><strong>3 turns only:</strong> You have a maximum of 3 turns per round to find all {TARGET_COUNT} targets.</li>
-                        <li><strong>Skip:</strong> If the remaining guesses feel too risky, the guesser may stop mid-turn. Before skipping, they mark the cards they think the clue probably meant. Correct guesses already made are kept, the remaining guesses are abandoned, and one full skip is consumed.</li>
-                    </ol>
-                </div>
-                <div class="guide-card guide-medals">
-                    <h3>Win Medals &amp; Points</h3>
-                    <p>The faster you find the {TARGET_COUNT} targets, the better your medal:</p>
-                    <ul>
-                        <li>&#129351; Gold (5 pts): Finish in 1 or 2 turns.</li>
-                        <li>&#129352; Silver (4 pts): Finish in 3 turns.</li>
-                    </ul>
-                    <p>Pro Tip: Try to think like your AI partner! The better you "connect," the more points you'll earn.</p>
-                </div>
-                <div class="guide-card guide-research">
-                    <h3>After Each Turn</h3>
-                    <p>After each hint and guess, you will answer a short reflection question.</p>
-                    <ol>
-                        <li><strong>Rate understanding:</strong> Tell us how well your intended meaning was understood.</li>
-                        <li><strong>Describe the relationship:</strong> Briefly describe the general relationship behind the clue.</li>
-                        <li><strong>Keep it general:</strong> Do not mention card names or target words in your reflection.</li>
-                    </ol>
-                    <p>The game interface is the same for all participants.</p>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with st.container(key="game_guide_document"):
+        with st.container(key="game_guide_logos"):
+            university_col, colaps_col = st.columns(
+                2, gap="large", vertical_alignment="center"
+            )
+            with university_col:
+                st.image(
+                    str(ASSETS_DIR / "university_duisburg_essen.png"), width=190
+                )
+            with colaps_col:
+                st.image(str(ASSETS_DIR / "colaps.png"), width=180)
 
-    st.markdown('<div class="center-actions">', unsafe_allow_html=True)
-    if st.button("Start the game", type="primary", use_container_width=True):
-        st.session_state.started = True
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <section class="game-guide-hero">
+                <div class="game-guide-hero-copy">
+                    <div class="information-eyebrow">RESEARCH STUDY</div>
+                    <h1>Game Guide</h1>
+                    <h2>Team Up with an AI</h2>
+                    <p>This page explains how the game works and what you need to do.<br>Please read the instructions carefully before starting.</p>
+                </div>
+                <div class="game-guide-word-cards" aria-hidden="true">
+                    <span>think</span><span>connect</span><span>play</span>
+                </div>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.expander(
+            "**1**　Overview", expanded=True, icon=":material/groups:"
+        ):
+            st.markdown(GUIDE_OVERVIEW)
+        with st.expander(
+            "**2**　Your Role", expanded=True, icon=":material/switch_account:"
+        ):
+            st.markdown(GUIDE_ROLE)
+        with st.expander(
+            "**3**　When You Are the Clue-Giver",
+            expanded=True,
+            icon=":material/lightbulb:",
+        ):
+            st.markdown(CLUE_GIVER_INTRO)
+            for step_number, (step_heading, step_content) in enumerate(
+                CLUE_GIVER_STEPS, start=1
+            ):
+                with st.container(key=f"guide_clue_step_{step_number}"):
+                    number_col, content_col = st.columns([0.55, 9.45])
+                    with number_col:
+                        st.markdown(
+                            f'<div class="guide-step-number">{step_number}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    with content_col:
+                        st.markdown(f"#### {step_heading}")
+                        st.markdown(step_content)
+            st.success(CLUE_GIVER_OUTRO)
+
+        section_icons = (
+            ":material/smart_toy:",
+            ":material/target:",
+            ":material/style:",
+            ":material/sync:",
+            ":material/skip_next:",
+            ":material/forum:",
+            ":material/schedule:",
+            ":material/rate_review:",
+            ":material/emoji_events:",
+        )
+        for section_number, ((title, content), icon) in enumerate(
+            zip(GUIDE_SECTIONS, section_icons), start=4
+        ):
+            with st.expander(
+                f"**{section_number}**　{title}",
+                expanded=False,
+                icon=icon,
+            ):
+                st.markdown(content)
+
+        with st.container(key="guide_reminders"):
+            st.markdown(
+                '<div class="guide-reminder-title"><span>★</span>'
+                "MOST IMPORTANT THINGS TO REMEMBER</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(GUIDE_REMINDERS)
+
+        with st.container(key="game_guide_action"):
+            if st.button(
+                "Continue to Next Page",
+                type="primary",
+                use_container_width=True,
+            ):
+                st.session_state.started = True
+                st.rerun()
 
 
 def _reset_tutorial_practice():
@@ -333,12 +374,47 @@ def screen_tutorial():
             st.session_state.tutorial_practice_result = "timeout"
         render_clue_timer(remaining)
         st.markdown("### Round 1 of 2 · AI Clue-Giver")
-        st.caption("You are the Guesser. Interpret the clue, explain your reasoning, then select two cards.")
+        st.caption("You are the Guesser. Interpret the clue, explain your reasoning, then guess or use a skip just as in the real game.")
         with st.container(border=True, key="tutorial_ai_clue_panel"):
-            st.info(f"AI clue: **{TUTORIAL_CLUE} — {TUTORIAL_CLUE_NUMBER}**")
+            repair_attempt = int(st.session_state.get("tutorial_repair_attempt", 0) or 0)
+            found_targets = set(st.session_state.get("tutorial_found_targets", []))
+            if repair_attempt:
+                unresolved_targets = TUTORIAL_TARGETS - found_targets
+                current_clue, current_clue_number = tutorial_repair_clue(
+                    unresolved_targets, repair_attempt
+                )
+                st.info(
+                    f"AI repair clue: **{current_clue} — {current_clue_number}**  "
+                    f"\nRepair attempt {repair_attempt} for the same unresolved target set."
+                )
+            else:
+                current_clue, current_clue_number = TUTORIAL_CLUE, TUTORIAL_CLUE_NUMBER
+                st.info(f"AI clue: **{current_clue} — {current_clue_number}**")
+
+            completed_interactions = int(
+                st.session_state.get("tutorial_completed_interactions", 0) or 0
+            )
+            skip_count = int(st.session_state.get("tutorial_skip_count", 0) or 0)
+            status_col_1, status_col_2 = st.columns(2)
+            status_col_1.caption(
+                f"Completed interactions: {completed_interactions} / {MAX_INTERACTIONS_PER_ROUND}"
+            )
+            status_col_2.caption(f"Skips used: {skip_count} / {MAX_SKIPS_PER_ROUND}")
+            last_skip_kind = st.session_state.get("tutorial_last_skip_kind", "")
+            if last_skip_kind:
+                st.success(
+                    f"{last_skip_kind} recorded: one skip was used. "
+                    + (
+                        "The completed guesses count as one interaction; the skip adds no extra interaction."
+                        if last_skip_kind == "Partial skip"
+                        else "No completed interaction was used."
+                    )
+                )
+
+            rationale_key = f"tutorial_guess_rationale_{repair_attempt}"
             rationale = st.text_area(
                 "Why do these cards fit the clue? (3–30 English words, no card names)",
-                key="tutorial_guess_rationale",
+                key=rationale_key,
                 disabled=bool(st.session_state.get("tutorial_practice_result")),
                 placeholder="Explain the general connection without naming any card.",
                 height=90,
@@ -362,15 +438,18 @@ def screen_tutorial():
                 st.success("Reasoning complete — select two cards directly from the board.")
 
             selected = list(st.session_state.get("tutorial_guesser_cards", []))
+            current_guesses = list(st.session_state.get("tutorial_current_guesses", []))
             clicked = render_board(
                 list(TUTORIAL_BOARD),
                 TUTORIAL_WORD_ROLES,
                 guesses=selected,
                 reveal_all=bool(st.session_state.get("tutorial_practice_result")),
                 clickable=not bool(st.session_state.get("tutorial_practice_result")),
-                max_clicks=TUTORIAL_CLUE_NUMBER,
+                max_clicks=(
+                    len(selected) - len(current_guesses) + current_clue_number
+                ),
                 column_count=3,
-                key_prefix="tutorial_board_button",
+                key_prefix=f"tutorial_board_button_{repair_attempt}",
             )
             result = st.session_state.get("tutorial_practice_result", "")
             if clicked and not result:
@@ -380,23 +459,90 @@ def screen_tutorial():
                     st.error(_guess_rationale_error(rationale_reason))
                 else:
                     selected.append(clicked)
+                    current_guesses.append(clicked)
                     st.session_state.tutorial_guesser_cards = selected
-                    if len(selected) >= TUTORIAL_CLUE_NUMBER:
-                        st.session_state.tutorial_practice_result = (
-                            "correct"
-                            if tutorial_selection_is_correct(selected)
-                            else "incorrect"
-                        )
+                    st.session_state.tutorial_current_guesses = current_guesses
+                    if clicked in TUTORIAL_TARGETS:
+                        found_targets.add(clicked)
+                        st.session_state.tutorial_found_targets = list(found_targets)
+                    if clicked == TUTORIAL_BOMB:
+                        st.session_state.tutorial_completed_interactions = completed_interactions + 1
+                        st.session_state.tutorial_practice_result = "bomb"
+                    elif len(current_guesses) >= current_clue_number:
+                        completed_interactions += 1
+                        st.session_state.tutorial_completed_interactions = completed_interactions
+                        if found_targets == set(TUTORIAL_TARGETS):
+                            st.session_state.tutorial_practice_result = "correct"
+                        elif completed_interactions >= MAX_INTERACTIONS_PER_ROUND:
+                            st.session_state.tutorial_practice_result = "incorrect"
+                        else:
+                            st.session_state.tutorial_practice_result = "incorrect"
                     st.rerun()
+
+            result = st.session_state.get("tutorial_practice_result", "")
+            if not result:
+                remaining_guess_slots = current_clue_number - len(current_guesses)
+                unavailable_cards = set(selected)
+                skip_interpretation = st.multiselect(
+                    (
+                        f"Before skipping, select exactly {remaining_guess_slots} card(s) "
+                        "you think this clue was meant for."
+                    ),
+                    options=[word for word in TUTORIAL_BOARD if word not in unavailable_cards],
+                    max_selections=remaining_guess_slots,
+                    key=f"tutorial_skip_interpretation_{repair_attempt}",
+                    help=(
+                        "These cards are stored separately as your interpretation and do not "
+                        "count as guesses."
+                    ),
+                )
+                skip_disabled = skip_count >= MAX_SKIPS_PER_ROUND
+                if st.button(
+                    "Stop guessing and use 1 skip",
+                    use_container_width=True,
+                    disabled=skip_disabled,
+                    key=f"tutorial_skip_button_{repair_attempt}",
+                ):
+                    if len(skip_interpretation) != remaining_guess_slots:
+                        st.error(
+                            f"Please select exactly {remaining_guess_slots} card(s) before skipping."
+                        )
+                    elif current_guesses and not rationale_valid:
+                        st.error(_guess_rationale_error(rationale_reason))
+                    else:
+                        # A partial skip preserves the already-completed guesses as one
+                        # interaction. A full skip consumes no interaction.
+                        if current_guesses:
+                            completed_interactions += 1
+                            st.session_state.tutorial_completed_interactions = completed_interactions
+                            st.session_state.tutorial_last_skip_kind = "Partial skip"
+                        else:
+                            st.session_state.tutorial_last_skip_kind = "Full skip"
+                        st.session_state.tutorial_skip_count = skip_count + 1
+                        unresolved_targets = TUTORIAL_TARGETS - found_targets
+                        if not unresolved_targets:
+                            st.session_state.tutorial_practice_result = "correct"
+                        elif completed_interactions >= MAX_INTERACTIONS_PER_ROUND:
+                            st.session_state.tutorial_practice_result = "incorrect"
+                        else:
+                            st.session_state.tutorial_repair_attempt = repair_attempt + 1
+                            st.session_state.tutorial_current_guesses = []
+                            # A repair/new clue starts a fresh participant decision window.
+                            st.session_state.tutorial_practice_started_at = _now_iso()
+                        st.rerun()
+                if skip_disabled:
+                    st.caption("Both practice skips have been used; continue by selecting cards.")
 
             if result == "timeout":
                 st.warning("Practice time expired. This does not affect your study participation or score.")
                 if st.button("Retry with a fresh timer", use_container_width=True):
                     _reset_tutorial_practice()
                     st.rerun()
-            elif result in {"correct", "incorrect"}:
+            elif result in {"correct", "incorrect", "bomb"}:
                 if result == "correct":
                     st.success("Correct — the clue referred to both target cards.")
+                elif result == "bomb":
+                    st.error("Bomb selected — just as in the real game, the round ends immediately.")
                 else:
                     st.warning("The intended cards were Cat and Dog. The revealed colors show each card's role.")
                 st.markdown(f"**AI's explanation:** {TUTORIAL_AI_EXPLANATION}")
@@ -461,14 +607,19 @@ def screen_tutorial():
                 for word in st.session_state.get("tutorial_intended_targets", [])
                 if word in tutorial_target_options
             ][:clue_number]
+            st.caption(
+                "All six board cards are shown here. As the Clue-Giver, you can select only "
+                "green target cards; neutral cards and the bomb are unavailable."
+            )
             render_hint_target_selector(
-                tutorial_target_options,
+                list(TUTORIAL_ROUND_2_BOARD),
                 st.session_state.tutorial_intended_targets,
                 clue_number,
                 state_key="tutorial_intended_targets",
                 key_prefix="tutorial_hint_target",
-                column_count=2,
+                column_count=3,
                 disabled=form_locked,
+                selectable_words=tutorial_target_options,
             )
             intended = st.session_state.tutorial_intended_targets
             expected = st.multiselect(
@@ -621,95 +772,134 @@ def _history_with_pending_ai_guess(pending_review):
 
 
 def screen_name():
-    with st.container(border=True, key="participant_profile_panel"):
+    with st.container(key="participant_profile_page"):
+        with st.container(key="participant_profile_logos"):
+            university_col, colaps_col = st.columns(
+                2, gap="large", vertical_alignment="center"
+            )
+            with university_col:
+                st.image(
+                    str(ASSETS_DIR / "university_duisburg_essen.png"), width=190
+                )
+            with colaps_col:
+                st.image(str(ASSETS_DIR / "colaps.png"), width=180)
         st.markdown(
             """
-            <div class="panel-title">Participant profile</div>
-            <p class="subtle-text" style="margin-top:0;">These answers help us analyze the game results.</p>
+            <section class="participant-profile-hero">
+                <div class="participant-profile-hero-copy">
+                    <div class="information-eyebrow">PARTICIPANT PROFILE</div>
+                    <h1>Participant Profile</h1>
+                    <p>These answers help us analyze the game results.</p>
+                </div>
+                <div class="participant-profile-card-art" aria-hidden="true">
+                    <div class="profile-avatar"></div>
+                    <i></i><i></i><i></i>
+                </div>
+            </section>
             """,
             unsafe_allow_html=True,
         )
-        nickname = st.text_input(
-            "Nickname or pseudonym (optional — do not enter your real name)",
-            value=st.session_state.get("nickname", ""),
-            placeholder="Optional nickname",
-        )
-        age_group = st.selectbox(
-            "What is your age group?",
-            [""] + AGE_GROUP_OPTIONS,
-            index=0,
-            format_func=lambda option: "Select age group" if option == "" else option,
-            key="profile_age_group",
-        )
-        gender_choice = st.radio(
-            "What is your gender? Optional",
-            GENDER_OPTIONS,
-            index=None,
-            horizontal=True,
-            key="profile_gender",
-        )
-        gender_self_describe = ""
-        if gender_choice == "Prefer to self-describe":
-            gender_self_describe = st.text_input(
-                "Self-describe",
-                placeholder="Write your gender",
-                key="profile_gender_self_describe",
-            )
-        english_proficiency = st.radio(
-            "How would you describe your English proficiency?",
-            ENGLISH_PROFICIENCY_OPTIONS,
-            index=None,
-            horizontal=True,
-            key="profile_english_proficiency",
-        )
-        ai_experience = st.radio(
-            "How often do you use AI tools such as ChatGPT, Gemini, or Claude?",
-            AI_EXPERIENCE_OPTIONS,
-            index=None,
-            horizontal=True,
-            key="profile_ai_experience",
-        )
-        codenames_experience = st.radio(
-            "Have you played Codenames before?",
-            CODENAMES_EXPERIENCE_OPTIONS,
-            index=None,
-            horizontal=True,
-            key="profile_codenames_experience",
-        )
+        with st.container(border=True, key="participant_profile_panel"):
+            form_col, aside_col = st.columns([3.35, 1.15], gap="large")
+            with form_col:
+                with st.container(key="profile_nickname_group"):
+                    nickname = st.text_input(
+                        "Nickname or pseudonym (optional — do not enter your real name)",
+                        value=st.session_state.get("nickname", ""),
+                        placeholder="Optional nickname",
+                    )
+                with st.container(key="profile_age_group_group"):
+                    age_group = st.selectbox(
+                        "What is your age group?",
+                        [""] + AGE_GROUP_OPTIONS,
+                        index=0,
+                        format_func=lambda option: (
+                            "Select age group" if option == "" else option
+                        ),
+                        key="profile_age_group",
+                    )
+                with st.container(key="profile_gender_group"):
+                    gender_choice = st.radio(
+                        "What is your gender?",
+                        GENDER_OPTIONS,
+                        index=None,
+                        horizontal=True,
+                        key="profile_gender",
+                    )
+                with st.container(key="profile_english_group"):
+                    english_proficiency = st.radio(
+                        "How would you describe your English proficiency?",
+                        ENGLISH_PROFICIENCY_OPTIONS,
+                        index=None,
+                        horizontal=True,
+                        key="profile_english_proficiency",
+                    )
+                with st.container(key="profile_ai_experience_group"):
+                    ai_experience = st.radio(
+                        "How often do you use AI tools such as ChatGPT, Gemini, or Claude?",
+                        AI_EXPERIENCE_OPTIONS,
+                        index=None,
+                        horizontal=True,
+                        key="profile_ai_experience",
+                    )
+                with st.container(key="profile_codenames_group"):
+                    codenames_experience = st.radio(
+                        "Have you played Codenames before?",
+                        CODENAMES_EXPERIENCE_OPTIONS,
+                        index=None,
+                        horizontal=True,
+                        key="profile_codenames_experience",
+                    )
+            with aside_col:
+                with st.container(key="profile_side_cards"):
+                    st.markdown(
+                        """
+                        <aside class="profile-aside">
+                            <section>
+                                <div class="profile-aside-icon">i</div>
+                                <h2>Why we ask this</h2>
+                                <p>These answers help us analyze the game results.</p>
+                            </section>
+                            <section>
+                                <div class="profile-aside-icon profile-shield">◇</div>
+                                <h2>Your privacy</h2>
+                                <p>Do not enter your real name.</p>
+                            </section>
+                            <div class="profile-aside-word-cards" aria-hidden="true">
+                                <span>think</span><span>connect</span><span>play</span>
+                            </div>
+                        </aside>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-        if st.button("Continue", type="primary", use_container_width=True):
-            missing = []
-            if not age_group:
-                missing.append("age group")
-            if gender_choice is None:
-                missing.append("gender")
-            if gender_choice == "Prefer to self-describe" and not gender_self_describe.strip():
-                missing.append("self-described gender")
-            if english_proficiency is None:
-                missing.append("English proficiency")
-            if ai_experience is None:
-                missing.append("AI experience")
-            if codenames_experience is None:
-                missing.append("Codenames experience")
-            if missing:
-                st.error("Please complete: " + ", ".join(missing) + ".")
-            else:
-                clean_nickname = nickname.strip()
-                participant_id = clean_nickname or _anonymous_participant_id()
-                gender = (
-                    f"Self-describe: {gender_self_describe.strip()}"
-                    if gender_choice == "Prefer to self-describe"
-                    else gender_choice
-                )
-                st.session_state.nickname = clean_nickname
-                st.session_state.participant_id = participant_id
-                st.session_state.age_group = age_group
-                st.session_state.gender = gender
-                st.session_state.english_proficiency = english_proficiency
-                st.session_state.ai_experience = ai_experience
-                st.session_state.codenames_experience = codenames_experience
-                initialize_session_log(participant_id)
-                st.rerun()
+            if st.button("Continue", type="primary", use_container_width=True):
+                missing = []
+                if not age_group:
+                    missing.append("age group")
+                if gender_choice is None:
+                    missing.append("gender")
+                if english_proficiency is None:
+                    missing.append("English proficiency")
+                if ai_experience is None:
+                    missing.append("AI experience")
+                if codenames_experience is None:
+                    missing.append("Codenames experience")
+                if missing:
+                    st.error("Please complete: " + ", ".join(missing) + ".")
+                else:
+                    clean_nickname = nickname.strip()
+                    participant_id = clean_nickname or _anonymous_participant_id()
+                    gender = gender_choice
+                    st.session_state.nickname = clean_nickname
+                    st.session_state.participant_id = participant_id
+                    st.session_state.age_group = age_group
+                    st.session_state.gender = gender
+                    st.session_state.english_proficiency = english_proficiency
+                    st.session_state.ai_experience = ai_experience
+                    st.session_state.codenames_experience = codenames_experience
+                    initialize_session_log(participant_id)
+                    st.rerun()
 
 
 def _skip_help_text():

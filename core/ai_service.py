@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import re
 import time
@@ -17,7 +18,27 @@ from core.constants import (
 )
 from core.validation import mentions_board_word
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+client = None
+
+
+def _get_openai_client():
+    """Create the API client lazily so study pages can load without AI secrets."""
+    global client
+    if client is not None:
+        return client
+
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        try:
+            api_key = str(st.secrets.get("OPENAI_API_KEY", "")).strip()
+        except Exception:
+            api_key = ""
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not configured. Add it to the Streamlit app secrets."
+        )
+    client = OpenAI(api_key=api_key)
+    return client
 
 
 class AIClueGenerationError(RuntimeError):
@@ -49,7 +70,7 @@ def call_openai_chat(
         kwargs["response_format"] = {"type": "json_object"}
 
     start = time.perf_counter()
-    response = client.chat.completions.create(**kwargs)
+    response = _get_openai_client().chat.completions.create(**kwargs)
     elapsed = time.perf_counter() - start
     text = (response.choices[0].message.content or "").strip()
     return text, elapsed

@@ -32,6 +32,12 @@ TUTORIAL_ROUND_2_WORD_ROLES = {
     "River": "bomb",
 }
 
+_TUTORIAL_REPAIR_CLUES = {
+    frozenset({"Cat", "Dog"}): ("Companion", "Animals"),
+    frozenset({"Cat"}): ("Feline", "Whiskered"),
+    frozenset({"Dog"}): ("Canine", "Barking"),
+}
+
 
 def tutorial_selection_is_correct(selected_cards):
     return set(selected_cards or []) == TUTORIAL_TARGETS
@@ -62,6 +68,14 @@ def simulated_ai_guesses(clue_number):
         for word in TUTORIAL_ROUND_2_BOARD
         if word in TUTORIAL_ROUND_2_TARGETS
     ][:count]
+
+
+def tutorial_repair_clue(unresolved_targets, repair_attempt=1):
+    """Return a deterministic one-word repair clue for the unresolved targets."""
+    targets = frozenset(unresolved_targets or [])
+    alternatives = _TUTORIAL_REPAIR_CLUES.get(targets, ("Related",))
+    index = min(max(int(repair_attempt or 1), 1) - 1, len(alternatives) - 1)
+    return alternatives[index], len(targets)
 
 
 def tutorial_time_remaining(started_at, now=None):

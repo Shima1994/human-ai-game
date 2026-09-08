@@ -32,12 +32,10 @@ def main():
         return
 
     if not st.session_state.started:
-        render_app_header()
         screen_welcome()
         return
 
     if not st.session_state.participant_id:
-        render_app_header()
         screen_name()
         return
 

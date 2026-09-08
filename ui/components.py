@@ -217,8 +217,10 @@ def render_hint_target_selector(
     key_prefix="hint_target",
     column_count=None,
     disabled=False,
+    selectable_words=None,
 ):
     selected_targets = selected_targets or []
+    selectable_set = set(target_words if selectable_words is None else selectable_words)
     st.markdown(
         """
         <div class="panel-title section-gap">Select the target cards this clue is meant for</div>
@@ -239,6 +241,7 @@ def render_hint_target_selector(
                 use_container_width=True,
                 disabled=(
                     disabled
+                    or word not in selectable_set
                     or (not is_selected and len(selected_targets) >= max_targets)
                 ),
             ):
