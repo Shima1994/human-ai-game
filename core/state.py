@@ -45,6 +45,11 @@ def init_session_state():
         "english_proficiency": "",
         "ai_experience": "",
         "codenames_experience": "",
+        "tutorial_completed": False,
+        "tutorial_step": "introduction",
+        "tutorial_practice_started_at": "",
+        "tutorial_practice_result": "",
+        "tutorial_comprehension_result": "",
         "round": 1,
         "score": 0,
         "board": None,
@@ -78,6 +83,11 @@ def init_session_state():
         "start_time": None,
         "session_start_time": datetime.utcnow().isoformat(),
         "session_end_time": "",
+        "last_activity_at": "",
+        "last_completed_stage": "",
+        "session_end_reason": "",
+        "withdrawal_requested": False,
+        "technical_termination": False,
         "session_log_initialized": False,
         "round_start_time": "",
         "logged_round_starts": [],
@@ -113,6 +123,7 @@ def init_session_state():
         "round_medal": "none",
         "round_success": False,
         "round_bomb_hit": False,
+        "round_end_reason": "",
         "medal_counts": {"gold": 0, "silver": 0, "none": 0},
         "remote_log_status": "",
         "remote_log_error": "",
@@ -171,6 +182,7 @@ def reset_round_state():
     st.session_state.round_medal = "none"
     st.session_state.round_success = False
     st.session_state.round_bomb_hit = False
+    st.session_state.round_end_reason = ""
     st.session_state.pending_hint_meta = None
     st.session_state.pending_reflection_turn = None
 
@@ -195,6 +207,11 @@ def restart_game(keep_participant=False):
     st.session_state.starting_role = _new_starting_role()
     st.session_state.session_start_time = datetime.utcnow().isoformat()
     st.session_state.session_end_time = ""
+    st.session_state.last_activity_at = ""
+    st.session_state.last_completed_stage = ""
+    st.session_state.session_end_reason = ""
+    st.session_state.withdrawal_requested = False
+    st.session_state.technical_termination = False
     st.session_state.session_log_initialized = False
     st.session_state.consent_given = False
     st.session_state.consent_timestamp = ""

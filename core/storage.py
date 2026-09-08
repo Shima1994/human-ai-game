@@ -10,15 +10,21 @@ from urllib.request import Request, urlopen
 import streamlit as st
 
 from core.constants import (
+    CODE_COMMIT,
+    CONDITION_ASSIGNMENT_VERSION,
     DATA_FILE,
     DEFAULT_CONDITION,
+    DEPLOYMENT_VERSION,
     EVENTS_DATA_FILE,
+    EXPERIMENT_VERSION,
     GUESS_MODEL_NAME,
     HINT_MODEL_NAME,
     INTERACTION_DATA_FILE,
     N_ROUNDS,
+    MODEL_IDENTIFIER,
     REFLECTION_MODEL_NAME,
     ROUNDS_DATA_FILE,
+    SCHEMA_VERSION,
     SESSIONS_DATA_FILE,
     TURNS_DATA_FILE,
     VALID_CONDITIONS,
@@ -27,6 +33,12 @@ from core.game_logic import compute_score_change
 
 
 CONDITION_ASSIGNMENT_LOCK = threading.RLock()
+
+
+class RemoteRowConflictError(OSError):
+    """Raised when one canonical remote identity has conflicting row contents."""
+
+
 ROUND_LOG_FIELDS = [
     "session_id",
     "timestamp_utc",
@@ -110,6 +122,8 @@ INTERACTION_LOG_FIELDS = [
     "bomb_word_types",
     "turn",
     "turn_number",
+    "completed_turn_number",
+    "skip_number",
     "clue_giver",
     "guesser",
     "hint",
@@ -191,6 +205,8 @@ INTERACTION_LOG_FIELDS = [
     "human_explanation_sanitized",
     "human_explanation_is_valid",
     "human_explanation_blocked_reason",
+    "human_explanation_source",
+    "human_explanation_collected_at",
     "ai_relationship_type",
     "ai_explanation_raw",
     "ai_explanation_sanitized",
@@ -240,6 +256,17 @@ SESSIONS_LOG_FIELDS = [
     "post_game_reflection_helped",
     "post_game_shared_understanding",
     "post_game_questionnaire_json",
+    "experiment_version",
+    "schema_version",
+    "code_commit",
+    "deployment_version",
+    "model_identifier",
+    "condition_assignment_version",
+    "last_activity_at",
+    "last_completed_stage",
+    "session_end_reason",
+    "withdrawal_requested",
+    "technical_termination",
 ]
 
 
@@ -273,6 +300,7 @@ ROUNDS_LOG_FIELDS = [
     "round_start_time",
     "round_end_time",
     "round_duration_seconds",
+    "round_end_reason",
 ]
 
 
@@ -282,6 +310,10 @@ TURNS_LOG_FIELDS = [
     "condition",
     "round_number",
     "turn_number",
+    "action_type",
+    "alignment_applicability",
+    "completed_turn_number",
+    "skip_number",
     "clue_giver",
     "guesser",
     "clue",
@@ -342,6 +374,8 @@ TURNS_LOG_FIELDS = [
     "human_explanation_sanitized",
     "human_explanation_is_valid",
     "human_explanation_blocked_reason",
+    "human_explanation_source",
+    "human_explanation_collected_at",
     "ai_relationship_type",
     "ai_explanation_raw",
     "ai_explanation_sanitized",
@@ -389,6 +423,34 @@ EVENTS_LOG_FIELDS = [
     "turn_number",
     "event_payload",
 ]
+
+
+SESSION_STAGES = frozenset(
+    {
+        "consent",
+        "game_guide",
+        "participant_profile",
+        "tutorial",
+        "gameplay",
+        "post_study_questionnaire",
+        "debriefing",
+        "completed",
+    }
+)
+SESSION_END_REASONS = frozenset({"completed", "participant_withdrawal", "technical_termination"})
+ACTION_TYPES = frozenset({"interaction", "full_skip", "partial_skip", "timeout"})
+ALIGNMENT_APPLICABILITY_VALUES = frozenset(
+    {
+        "observed_completed_selection",
+        "partial_selection",
+        "interpreted_only_skip",
+        "timeout_no_behavioral_selection",
+        "not_applicable",
+    }
+)
+ROUND_END_REASONS = frozenset(
+    {"all_targets_found", "bomb", "completed_turn_limit"}
+)
 
 
 def get_data_file():
@@ -601,6 +663,18 @@ def _github_storage_config():
             "GITHUB_SESSIONS_CSV_PATH",
             "data/sessions.csv",
         ),
+        "rounds_path": _secret_value(
+            "GITHUB_NORMALIZED_ROUNDS_CSV_PATH",
+            "data/rounds.csv",
+        ),
+        "turns_path": _secret_value(
+            "GITHUB_TURNS_CSV_PATH",
+            "data/turns.csv",
+        ),
+        "events_path": _secret_value(
+            "GITHUB_EVENTS_CSV_PATH",
+            "data/events.csv",
+        ),
     }
 
 
@@ -621,7 +695,7 @@ def _github_request(url, token, method="GET", payload=None):
         return json.loads(response.read().decode("utf-8"))
 
 
-def _append_to_github_csv_once(path, header, rows, message):
+def _append_to_github_csv_once(path, header, rows, message, key_fields=None):
     config = _github_storage_config()
     if not config:
         return
@@ -644,8 +718,36 @@ def _append_to_github_csv_once(path, header, rows, message):
         if error.code != 404:
             raise
 
-    for row in rows:
-        content += _csv_line(row)
+    rows_added = 0
+    if key_fields:
+        existing_rows = list(csv.DictReader(io.StringIO(content)))
+        key_indexes = [header.index(field) for field in key_fields]
+        existing_by_key = {
+            tuple(str(row.get(field, "")) for field in key_fields): tuple(
+                str(row.get(field, "")) for field in header
+            )
+            for row in existing_rows
+        }
+        for values in rows:
+            values = list(values)
+            key = tuple(str(values[index]) for index in key_indexes)
+            serialized_values = tuple(str(value) for value in values)
+            if key in existing_by_key:
+                if existing_by_key[key] != serialized_values:
+                    raise RemoteRowConflictError(
+                        f"Conflicting remote row for {path} identity {key}"
+                    )
+            else:
+                content += _csv_line(values)
+                existing_by_key[key] = serialized_values
+                rows_added += 1
+    else:
+        for row in rows:
+            content += _csv_line(row)
+            rows_added += 1
+
+    if not rows_added:
+        return
 
     payload = {
         "message": message,
@@ -659,17 +761,40 @@ def _append_to_github_csv_once(path, header, rows, message):
     _github_request(put_url, token, method="PUT", payload=payload)
 
 
-def _append_to_github_csv(path, header, rows, message):
+def _append_to_github_csv(path, header, rows, message, key_fields=None):
     for attempt in range(3):
         try:
-            _append_to_github_csv_once(path, header, rows, message)
+            _append_to_github_csv_once(path, header, rows, message, key_fields=key_fields)
             return
         except HTTPError as error:
             if error.code != 409 or attempt == 2:
                 raise
+        except (URLError, TimeoutError, OSError):
+            if attempt == 2:
+                raise
 
 
-def append_remote_csv(round_row, interaction_rows):
+def _set_remote_saved():
+    if st.session_state.get("remote_log_status") != "github_failed":
+        st.session_state.remote_log_status = "github_saved"
+        st.session_state.remote_log_error = ""
+
+
+def _set_remote_failure(error):
+    st.session_state.remote_log_status = "github_failed"
+    existing = str(st.session_state.get("remote_log_error", "") or "")
+    message = str(error)
+    st.session_state.remote_log_error = (
+        f"{existing}; {message}" if existing and message not in existing else existing or message
+    )
+
+
+def append_remote_csv(
+    round_row,
+    interaction_rows,
+    normalized_round_row=None,
+    normalized_turn_rows=None,
+):
     try:
         config = _github_storage_config()
         if not config:
@@ -684,6 +809,7 @@ def append_remote_csv(round_row, interaction_rows):
             ROUND_LOG_FIELDS,
             [round_row],
             "Append word game round data",
+            key_fields=["session_id", "round_number"],
         )
         if interaction_rows:
             _append_to_github_csv(
@@ -691,12 +817,30 @@ def append_remote_csv(round_row, interaction_rows):
                 INTERACTION_LOG_FIELDS,
                 interaction_rows,
                 "Append word game interaction data",
+                key_fields=["session_id", "round_number", "turn_number"],
             )
-        st.session_state.remote_log_status = "github_saved"
-        st.session_state.remote_log_error = ""
+        if normalized_round_row is not None:
+            _append_to_github_csv(
+                config["rounds_path"],
+                ROUNDS_LOG_FIELDS,
+                [[normalized_round_row.get(field, "") for field in ROUNDS_LOG_FIELDS]],
+                "Append normalized word game round data",
+                key_fields=["session_id", "round_number"],
+            )
+        if normalized_turn_rows:
+            _append_to_github_csv(
+                config["turns_path"],
+                TURNS_LOG_FIELDS,
+                [
+                    [row.get(field, "") for field in TURNS_LOG_FIELDS]
+                    for row in normalized_turn_rows
+                ],
+                "Append normalized word game turn data",
+                key_fields=["session_id", "round_number", "turn_number"],
+            )
+        _set_remote_saved()
     except (HTTPError, URLError, TimeoutError, OSError) as error:
-        st.session_state.remote_log_status = "github_failed"
-        st.session_state.remote_log_error = str(error)
+        _set_remote_failure(error)
 
 
 def clean_interaction_history(history):
@@ -716,6 +860,8 @@ def clean_interaction_history(history):
         clean_items.append(
             {
                 "turn": index,
+                "completed_turn_number": item.get("completed_turn_number", index),
+                "skip_number": item.get("skip_number", ""),
                 "clue_giver": item.get("clue_giver", ""),
                 "guesser": item.get("guesser", ""),
                 "hint": item.get("hint", ""),
@@ -817,6 +963,8 @@ def clean_interaction_history(history):
                 "human_explanation_sanitized": item.get("human_explanation_sanitized", ""),
                 "human_explanation_is_valid": item.get("human_explanation_is_valid", ""),
                 "human_explanation_blocked_reason": item.get("human_explanation_blocked_reason", ""),
+                "human_explanation_source": item.get("human_explanation_source", ""),
+                "human_explanation_collected_at": item.get("human_explanation_collected_at", ""),
                 "ai_relationship_type": item.get("ai_relationship_type", ""),
                 "ai_explanation_raw": item.get("ai_explanation_raw", ""),
                 "ai_explanation_sanitized": item.get("ai_explanation_sanitized", item.get("ai_explanation", "")),
@@ -871,6 +1019,12 @@ def _session_row(completed=False):
     if st.session_state.get("round_finished"):
         total_completed = max(total_completed, int(st.session_state.get("round", 0) or 0))
     questionnaire = st.session_state.get("post_game_questionnaire", {}) or {}
+    last_completed_stage = st.session_state.get("last_completed_stage", "")
+    session_end_reason = st.session_state.get("session_end_reason", "")
+    if last_completed_stage and last_completed_stage not in SESSION_STAGES:
+        raise ValueError(f"Unknown completed session stage: {last_completed_stage}")
+    if session_end_reason and session_end_reason not in SESSION_END_REASONS:
+        raise ValueError(f"Unknown session end reason: {session_end_reason}")
     return {
         "participant_id": st.session_state.get("participant_id", ""),
         "nickname": st.session_state.get("nickname", st.session_state.get("participant_id", "")),
@@ -892,7 +1046,11 @@ def _session_row(completed=False):
             int(summary.get("turns", 0) or 0)
             for summary in st.session_state.get("ai_round_summaries", [])
         )
-        + (len(history) if not st.session_state.get("round_finished") else 0),
+        + (
+            int(st.session_state.get("round_interactions", 0) or 0)
+            if not st.session_state.get("round_finished")
+            else 0
+        ),
         "final_total_score": st.session_state.get("score", 0),
         "user_agent": st.session_state.get("user_agent", "unknown"),
         "device_type": st.session_state.get("device_type", "unknown"),
@@ -905,6 +1063,21 @@ def _session_row(completed=False):
         "post_game_reflection_helped": questionnaire.get("reflection_helped", ""),
         "post_game_shared_understanding": questionnaire.get("shared_understanding", ""),
         "post_game_questionnaire_json": json.dumps(questionnaire, ensure_ascii=False),
+        "experiment_version": EXPERIMENT_VERSION,
+        "schema_version": SCHEMA_VERSION,
+        "code_commit": CODE_COMMIT,
+        "deployment_version": DEPLOYMENT_VERSION,
+        "model_identifier": MODEL_IDENTIFIER,
+        "condition_assignment_version": CONDITION_ASSIGNMENT_VERSION,
+        "last_activity_at": st.session_state.get("last_activity_at", ""),
+        "last_completed_stage": last_completed_stage,
+        "session_end_reason": session_end_reason,
+        "withdrawal_requested": str(
+            bool(st.session_state.get("withdrawal_requested", False))
+        ).lower(),
+        "technical_termination": str(
+            bool(st.session_state.get("technical_termination", False))
+        ).lower(),
     }
 
 
@@ -995,25 +1168,38 @@ def _append_remote_session_snapshot(completed=False):
         SESSIONS_LOG_FIELDS,
         [[row.get(field, "") for field in SESSIONS_LOG_FIELDS]],
         "Append completed study session snapshot" if completed else "Append study session snapshot",
+        key_fields=SESSIONS_LOG_FIELDS,
     )
 
 
-def log_session_state(completed=False):
+def log_session_state(completed=False, persist_remote=False):
     data_file = ensure_sessions_data_file()
     if completed and not st.session_state.get("session_end_time"):
         st.session_state.session_end_time = _iso_now()
+    if completed:
+        st.session_state.session_end_reason = "completed"
+        st.session_state.last_completed_stage = "completed"
     _upsert_dict_row(
         data_file,
         SESSIONS_LOG_FIELDS,
         _session_row(completed=completed),
         ["participant_id", "session_id"],
     )
-    if completed:
+    if completed or persist_remote:
         try:
-            _append_remote_session_snapshot(completed=True)
+            _append_remote_session_snapshot(completed=completed)
         except (HTTPError, URLError, TimeoutError, OSError) as error:
-            st.session_state.remote_log_status = "github_failed"
-            st.session_state.remote_log_error = str(error)
+            _set_remote_failure(error)
+
+
+def mark_session_progress(stage, completed=False):
+    """Persist a successfully completed study stage at a meaningful boundary."""
+    if stage not in SESSION_STAGES:
+        raise ValueError(f"Unknown session stage: {stage}")
+    timestamp = _iso_now()
+    st.session_state.last_activity_at = timestamp
+    st.session_state.last_completed_stage = stage
+    log_session_state(completed=completed, persist_remote=True)
 
 
 def log_event(event_type, payload=None, round_number=None, turn_number=None):
@@ -1029,6 +1215,29 @@ def log_event(event_type, payload=None, round_number=None, turn_number=None):
         "event_payload": _json_obj(payload or {}),
     }
     _append_dict_row(data_file, EVENTS_LOG_FIELDS, row)
+    try:
+        config = _github_storage_config()
+        if not config:
+            if st.session_state.get("remote_log_status") != "github_failed":
+                st.session_state.remote_log_status = "local_only"
+                st.session_state.remote_log_error = (
+                    "GitHub logging is not configured. Add GITHUB_TOKEN and GITHUB_REPO "
+                    "to Streamlit secrets to save public runs durably."
+                )
+            return
+        _append_to_github_csv(
+            config["events_path"],
+            EVENTS_LOG_FIELDS,
+            [[row.get(field, "") for field in EVENTS_LOG_FIELDS]],
+            "Append word game event data",
+            # There is no event-id column. The complete immutable event row is the
+            # narrowest safe retry identity: it suppresses only an exact replay of
+            # the same timestamped event and cannot merge separately emitted events.
+            key_fields=EVENTS_LOG_FIELDS,
+        )
+        _set_remote_saved()
+    except (HTTPError, URLError, TimeoutError, OSError) as error:
+        _set_remote_failure(error)
 
 
 def initialize_session_log(participant_id):
@@ -1037,6 +1246,8 @@ def initialize_session_log(participant_id):
     st.session_state.participant_id = participant_id
     st.session_state.nickname = st.session_state.get("nickname", participant_id) or participant_id
     st.session_state.consent_given = True
+    st.session_state.last_activity_at = _iso_now()
+    st.session_state.last_completed_stage = "participant_profile"
     # Allocate only when a participant is actually registered. Ordinary Streamlit
     # reruns therefore do not consume a slot in the alternating assignment.
     with CONDITION_ASSIGNMENT_LOCK:
@@ -1092,6 +1303,11 @@ def _round_analysis_row(participant_id, timestamp, score_change):
             duration = f"{(datetime.fromisoformat(round_end) - datetime.fromisoformat(round_start)).total_seconds():.3f}"
         except ValueError:
             duration = ""
+    round_end_reason = st.session_state.get("round_end_reason", "")
+    if round_end_reason and round_end_reason not in ROUND_END_REASONS:
+        raise ValueError(f"Unknown round end reason: {round_end_reason}")
+    if not st.session_state.get("round_finished"):
+        round_end_reason = ""
     return {
         "participant_id": participant_id,
         "session_id": st.session_state.get("session_id", ""),
@@ -1124,7 +1340,35 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "round_start_time": round_start or "",
         "round_end_time": round_end,
         "round_duration_seconds": duration,
+        "round_end_reason": round_end_reason,
     }
+
+
+def _action_classification(item):
+    if item.get("timed_out") or item.get("outcome") == "timeout":
+        return "timeout"
+    if item.get("partial_skip") or item.get("outcome") == "partial_skip":
+        return "partial_skip"
+    if item.get("skipped") or item.get("outcome") == "skip":
+        return "full_skip"
+    return "interaction"
+
+
+def _alignment_applicability(item, action_type=None):
+    action_type = action_type or _action_classification(item)
+    if action_type == "timeout":
+        return "timeout_no_behavioral_selection"
+    if action_type == "partial_skip":
+        return "partial_selection"
+    if action_type == "full_skip":
+        return (
+            "interpreted_only_skip"
+            if item.get("skip_interpreted_cards")
+            else "not_applicable"
+        )
+    if item.get("guesses"):
+        return "observed_completed_selection"
+    return "not_applicable"
 
 
 def _llm_fields_for_turn(item):
@@ -1181,12 +1425,22 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
     ai_sanitized = item.get("ai_explanation_sanitized", item.get("ai_explanation", ""))
     ai_valid = bool(item.get("ai_explanation_is_valid", False))
     llm_fields = _llm_fields_for_turn(item)
+    action_type = _action_classification(item)
+    alignment_applicability = _alignment_applicability(item, action_type)
+    if action_type not in ACTION_TYPES:
+        raise ValueError(f"Unknown action type: {action_type}")
+    if alignment_applicability not in ALIGNMENT_APPLICABILITY_VALUES:
+        raise ValueError(f"Unknown alignment applicability: {alignment_applicability}")
     return {
         "participant_id": participant_id,
         "session_id": st.session_state.get("session_id", ""),
         "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "round_number": st.session_state.round,
         "turn_number": item.get("turn", ""),
+        "action_type": action_type,
+        "alignment_applicability": alignment_applicability,
+        "completed_turn_number": item.get("completed_turn_number", ""),
+        "skip_number": item.get("skip_number", ""),
         "clue_giver": item.get("clue_giver", ""),
         "guesser": item.get("guesser", ""),
         "clue": item.get("hint", ""),
@@ -1268,6 +1522,8 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "human_explanation_sanitized": human_sanitized if human_valid else "",
         "human_explanation_is_valid": str(human_valid).lower(),
         "human_explanation_blocked_reason": item.get("human_explanation_blocked_reason", ""),
+        "human_explanation_source": item.get("human_explanation_source", ""),
+        "human_explanation_collected_at": item.get("human_explanation_collected_at", ""),
         "ai_relationship_type": item.get("ai_relationship_type", ""),
         "ai_explanation_raw": item.get("ai_explanation_raw", ""),
         "ai_explanation_sanitized": ai_sanitized,
@@ -1315,12 +1571,16 @@ def append_analysis_logs(participant_id, timestamp, score_change, clean_history)
     _append_dict_row(rounds_file, ROUNDS_LOG_FIELDS, round_row)
 
     word_type_per_card = st.session_state.get("word_type_per_card", {})
+    turn_rows = []
     for item in clean_history:
+        turn_row = _turn_analysis_row(participant_id, item, word_type_per_card)
         _append_dict_row(
             turns_file,
             TURNS_LOG_FIELDS,
-            _turn_analysis_row(participant_id, item, word_type_per_card),
+            turn_row,
         )
+        turn_rows.append(turn_row)
+    return round_row, turn_rows
 
 
 def log_round(participant_id):
@@ -1509,6 +1769,8 @@ def log_round(participant_id):
                 _join_word_types(bomb_words, word_type_per_card),
                 item["turn"],
                 item["turn"],
+                item.get("completed_turn_number", ""),
+                item.get("skip_number", ""),
                 item["clue_giver"],
                 item["guesser"],
                 item["hint"],
@@ -1599,6 +1861,8 @@ def log_round(participant_id):
                 item["human_explanation_sanitized"],
                 item["human_explanation_is_valid"],
                 item["human_explanation_blocked_reason"],
+                item["human_explanation_source"],
+                item["human_explanation_collected_at"],
                 item["ai_relationship_type"],
                 item["ai_explanation_raw"],
                 item["ai_explanation_sanitized"],
@@ -1629,7 +1893,12 @@ def log_round(participant_id):
     st.session_state.last_score_change = score_change
     st.session_state.score += score_change
 
-    append_analysis_logs(participant_id, timestamp, score_change, clean_history)
+    normalized_round_row, normalized_turn_rows = append_analysis_logs(
+        participant_id,
+        timestamp,
+        score_change,
+        clean_history,
+    )
     log_event(
         "round_completed",
         {
@@ -1654,6 +1923,13 @@ def log_round(participant_id):
             turn_number=st.session_state.round_interactions,
         )
     log_event("export_completed", {"files": ["rounds.csv", "turns.csv"]})
-    log_session_state(completed=False)
+    st.session_state.last_activity_at = timestamp
+    st.session_state.last_completed_stage = "gameplay"
+    log_session_state(completed=False, persist_remote=True)
 
-    append_remote_csv(round_row, interaction_rows)
+    append_remote_csv(
+        round_row,
+        interaction_rows,
+        normalized_round_row,
+        normalized_turn_rows,
+    )

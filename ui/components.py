@@ -137,9 +137,20 @@ def _render_static_card(word, role, revealed, guessed=False):
     )
 
 
-def render_board(board, word_roles, guesses=None, reveal_all=False, clickable=False, max_clicks=0):
+def render_board(
+    board,
+    word_roles,
+    guesses=None,
+    reveal_all=False,
+    clickable=False,
+    max_clicks=0,
+    column_count=None,
+    key_prefix="board_button",
+):
     guesses = guesses or []
-    column_count = 4 if len(board) == BOARD_SIZE else min(4, max(1, len(board)))
+    column_count = column_count or (
+        4 if len(board) == BOARD_SIZE else min(4, max(1, len(board)))
+    )
     cols = st.columns(column_count)
     guess_set = set(guesses)
     clicked_word = None
@@ -154,7 +165,7 @@ def render_board(board, word_roles, guesses=None, reveal_all=False, clickable=Fa
                 is_disabled = len(guesses) >= max_clicks or is_guessed
                 if st.button(
                     word,
-                    key=f"board_button_{st.session_state.round}_{word}",
+                    key=f"{key_prefix}_{st.session_state.round}_{word}",
                     use_container_width=True,
                     disabled=is_disabled,
                 ):
@@ -197,7 +208,16 @@ def render_hint_panel(current_hint, hint_number, previous_hint=None):
     )
 
 
-def render_hint_target_selector(target_words, selected_targets, max_targets):
+def render_hint_target_selector(
+    target_words,
+    selected_targets,
+    max_targets,
+    *,
+    state_key="hint_targets",
+    key_prefix="hint_target",
+    column_count=None,
+    disabled=False,
+):
     selected_targets = selected_targets or []
     st.markdown(
         """
@@ -205,23 +225,29 @@ def render_hint_target_selector(target_words, selected_targets, max_targets):
         """,
         unsafe_allow_html=True,
     )
-    cols = st.columns(5 if len(target_words) >= 5 else 4)
+    cols = st.columns(column_count or (5 if len(target_words) >= 5 else 4))
     for index, word in enumerate(target_words):
         is_selected = word in selected_targets
         label = f"[x] {word}" if is_selected else word
         with cols[index % len(cols)]:
             if st.button(
                 label,
-                key=f"hint_target_{st.session_state.round}_{st.session_state.round_interactions}_{word}",
+                key=(
+                    f"{key_prefix}_{st.session_state.get('round', 0)}_"
+                    f"{len(st.session_state.get('interaction_history', []))}_{word}"
+                ),
                 use_container_width=True,
-                disabled=(not is_selected and len(selected_targets) >= max_targets),
+                disabled=(
+                    disabled
+                    or (not is_selected and len(selected_targets) >= max_targets)
+                ),
             ):
                 if is_selected:
-                    st.session_state.hint_targets = [
+                    st.session_state[state_key] = [
                         item for item in selected_targets if item != word
                     ]
                 else:
-                    st.session_state.hint_targets = selected_targets + [word]
+                    st.session_state[state_key] = selected_targets + [word]
                 st.rerun()
 
 

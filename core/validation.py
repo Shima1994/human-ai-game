@@ -55,3 +55,33 @@ def mentions_board_word(text, board_words):
                 return True
 
     return False
+
+
+def validate_general_link(text, board_words, min_words=3, max_words=20, max_chars=150):
+    """Validate the human clue-giver's board-independent pre-AI explanation."""
+    cleaned = str(text or "").strip()
+    word_count = len([word for word in cleaned.split() if word])
+    if word_count < min_words:
+        return False, "too_short"
+    if word_count > max_words or len(cleaned) > max_chars:
+        return False, "too_long"
+    if not re.search(r"[A-Za-z]", cleaned) or not cleaned.isascii():
+        return False, "non_english"
+    if mentions_board_word(cleaned, board_words):
+        return False, "board_word"
+    return True, ""
+
+
+def validate_guess_rationale(text, board_words, min_words=3, max_words=30, max_chars=240):
+    """Validate a human guess explanation without leaking exact board-card names."""
+    cleaned = str(text or "").strip()
+    word_count = len([word for word in cleaned.split() if word])
+    if word_count < min_words:
+        return False, "too_short"
+    if word_count > max_words or len(cleaned) > max_chars:
+        return False, "too_long"
+    if not re.search(r"[A-Za-z]", cleaned) or not cleaned.isascii():
+        return False, "non_english"
+    if mentions_board_word(cleaned, board_words):
+        return False, "board_word"
+    return True, ""

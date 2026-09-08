@@ -10,6 +10,7 @@ from ui.screens import (
     screen_human_clue,
     screen_human_guesser,
     screen_name,
+    screen_tutorial,
     screen_welcome,
 )
 from ui.styles import inject_css
@@ -27,7 +28,6 @@ def main():
     inject_css()
 
     if not st.session_state.consent_given:
-        render_app_header()
         screen_consent()
         return
 
@@ -39,6 +39,11 @@ def main():
     if not st.session_state.participant_id:
         render_app_header()
         screen_name()
+        return
+
+    if not st.session_state.tutorial_completed:
+        render_app_header()
+        screen_tutorial()
         return
 
     if st.session_state.game_over:

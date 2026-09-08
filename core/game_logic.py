@@ -297,6 +297,7 @@ def setup_new_round():
     st.session_state.round_medal = "none"
     st.session_state.round_success = False
     st.session_state.round_bomb_hit = False
+    st.session_state.round_end_reason = ""
     st.session_state.ai_round_reflection = ""
     st.session_state.human_round_feedback = ""
     st.session_state.pending_hint_meta = None
@@ -350,6 +351,11 @@ def record_interaction(
     timer_duration_seconds=None,
     human_decision_ended_at=None,
     human_decision_time_sec=None,
+    human_explanation_raw="",
+    human_explanation_is_valid=None,
+    human_explanation_blocked_reason="",
+    human_explanation_source="",
+    human_explanation_collected_at="",
 ):
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
@@ -431,6 +437,7 @@ def record_interaction(
         except (TypeError, ValueError):
             human_decision_time_sec = None
 
+    interaction_sequence = len(st.session_state.interaction_history) + 1
     st.session_state.round_interactions += 1
     if partial_skip:
         st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
@@ -442,7 +449,9 @@ def record_interaction(
         st.session_state.used_hints.append(normalized_hint)
     st.session_state.interaction_history.append(
         {
-            "turn": st.session_state.round_interactions,
+            "turn": interaction_sequence,
+            "completed_turn_number": st.session_state.round_interactions,
+            "skip_number": st.session_state.get("round_skips", 0) if partial_skip else "",
             "clue_giver": clue_giver,
             "guesser": guesser,
             "hint": normalized_hint,
@@ -470,7 +479,7 @@ def record_interaction(
             "repair_source_targets": list(repair_context.get("unresolved_targets", [])),
             "repair_chain_id": repair_context.get("repair_chain_id", "") or (
                 f"{st.session_state.get('session_id', '')}:r{st.session_state.get('round', '')}:"
-                f"t{st.session_state.round_interactions}"
+                f"t{interaction_sequence}"
                 if partial_skip and clue_giver == "ai" and skipped_by == "human"
                 else ""
             ),
@@ -525,15 +534,17 @@ def record_interaction(
             "recorded_at": turn_end.isoformat(),
             "reflection_rating": "",
             "reflection_relationship_type": "",
-            "reflection_explanation_raw": "",
-            "reflection_explanation_is_valid": "",
+            "reflection_explanation_raw": human_explanation_raw,
+            "reflection_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
             "reflection_blocked_reason": "",
             "human_understanding_rating": "",
             "human_relationship_type": "",
-            "human_explanation_raw": "",
-            "human_explanation_sanitized": "",
-            "human_explanation_is_valid": "",
-            "human_explanation_blocked_reason": "",
+            "human_explanation_raw": human_explanation_raw,
+            "human_explanation_sanitized": human_explanation_raw if human_explanation_is_valid else "",
+            "human_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
+            "human_explanation_blocked_reason": human_explanation_blocked_reason,
+            "human_explanation_source": human_explanation_source,
+            "human_explanation_collected_at": human_explanation_collected_at,
             "ai_relationship_type": "",
             "ai_explanation_raw": "",
             "ai_explanation_sanitized": "",
@@ -543,7 +554,7 @@ def record_interaction(
             "reflection_source": "",
         }
     )
-    st.session_state.pending_reflection_turn = st.session_state.round_interactions
+    st.session_state.pending_reflection_turn = interaction_sequence
 
     if (
         bomb_hit
@@ -554,10 +565,7 @@ def record_interaction(
 
 
 def can_skip_current_clue():
-    return (
-        st.session_state.get("round_skips", 0) < MAX_SKIPS_PER_ROUND
-        and st.session_state.get("round_interactions", 0) < MAX_INTERACTIONS_PER_ROUND - 1
-    )
+    return st.session_state.get("round_skips", 0) < MAX_SKIPS_PER_ROUND
 
 
 def record_skip(
@@ -584,6 +592,11 @@ def record_skip(
     timer_duration_seconds=None,
     human_decision_ended_at=None,
     human_decision_time_sec=None,
+    human_explanation_raw="",
+    human_explanation_is_valid=None,
+    human_explanation_blocked_reason="",
+    human_explanation_source="",
+    human_explanation_collected_at="",
 ):
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
@@ -617,14 +630,20 @@ def record_skip(
         except (TypeError, ValueError):
             human_decision_time_sec = None
 
-    st.session_state.round_interactions += 1
-    if not timed_out:
+    interaction_sequence = len(st.session_state.interaction_history) + 1
+    if timed_out:
+        # Preserve the established timeout behavior: an expired human task uses
+        # one completed-turn allowance, but never one of the skip allowances.
+        st.session_state.round_interactions += 1
+    else:
         st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
     if normalized_hint and normalized_hint not in st.session_state.used_hints:
         st.session_state.used_hints.append(normalized_hint)
     st.session_state.interaction_history.append(
         {
-            "turn": st.session_state.round_interactions,
+            "turn": interaction_sequence,
+            "completed_turn_number": st.session_state.round_interactions,
+            "skip_number": st.session_state.get("round_skips", 0) if not timed_out else "",
             "clue_giver": clue_giver,
             "guesser": guesser,
             "hint": normalized_hint,
@@ -654,7 +673,7 @@ def record_skip(
             "repair_source_targets": list(repair_context.get("unresolved_targets", [])),
             "repair_chain_id": repair_context.get("repair_chain_id", "") or (
                 f"{st.session_state.get('session_id', '')}:r{st.session_state.get('round', '')}:"
-                f"t{st.session_state.round_interactions}"
+                f"t{interaction_sequence}"
                 if not timed_out and clue_giver == "ai" and skipped_by == "human"
                 else ""
             ),
@@ -713,15 +732,17 @@ def record_skip(
             "recorded_at": turn_end.isoformat(),
             "reflection_rating": "",
             "reflection_relationship_type": "",
-            "reflection_explanation_raw": "",
-            "reflection_explanation_is_valid": "",
+            "reflection_explanation_raw": human_explanation_raw,
+            "reflection_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
             "reflection_blocked_reason": "",
             "human_understanding_rating": "",
             "human_relationship_type": "",
-            "human_explanation_raw": "",
-            "human_explanation_sanitized": "",
-            "human_explanation_is_valid": "",
-            "human_explanation_blocked_reason": "",
+            "human_explanation_raw": human_explanation_raw,
+            "human_explanation_sanitized": human_explanation_raw if human_explanation_is_valid else "",
+            "human_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
+            "human_explanation_blocked_reason": human_explanation_blocked_reason,
+            "human_explanation_source": human_explanation_source,
+            "human_explanation_collected_at": human_explanation_collected_at,
             "ai_relationship_type": "",
             "ai_explanation_raw": "",
             "ai_explanation_sanitized": "",
@@ -731,9 +752,7 @@ def record_skip(
             "reflection_source": "",
         }
     )
-    st.session_state.pending_reflection_turn = (
-        None if timed_out else st.session_state.round_interactions
-    )
+    st.session_state.pending_reflection_turn = None if timed_out else interaction_sequence
 
     if st.session_state.round_interactions >= MAX_INTERACTIONS_PER_ROUND:
         finish_round()
@@ -752,6 +771,11 @@ def record_timeout(
     hint_raw_response="",
     hint_time_sec=None,
     ai_understanding_rating_before=None,
+    human_explanation_raw="",
+    human_explanation_is_valid=None,
+    human_explanation_blocked_reason="",
+    human_explanation_source="",
+    human_explanation_collected_at="",
 ):
     if st.session_state.get("clue_timer_timeout_consumed", False):
         return None
@@ -773,6 +797,11 @@ def record_timeout(
         timeout_timestamp=timeout_timestamp,
         timeout_selected_cards=timeout_selected_cards,
         human_decision_ended_at=timeout_timestamp,
+        human_explanation_raw=human_explanation_raw,
+        human_explanation_is_valid=human_explanation_is_valid,
+        human_explanation_blocked_reason=human_explanation_blocked_reason,
+        human_explanation_source=human_explanation_source,
+        human_explanation_collected_at=human_explanation_collected_at,
     )
     if st.session_state.get("interaction_history"):
         st.session_state.interaction_history[-1]["ai_understanding_rating_before"] = (
@@ -790,6 +819,14 @@ def finish_round():
     st.session_state.round_success = (
         len(st.session_state.found_targets) == len(st.session_state.target_words)
     )
+    if st.session_state.round_bomb_hit:
+        st.session_state.round_end_reason = "bomb"
+    elif st.session_state.round_success:
+        st.session_state.round_end_reason = "all_targets_found"
+    elif st.session_state.round_interactions >= MAX_INTERACTIONS_PER_ROUND:
+        st.session_state.round_end_reason = "completed_turn_limit"
+    else:
+        st.session_state.round_end_reason = ""
     st.session_state.round_medal = get_medal_for_round(
         st.session_state.round_interactions,
         st.session_state.round_success,
@@ -838,6 +875,8 @@ def append_ai_round_summary():
             "interactions": [
                 {
                     "turn": item.get("turn"),
+                    "completed_turn_number": item.get("completed_turn_number", ""),
+                    "skip_number": item.get("skip_number", ""),
                     "clue_giver": item.get("clue_giver"),
                     "guesser": item.get("guesser"),
                     "hint": item.get("hint"),
@@ -892,6 +931,8 @@ def append_ai_round_summary():
                     "human_explanation_sanitized": item.get("human_explanation_sanitized", ""),
                     "human_explanation_is_valid": item.get("human_explanation_is_valid", ""),
                     "human_explanation_blocked_reason": item.get("human_explanation_blocked_reason", ""),
+                    "human_explanation_source": item.get("human_explanation_source", ""),
+                    "human_explanation_collected_at": item.get("human_explanation_collected_at", ""),
                     "ai_relationship_type": item.get("ai_relationship_type", ""),
                     "ai_explanation_raw": item.get("ai_explanation_raw", ""),
                     "ai_explanation_sanitized": item.get("ai_explanation_sanitized", ""),

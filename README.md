@@ -54,7 +54,7 @@ Baseline prompt construction uses dedicated fact-only history formatters. Intend
 - In round 1, the participant presses **Ask AI for a clue**, giving them time to inspect the initial board.
 - In later rounds, AI clues are generated automatically when the screen loads.
 - Before selecting cards, the participant writes a 3–30 word English rationale.
-- After the turn, a rating is required. If the human was the clue-giver, a 3–20 word English clue explanation is also required.
+- Before the AI guesses, the human clue-giver must provide a 3–20 word English General Link that contains no board/card names. After the turn, a separate shared-understanding rating is required.
 
 ### Human clue-giver / AI guesser
 
@@ -65,8 +65,8 @@ Baseline prompt construction uses dedicated fact-only history formatters. Intend
 
 ### Full and partial skips
 
-At most two skips are available per round, and a skip is unavailable on the final possible turn.
-Each human clue-giving or guessing task has a configurable decision countdown (currently 120 seconds). AI/API processing uses a separate technical timeout and never reduces the participant's decision window. A human timeout consumes the turn without submitting guesses or consuming a skip.
+At most two skips are available per round independently of the three completed-turn limit. A full skip consumes no completed turn; a partial skip retains its completed guesses as one interaction and does not add another turn for the repair action.
+Each human clue-giving or guessing task has a configurable decision countdown (currently 90 seconds). AI/API processing uses a separate 120-second technical timeout and never reduces the participant's decision window. A human timeout consumes the turn without submitting guesses or consuming a skip.
 When a human skips an AI clue, the AI's next clue retries the same unresolved intended targets with a different clue. Adaptive sessions may use the participant's recorded interpretation and reflection to improve that repair; baseline sessions retry the targets without receiving reflection context.
 
 - **Full skip:** no card is selected; the clue is abandoned; one full skip is consumed.
@@ -84,7 +84,7 @@ After a non-bomb turn containing one or more wrong neutral guesses, the guesser 
 - Clues may not equal or closely match a board word and may not repeat within a round.
 - Human rationales and reflections must contain English ASCII text; Persian, Arabic, Japanese, mixed-script, and other non-ASCII responses are rejected.
 - Guess rationales require 3–30 words.
-- Turn-level human clue explanations require 3–20 words and normally may not name board cards.
+- Pre-AI human clue explanations require 3–20 English words and may never name board cards, including when the resulting turn ends the round.
 - The board-word restriction is removed after a bomb ends the round because hidden information is no longer at risk.
 - End-of-round human feedback requires 3–200 English words.
 
@@ -122,7 +122,7 @@ Six CSV files are maintained under `data/`:
 | `game_rounds.csv` | one row per round | wide backward-compatible research export |
 | `game_interactions.csv` | one row per turn | wide backward-compatible interaction export |
 
-For primary analysis, use the normalized `sessions.csv`, `rounds.csv`, `turns.csv`, and `events.csv` tables. The `game_rounds.csv` and `game_interactions.csv` files are backward-compatible wide/audit exports (and the durable remote exports when GitHub storage is enabled); do not combine their duplicate measures with normalized rows as if they were additional observations.
+For primary analysis, use the normalized `sessions.csv`, `rounds.csv`, `turns.csv`, and `events.csv` tables. The `game_rounds.csv` and `game_interactions.csv` files are backward-compatible wide/audit exports; do not combine their duplicate measures with normalized rows as if they were additional observations. All six datasets are mirrored durably when GitHub storage is enabled.
 
 `session_id`, `participant_id`, `condition`, `round_number`, and `turn_number` are the primary join keys. Exact schemas are defined by the field lists in `core/storage.py`; these lists are the source of truth.
 
@@ -131,7 +131,7 @@ Important turn-level fields include:
 - clue, `N`, intended cards, expected guesses, actual guess order;
 - correct, incorrect, neutral, and bomb selections;
 - `outcome`, alignment status, error type, and score contribution;
-- `skipped`, `skipped_by`, `partial_skip`, `completed_guesses`, and `skipped_guesses`;
+- action-sequence `turn_number`, `completed_turn_number`, `skip_number`, `skipped`, `skipped_by`, `partial_skip`, `completed_guesses`, and `skipped_guesses`;
 - `skip_interpreted_cards`, their word types, and interpretation count;
 - counterfactual wrong-guess replacements, actor, word types, count, and AI-call metadata;
 - raw and sanitized human/AI explanations plus validation status and block reason;
@@ -139,10 +139,11 @@ Important turn-level fields include:
 - explicit human-decision start/end/duration/timeout fields, separate from LLM latency;
 - raw LLM response, parsed response, model, temperature, retries, and latency;
 - `repair_applied_to_next_prompt`, immediate `repair_source_turn`, stable `repair_chain_id`, and `repair_attempt_number` for repeated repairs.
+- canonical `action_type` and `alignment_applicability` classifications derived from the raw action fields without changing stored outcome metrics.
 
 Turn metrics use the live game outcome: `hit_rate` is target guesses divided by all submitted guesses, `target_yield` and `turn_score_delta` are newly found targets, and `jaccard_alignment` compares intended and guessed-card sets. Skip/timeout rows have zero outcome metrics because no guesses were finalized; unavailable legacy/incomplete metrics remain blank.
 
-Rating fields intentionally represent different stages. `ai_understanding_rating_before` is the human clue-giver's expectation before the AI guess. `human_understanding_rating` is the post-turn shared-understanding rating and is also retained as `reflection_rating` in the wide compatibility exports. `perception_rating_end` in `game_rounds.csv` is the latest post-turn shared-understanding rating at round end, not a separate end-of-round scale. `human_round_feedback` is the qualitative end-of-round response. The five `post_game_*` session fields are the final questionnaire items. `ai_understanding_rating_after` is retained only for backward schema compatibility and is currently non-applicable.
+Rating fields intentionally represent different stages. `ai_understanding_rating_before` is the human clue-giver's expectation before the AI guess. `human_understanding_rating` is the post-turn shared-understanding rating and is also retained as `reflection_rating` in the wide compatibility exports. `human_explanation_*` is the canonical pre-AI General Link, with `human_explanation_source=pre_ai_human_clue_form` and `human_explanation_collected_at` marking its origin and submission time; `reflection_explanation_*` remains a compatibility alias for that text on human-clue turns. `perception_rating_end` in `game_rounds.csv` is the latest post-turn shared-understanding rating at round end, not a separate end-of-round scale. `human_round_feedback` is the qualitative end-of-round response. The five `post_game_*` session fields are the final questionnaire items. `ai_understanding_rating_after` is retained only for backward schema compatibility and is currently non-applicable.
 
 ### Serialization conventions
 
@@ -152,11 +153,19 @@ Rating fields intentionally represent different stages. `ai_understanding_rating
 - Timestamps are recorded as UTC ISO-8601 strings. Older rows may be timezone-naive but are UTC by convention.
 - Raw invalid explanations are retained for audit; sanitized fields are blank when validation fails.
 
+### Provenance and lifecycle
+
+New session rows record `experiment_version`, `schema_version`, `code_commit`, `deployment_version`, `model_identifier`, and `condition_assignment_version`. The source-controlled defaults identify the current pilot and schema. Deployments should provide exact platform identifiers through `CODE_COMMIT` (or `GITHUB_SHA`, `STREAMLIT_GIT_COMMIT`, or `RENDER_GIT_COMMIT`) and `DEPLOYMENT_VERSION`. Unavailable identifiers remain blank; timestamps are never substituted for version identifiers. `model_identifier` records the exact configured model aliases and does not claim that a mutable provider alias is an immutable model snapshot.
+
+Session lifecycle fields are updated only at persisted stage boundaries: participant profile, tutorial, saved gameplay rounds, post-study questionnaire, and completed debriefing. `last_completed_stage` means the last successfully completed stage, not the currently displayed page. `session_end_reason` is blank for an incomplete or disappeared session and is `completed` only after the participant acknowledges the debriefing. There is currently no explicit participant-withdrawal action or terminal technical-error route, so `withdrawal_requested` and `technical_termination` remain false rather than inferring intent from browser disappearance, AI errors, skips, timeouts, or game outcomes.
+
+Normalized turn `action_type` values are `interaction`, `full_skip`, `partial_skip`, and `timeout`. `alignment_applicability` values are `observed_completed_selection`, `partial_selection`, `interpreted_only_skip`, `timeout_no_behavioral_selection`, and `not_applicable`. Existing Jaccard and hit-rate values are unchanged; this metadata identifies structural placeholder zeros. Normalized round `round_end_reason` values produced by the current state machine are `all_targets_found`, `bomb`, and `completed_turn_limit`. Retryable technical events are not round terminations.
+
 `storage.py` includes schema migration and a repair path for legacy `game_interactions.csv` rows that were historically written with two duplicated values. Existing recoverable rows are realigned before the current schema is written.
 
 ## Durable storage
 
-Local CSV files are always written. On Streamlit Community Cloud, local storage is ephemeral, so `game_rounds.csv` and `game_interactions.csv` can also be mirrored to GitHub.
+Local CSV files are always written. When GitHub storage is configured, all six experimental datasets are also mirrored so they remain recoverable if the Streamlit host filesystem is restarted.
 
 Configure `.streamlit/secrets.toml`:
 
@@ -169,11 +178,14 @@ GITHUB_BRANCH = "main"
 GITHUB_ROUND_CSV_PATH = "data/game_rounds.csv"
 GITHUB_INTERACTION_CSV_PATH = "data/game_interactions.csv"
 GITHUB_SESSIONS_CSV_PATH = "data/sessions.csv"
+GITHUB_NORMALIZED_ROUNDS_CSV_PATH = "data/rounds.csv"
+GITHUB_TURNS_CSV_PATH = "data/turns.csv"
+GITHUB_EVENTS_CSV_PATH = "data/events.csv"
 ```
 
-Condition allocation uses the remote sessions file as an optimistic transaction when GitHub is configured, so a Streamlit instance restart does not reset alternation. On the first deployment of `sessions.csv`, the allocator seeds itself from the last condition in the existing remote round export. Completed session snapshots preserve demographics and final-questionnaire values remotely. Round and interaction exports are mirrored after every completed round.
+Condition allocation uses the remote sessions file as an optimistic transaction when GitHub is configured, so a Streamlit instance restart does not reset alternation. On the first deployment of `sessions.csv`, the allocator seeds itself from the last condition in the existing remote round export. Completed session snapshots preserve demographics and final-questionnaire values remotely. Wide and normalized round/turn exports are mirrored after every completed round, and events are mirrored when emitted.
 
-GitHub Contents API writes use optimistic retries for update conflicts. For high-volume or multi-instance production data collection, a transactional database/object store is preferable to GitHub-backed CSV because GitHub is not an atomic multi-table database. Normalized `rounds.csv`, `turns.csv`, and `events.csv` remain local in the current implementation; their durable equivalents are the remote wide exports plus remote session snapshots.
+GitHub Contents API writes use optimistic retries for update conflicts. Round rows are idempotent by session and round; turn rows are idempotent by session, round, and action number. Because the event schema has no event ID, exact timestamped event rows are deduplicated only when the complete row is replayed, preserving separately emitted events. For high-volume or multi-instance production data collection, a transactional database/object store is preferable to GitHub-backed CSV because GitHub is not an atomic multi-table database.
 
 ## Installation and local execution
 

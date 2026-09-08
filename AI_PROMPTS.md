@@ -272,7 +272,7 @@ Human explanation inputs are also local validations:
 
 - ASCII English text with at least one English letter;
 - guess rationale: 3–30 words;
-- human clue explanation: 3–20 words;
+- pre-AI human clue General Link: 3–20 English words with no board/card names;
 - end-of-round feedback: 3–200 words;
 - board-card names are blocked in turn explanation while hidden information remains relevant;
 - after a bomb ends the round, card names are permitted.
