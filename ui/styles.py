@@ -113,9 +113,12 @@ def inject_css():
         }
 
         .block-container {
-            max-width: 1120px;
+            width: 100%;
+            max-width: 1600px;
             padding-top: 2rem;
+            padding-right: clamp(1rem, 2.5vw, 2.5rem);
             padding-bottom: 2rem;
+            padding-left: clamp(1rem, 2.5vw, 2.5rem);
         }
 
         [data-testid="stSidebar"] {
@@ -515,7 +518,8 @@ def inject_css():
 
         /* Game Guide */
         .st-key-game_guide_document {
-            max-width: 1180px;
+            width: 100%;
+            max-width: none;
             margin: 0 auto;
             padding: clamp(1rem, 2.6vw, 2rem);
             border: 1px solid rgba(24, 76, 139, 0.08);
@@ -730,7 +734,8 @@ def inject_css():
         /* Research documents */
         .st-key-consent_document,
         .st-key-debriefing_document {
-            max-width: 1120px;
+            width: 100%;
+            max-width: none;
             margin: 0 auto 1.1rem auto;
             padding: clamp(1.25rem, 3vw, 2.6rem) clamp(1.15rem, 4vw, 3.4rem);
             background: rgba(255, 255, 255, 0.96);
@@ -809,7 +814,8 @@ def inject_css():
         }
         .st-key-consent_action_panel,
         .st-key-debriefing_action_panel {
-            max-width: 1120px;
+            width: 100%;
+            max-width: none;
             margin: 0 auto;
         }
         .st-key-consent_action_panel [data-testid="stVerticalBlockBorderWrapper"],
@@ -826,7 +832,7 @@ def inject_css():
             color: var(--color-heading);
         }
         .st-key-consent_document {
-            max-width: 1180px;
+            max-width: none;
             padding: clamp(1rem, 2.6vw, 2rem);
             background: #fbfcfe;
             border-color: rgba(24, 76, 139, 0.08);
@@ -984,7 +990,7 @@ def inject_css():
             background: #f7faff;
         }
         .st-key-debriefing_document {
-            max-width: 1180px;
+            max-width: none;
             padding: clamp(1rem, 2.6vw, 2rem);
             background: #fbfcfe;
             border-color: rgba(24, 76, 139, 0.08);
@@ -1631,7 +1637,8 @@ def inject_css():
             line-height: 1.25;
         }
         .st-key-participant_profile_page {
-            max-width: 1180px;
+            width: 100%;
+            max-width: none;
             margin: 0 auto;
             padding: clamp(1rem, 2.6vw, 2rem);
             border: 1px solid rgba(24, 76, 139, 0.08);

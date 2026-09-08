@@ -40,6 +40,32 @@ RATING_OPTIONS = {
 }
 
 
+def scroll_page_to_top():
+    """Reset the parent Streamlit viewport after navigating to a new study view."""
+    st_components.html(
+        """
+        <script>
+          const resetScroll = () => {
+            const parentWindow = window.parent;
+            const parentDocument = parentWindow.document;
+            parentWindow.scrollTo({ top: 0, left: 0, behavior: "instant" });
+            parentDocument.documentElement.scrollTop = 0;
+            parentDocument.body.scrollTop = 0;
+            const appViewport = parentDocument.querySelector(
+              '[data-testid="stAppViewContainer"]'
+            );
+            if (appViewport) appViewport.scrollTo({ top: 0, left: 0, behavior: "instant" });
+            const main = parentDocument.querySelector('[data-testid="stMain"]');
+            if (main) main.scrollTo({ top: 0, left: 0, behavior: "instant" });
+          };
+          requestAnimationFrame(() => requestAnimationFrame(resetScroll));
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
 def render_app_header():
     st.markdown(
         """

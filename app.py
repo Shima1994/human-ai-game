@@ -3,7 +3,7 @@ import streamlit as st
 from core.game_logic import BoardGenerationError, setup_new_round
 from core.state import init_session_state
 from core.storage import log_event
-from ui.components import render_app_header
+from ui.components import render_app_header, scroll_page_to_top
 from ui.screens import (
     screen_consent,
     screen_game_over,
@@ -23,9 +23,41 @@ st.set_page_config(
 )
 
 
+def _current_view_key():
+    """Identify real page transitions without treating widget reruns as navigation."""
+    state = st.session_state
+    if not state.consent_given:
+        return "consent"
+    if not state.started:
+        return "game_guide"
+    if not state.participant_id:
+        return "participant_profile"
+    if not state.tutorial_completed:
+        return f"tutorial:{state.get('tutorial_step', 'introduction')}"
+    if state.game_over:
+        if not state.get("post_game_questionnaire_submitted"):
+            return "post_study_questionnaire"
+        if not state.get("debriefing_acknowledged"):
+            return "debriefing"
+        return "completion"
+    round_number = state.get("round", 0)
+    if state.get("round_finished"):
+        return f"round:{round_number}:summary"
+    return f"round:{round_number}:{state.get('role', '')}"
+
+
+def _scroll_after_view_change():
+    current_view = _current_view_key()
+    previous_view = st.session_state.get("_rendered_view_key")
+    if previous_view is not None and previous_view != current_view:
+        scroll_page_to_top()
+    st.session_state._rendered_view_key = current_view
+
+
 def main():
     init_session_state()
     inject_css()
+    _scroll_after_view_change()
 
     if not st.session_state.consent_given:
         screen_consent()
