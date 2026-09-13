@@ -1,231 +1,31 @@
-﻿import base64
-import csv
-import io
 import json
-import threading
 from datetime import datetime
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
+import psycopg2
 import streamlit as st
 
+from core import db
 from core.constants import (
     CODE_COMMIT,
     CONDITION_ASSIGNMENT_VERSION,
-    DATA_FILE,
     DEFAULT_CONDITION,
     DEPLOYMENT_VERSION,
-    EVENTS_DATA_FILE,
     EXPERIMENT_VERSION,
     GUESS_MODEL_NAME,
     HINT_MODEL_NAME,
-    INTERACTION_DATA_FILE,
-    N_ROUNDS,
     MODEL_IDENTIFIER,
+    N_ROUNDS,
     REFLECTION_MODEL_NAME,
-    ROUNDS_DATA_FILE,
     SCHEMA_VERSION,
-    SESSIONS_DATA_FILE,
-    TURNS_DATA_FILE,
     VALID_CONDITIONS,
 )
 from core.game_logic import compute_score_change
 
 
-CONDITION_ASSIGNMENT_LOCK = threading.RLock()
-
-
-class RemoteRowConflictError(OSError):
-    """Raised when one canonical remote identity has conflicting row contents."""
-
-
-ROUND_LOG_FIELDS = [
-    "session_id",
-    "timestamp_utc",
-    "participant_id",
-    "condition",
-    "starting_role",
-    "round",
-    "round_number",
-    "round_role",
-    "role",
-    "word_type",
-    "board_template_type",
-    "board_id",
-    "word_type_per_card",
-    "board",
-    "all_board_words",
-    "targets",
-    "target_words",
-    "target_word_types",
-    "bomb",
-    "bomb_words",
-    "bomb_word_types",
-    "neutral_words",
-    "neutral_word_types",
-    "clues_used",
-    "guesses",
-    "guessed_word_types",
-    "correct_guess_word_types",
-    "incorrect_guess_word_types",
-    "turns",
-    "skips",
-    "targets_found",
-    "any_target_correct",
-    "all_targets_found",
-    "bomb_hit",
-    "medal",
-    "score_change",
-    "round_duration_sec",
-    "perception_rating_end",
-    "ai_round_reflection",
-    "human_round_feedback",
-    "alignment_status",
-    "error_type",
-    "human_understanding_rating",
-    "human_relationship_type",
-    "human_explanation_raw",
-    "human_explanation_sanitized",
-    "human_explanation_is_valid",
-    "human_explanation_blocked_reason",
-    "ai_relationship_type",
-    "ai_explanation_raw",
-    "ai_explanation_sanitized",
-    "ai_explanation_is_valid",
-    "ai_explanation_blocked_reason",
-    "ai_explanation",
-    "reflection_source",
-    "reflection_rating",
-    "reflection_relationship_type",
-    "reflection_explanation_raw",
-    "reflection_explanation_is_valid",
-    "reflection_blocked_reason",
-]
-
-
-INTERACTION_LOG_FIELDS = [
-    "session_id",
-    "timestamp_utc",
-    "participant_id",
-    "condition",
-    "starting_role",
-    "round",
-    "round_number",
-    "round_role",
-    "role",
-    "word_type",
-    "board_template_type",
-    "board_id",
-    "word_type_per_card",
-    "target_word_types",
-    "neutral_word_types",
-    "bomb_word_types",
-    "turn",
-    "turn_number",
-    "completed_turn_number",
-    "skip_number",
-    "clue_giver",
-    "guesser",
-    "hint",
-    "clue",
-    "hint_number",
-    "clue_number",
-    "intended_targets",
-    "intended_cards",
-    "expected_guesses",
-    "expected_guess_cards",
-    "expected_guess_word_types",
-    "guess_rationale",
-    "guess_rationale_word_count",
-    "hint_explanation",
-    "guesses",
-    "guessed_cards",
-    "guess_order",
-    "guess_order_json",
-    "guessed_word_types",
-    "correct_guesses",
-    "correct_guess_word_types",
-    "incorrect_guesses",
-    "incorrect_guess_word_types",
-    "missed_intended_targets",
-    "extra_correct_guesses",
-    "neutral_guesses",
-    "bomb_guess",
-    "outcome",
-    "alignment_status",
-    "error_type",
-    "skipped",
-    "skipped_by",
-    "partial_skip",
-    "skip_interpreted_cards",
-    "skip_interpreted_word_types",
-    "skip_interpreted_count",
-    "repair_required",
-    "repair_source_turn",
-    "repair_source_targets",
-    "repair_chain_id",
-    "repair_attempt_number",
-    "repair_attempt",
-    "repair_same_targets_retried",
-    "repair_success",
-    "timer_duration_seconds",
-    "clue_timer_started_at",
-    "human_decision_started_at",
-    "human_decision_ended_at",
-    "human_decision_time_sec",
-    "human_timed_out",
-    "timeout_timestamp",
-    "timed_out",
-    "timeout_repair_attempt",
-    "timeout_selected_cards",
-    "wrong_guess_replacements",
-    "wrong_guess_replacement_word_types",
-    "wrong_guess_replacement_count",
-    "wrong_guess_replacement_actor",
-    "wrong_guess_replacement_raw_response",
-    "wrong_guess_replacement_response_time_sec",
-    "wrong_guess_replacement_attempts",
-    "completed_guesses",
-    "skipped_guesses",
-    "bomb_hit",
-    "round_medal",
-    "round_success",
-    "ai_understanding_rating_before",
-    "ai_understanding_rating_after",
-    "hint_response_time_sec",
-    "hint_time_sec",
-    "hint_attempts",
-    "guess_response_time_sec",
-    "guess_time_sec",
-    "hint_raw_response",
-    "guess_raw_response",
-    "human_understanding_rating",
-    "human_relationship_type",
-    "human_explanation_raw",
-    "human_explanation_sanitized",
-    "human_explanation_is_valid",
-    "human_explanation_blocked_reason",
-    "human_explanation_source",
-    "human_explanation_collected_at",
-    "ai_relationship_type",
-    "ai_explanation_raw",
-    "ai_explanation_sanitized",
-    "ai_explanation_is_valid",
-    "ai_explanation_blocked_reason",
-    "ai_explanation",
-    "reflection_source",
-    "reflection_rating",
-    "reflection_relationship_type",
-    "reflection_explanation_raw",
-    "reflection_explanation_is_valid",
-    "reflection_blocked_reason",
-    "reflection_start_time",
-    "reflection_end_time",
-    "reflection_time_sec",
-    "interaction_recorded_at",
-]
-
-
+# Field lists are the canonical schema: every key inside a row's JSONB `data`
+# document. core/db.py's SCHEMA_SQL only declares the small set of real,
+# indexed columns used for joins and filtering; these lists are what the
+# thesis's data-collection description (System Description 3.5) refers to.
 SESSIONS_LOG_FIELDS = [
     "participant_id",
     "nickname",
@@ -256,6 +56,13 @@ SESSIONS_LOG_FIELDS = [
     "post_game_reflection_helped",
     "post_game_shared_understanding",
     "post_game_questionnaire_json",
+    "ai_post_game_i_understood_human_clues",
+    "ai_post_game_predict_human_interpretation",
+    "ai_post_game_adapted_to_human_behavior",
+    "ai_post_game_reflection_helped",
+    "ai_post_game_shared_understanding",
+    "ai_post_game_reasoning",
+    "ai_post_game_questionnaire_json",
     "experiment_version",
     "schema_version",
     "code_commit",
@@ -301,6 +108,8 @@ ROUNDS_LOG_FIELDS = [
     "round_end_time",
     "round_duration_seconds",
     "round_end_reason",
+    "ai_round_reflection",
+    "human_round_feedback",
 ]
 
 
@@ -318,7 +127,11 @@ TURNS_LOG_FIELDS = [
     "guesser",
     "clue",
     "clue_number",
+    "hint_explanation",
+    "hint_attempts",
     "board_id",
+    "outcome",
+    "bomb_hit",
     "intended_cards",
     "intended_word_types",
     "expected_guess_cards",
@@ -333,6 +146,8 @@ TURNS_LOG_FIELDS = [
     "correct_guess_word_types",
     "incorrect_guesses",
     "incorrect_guess_word_types",
+    "missed_intended_targets",
+    "extra_correct_guesses",
     "neutral_guesses",
     "neutral_guess_word_types",
     "bomb_guesses",
@@ -368,6 +183,9 @@ TURNS_LOG_FIELDS = [
     "reflection_end_time",
     "reflection_time_sec",
     "reflection_source",
+    "ai_understanding_rating_before",
+    "ai_understanding_rating_after",
+    "human_understanding_rating_before",
     "human_understanding_rating",
     "human_relationship_type",
     "human_explanation_raw",
@@ -453,115 +271,38 @@ ROUND_END_REASONS = frozenset(
 )
 
 
-def get_data_file():
-    return DATA_FILE
+# The real (non-JSONB) columns declared in core/db.py's SCHEMA_SQL for each
+# table, kept in one place so the flat analysis views below don't duplicate
+# a JSONB copy of a column that already exists as a real column.
+_SESSIONS_REAL_COLUMNS = ["participant_id", "session_id", "condition", "completed", "last_completed_stage"]
+_ROUNDS_REAL_COLUMNS = ["session_id", "round_number", "condition"]
+_TURNS_REAL_COLUMNS = [
+    "session_id",
+    "round_number",
+    "turn_number",
+    "condition",
+    "action_type",
+    "alignment_applicability",
+]
+
+_flat_views_ready = False
 
 
-def _header_matches(data_file, expected_fields):
-    try:
-        with data_file.open("r", newline="", encoding="utf-8") as file:
-            reader = csv.reader(file)
-            existing = next(reader, [])
-    except (FileNotFoundError, StopIteration):
-        return False
-    return list(existing) == list(expected_fields)
-
-
-def _repair_legacy_interaction_values(header, values):
-    """Repair rows written with two duplicated values by the legacy list writer."""
-    if not header or len(values) != len(header) + 2:
-        return values
-    required = {"clue_number", "intended_cards", "intended_targets"}
-    if not required.issubset(header):
-        return values
-    first_extra = header.index("clue_number") + 1
-    second_extra = header.index("intended_cards") + 2
-    repaired = list(values)
-    for index in sorted([first_extra, second_extra], reverse=True):
-        repaired.pop(index)
-    return repaired
-
-
-def _ensure_csv_fields(data_file, expected_fields):
-    data_file.parent.mkdir(parents=True, exist_ok=True)
-    if not data_file.exists():
-        with data_file.open("w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(expected_fields)
+def ensure_flat_views():
+    """Create/refresh turns_flat, rounds_flat, sessions_flat: one plain text
+    column per field (no JSON to unpack), for direct use in R/pandas/SPSS/Excel.
+    Safe to call repeatedly; only does real work once per process."""
+    global _flat_views_ready
+    if _flat_views_ready:
         return
-
-    try:
-        with data_file.open("r", newline="", encoding="utf-8-sig") as file:
-            raw_rows = list(csv.reader(file))
-            existing_fields = raw_rows[0] if raw_rows else []
-            repaired_values = [
-                _repair_legacy_interaction_values(existing_fields, values)
-                if data_file == INTERACTION_DATA_FILE
-                else values
-                for values in raw_rows[1:]
-            ]
-            rows_are_clean = all(len(values) == len(existing_fields) for values in repaired_values)
-            if existing_fields == list(expected_fields) and rows_are_clean:
-                return
-            rows = [dict(zip(existing_fields, values)) for values in repaired_values]
-    except (FileNotFoundError, StopIteration):
-        rows = []
-
-    with data_file.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=expected_fields, extrasaction="ignore")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({field: row.get(field, "") for field in expected_fields})
-
-
-def ensure_data_file():
-    data_file = get_data_file()
-    _ensure_csv_fields(data_file, ROUND_LOG_FIELDS)
-    return data_file
-
-
-def get_interaction_data_file():
-    return INTERACTION_DATA_FILE
-
-
-def ensure_interaction_data_file():
-    data_file = get_interaction_data_file()
-    _ensure_csv_fields(data_file, INTERACTION_LOG_FIELDS)
-    return data_file
-
-
-def ensure_sessions_data_file():
-    _ensure_csv_fields(SESSIONS_DATA_FILE, SESSIONS_LOG_FIELDS)
-    return SESSIONS_DATA_FILE
-
-
-def _next_balanced_condition(data_file):
-    """Alternate registered sessions, keeping adaptive as the first/default condition."""
-    last_condition = ""
-    if data_file.exists():
-        with data_file.open("r", newline="", encoding="utf-8") as file:
-            for row in csv.DictReader(file):
-                condition = str(row.get("condition", "")).strip().lower()
-                if condition in VALID_CONDITIONS:
-                    last_condition = condition
-    if not last_condition:
-        return DEFAULT_CONDITION
-    return "adaptive" if last_condition == "baseline" else "baseline"
-
-
-def ensure_rounds_data_file():
-    _ensure_csv_fields(ROUNDS_DATA_FILE, ROUNDS_LOG_FIELDS)
-    return ROUNDS_DATA_FILE
-
-
-def ensure_turns_data_file():
-    _ensure_csv_fields(TURNS_DATA_FILE, TURNS_LOG_FIELDS)
-    return TURNS_DATA_FILE
-
-
-def ensure_events_data_file():
-    _ensure_csv_fields(EVENTS_DATA_FILE, EVENTS_LOG_FIELDS)
-    return EVENTS_DATA_FILE
+    db.ensure_flat_views(
+        [
+            ("sessions_flat", "sessions", _SESSIONS_REAL_COLUMNS, SESSIONS_LOG_FIELDS),
+            ("rounds_flat", "rounds", _ROUNDS_REAL_COLUMNS, ROUNDS_LOG_FIELDS),
+            ("turns_flat", "turns", _TURNS_REAL_COLUMNS, TURNS_LOG_FIELDS),
+        ]
+    )
+    _flat_views_ready = True
 
 
 def _json(value):
@@ -572,275 +313,19 @@ def _json_obj(value):
     return json.dumps(value if value is not None else {}, ensure_ascii=False)
 
 
-def _append_dict_row(data_file, fields, row):
-    missing = [field for field in fields if field not in row]
-    if missing:
-        raise ValueError(f"Missing required log fields for {data_file}: {missing}")
-    with data_file.open("a", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fields, extrasaction="ignore")
-        writer.writerow(row)
-
-
-def _upsert_dict_row(data_file, fields, row, key_fields):
-    missing = [field for field in fields if field not in row]
-    if missing:
-        raise ValueError(f"Missing required log fields for {data_file}: {missing}")
-    rows = []
-    if data_file.exists():
-        with data_file.open("r", newline="", encoding="utf-8") as file:
-            rows = list(csv.DictReader(file))
-    key = tuple(str(row.get(field, "")) for field in key_fields)
-    replaced = False
-    for index, existing in enumerate(rows):
-        existing_key = tuple(str(existing.get(field, "")) for field in key_fields)
-        if existing_key == key:
-            rows[index] = {field: row.get(field, "") for field in fields}
-            replaced = True
-            break
-    if not replaced:
-        rows.append({field: row.get(field, "") for field in fields})
-    with data_file.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def _csv_line(values):
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(values)
-    return buffer.getvalue()
-
-
-def _migrate_csv_content(content, expected_fields):
-    raw_rows = list(csv.reader(io.StringIO(content)))
-    existing_fields = raw_rows[0] if raw_rows else []
-    repaired_values = [
-        _repair_legacy_interaction_values(existing_fields, values)
-        if "interaction_recorded_at" in expected_fields
-        else values
-        for values in raw_rows[1:]
-    ]
-    rows_are_clean = all(len(values) == len(existing_fields) for values in repaired_values)
-    if existing_fields == list(expected_fields) and rows_are_clean:
-        return content if content.endswith("\n") else f"{content}\n"
-
-    buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=expected_fields, extrasaction="ignore")
-    writer.writeheader()
-    for values in repaired_values:
-        row = dict(zip(existing_fields, values))
-        writer.writerow({field: row.get(field, "") for field in expected_fields})
-    return buffer.getvalue()
-
-
-def _secret_value(key, default=""):
-    try:
-        return st.secrets.get(key, default)
-    except Exception:
-        return default
-
-
-def _github_storage_config():
-    token = _secret_value("GITHUB_TOKEN")
-    repo = _secret_value("GITHUB_REPO")
-    branch = _secret_value("GITHUB_BRANCH", "main")
-    if not token or not repo:
-        return None
-    return {
-        "token": token,
-        "repo": repo,
-        "branch": branch,
-        "round_path": _secret_value(
-            "GITHUB_ROUND_CSV_PATH",
-            "data/game_rounds.csv",
-        ),
-        "interaction_path": _secret_value(
-            "GITHUB_INTERACTION_CSV_PATH",
-            "data/game_interactions.csv",
-        ),
-        "sessions_path": _secret_value(
-            "GITHUB_SESSIONS_CSV_PATH",
-            "data/sessions.csv",
-        ),
-        "rounds_path": _secret_value(
-            "GITHUB_NORMALIZED_ROUNDS_CSV_PATH",
-            "data/rounds.csv",
-        ),
-        "turns_path": _secret_value(
-            "GITHUB_TURNS_CSV_PATH",
-            "data/turns.csv",
-        ),
-        "events_path": _secret_value(
-            "GITHUB_EVENTS_CSV_PATH",
-            "data/events.csv",
-        ),
-    }
-
-
-def _github_request(url, token, method="GET", payload=None):
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    request = Request(
-        url,
-        data=data,
-        method=method,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "Content-Type": "application/json",
-        },
-    )
-    with urlopen(request, timeout=15) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def _append_to_github_csv_once(path, header, rows, message, key_fields=None):
-    config = _github_storage_config()
-    if not config:
-        return
-
-    token = config["token"]
-    encoded_path = "/".join(part.replace(" ", "%20") for part in path.split("/"))
-    url = (
-        f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
-        f"?ref={config['branch']}"
-    )
-    content = _csv_line(header)
-    sha = None
-
-    try:
-        existing = _github_request(url, token)
-        sha = existing.get("sha")
-        raw_content = base64.b64decode(existing.get("content", "")).decode("utf-8")
-        content = _migrate_csv_content(raw_content, header)
-    except HTTPError as error:
-        if error.code != 404:
-            raise
-
-    rows_added = 0
-    if key_fields:
-        existing_rows = list(csv.DictReader(io.StringIO(content)))
-        key_indexes = [header.index(field) for field in key_fields]
-        existing_by_key = {
-            tuple(str(row.get(field, "")) for field in key_fields): tuple(
-                str(row.get(field, "")) for field in header
-            )
-            for row in existing_rows
-        }
-        for values in rows:
-            values = list(values)
-            key = tuple(str(values[index]) for index in key_indexes)
-            serialized_values = tuple(str(value) for value in values)
-            if key in existing_by_key:
-                if existing_by_key[key] != serialized_values:
-                    raise RemoteRowConflictError(
-                        f"Conflicting remote row for {path} identity {key}"
-                    )
-            else:
-                content += _csv_line(values)
-                existing_by_key[key] = serialized_values
-                rows_added += 1
-    else:
-        for row in rows:
-            content += _csv_line(row)
-            rows_added += 1
-
-    if not rows_added:
-        return
-
-    payload = {
-        "message": message,
-        "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
-        "branch": config["branch"],
-    }
-    if sha:
-        payload["sha"] = sha
-
-    put_url = f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
-    _github_request(put_url, token, method="PUT", payload=payload)
-
-
-def _append_to_github_csv(path, header, rows, message, key_fields=None):
-    for attempt in range(3):
-        try:
-            _append_to_github_csv_once(path, header, rows, message, key_fields=key_fields)
-            return
-        except HTTPError as error:
-            if error.code != 409 or attempt == 2:
-                raise
-        except (URLError, TimeoutError, OSError):
-            if attempt == 2:
-                raise
-
-
 def _set_remote_saved():
-    if st.session_state.get("remote_log_status") != "github_failed":
-        st.session_state.remote_log_status = "github_saved"
+    if st.session_state.get("remote_log_status") != "db_failed":
+        st.session_state.remote_log_status = "db_saved"
         st.session_state.remote_log_error = ""
 
 
 def _set_remote_failure(error):
-    st.session_state.remote_log_status = "github_failed"
+    st.session_state.remote_log_status = "db_failed"
     existing = str(st.session_state.get("remote_log_error", "") or "")
     message = str(error)
     st.session_state.remote_log_error = (
         f"{existing}; {message}" if existing and message not in existing else existing or message
     )
-
-
-def append_remote_csv(
-    round_row,
-    interaction_rows,
-    normalized_round_row=None,
-    normalized_turn_rows=None,
-):
-    try:
-        config = _github_storage_config()
-        if not config:
-            st.session_state.remote_log_status = "local_only"
-            st.session_state.remote_log_error = (
-                "GitHub logging is not configured. Add GITHUB_TOKEN and GITHUB_REPO "
-                "to Streamlit secrets to save public runs durably."
-            )
-            return
-        _append_to_github_csv(
-            config["round_path"],
-            ROUND_LOG_FIELDS,
-            [round_row],
-            "Append word game round data",
-            key_fields=["session_id", "round_number"],
-        )
-        if interaction_rows:
-            _append_to_github_csv(
-                config["interaction_path"],
-                INTERACTION_LOG_FIELDS,
-                interaction_rows,
-                "Append word game interaction data",
-                key_fields=["session_id", "round_number", "turn_number"],
-            )
-        if normalized_round_row is not None:
-            _append_to_github_csv(
-                config["rounds_path"],
-                ROUNDS_LOG_FIELDS,
-                [[normalized_round_row.get(field, "") for field in ROUNDS_LOG_FIELDS]],
-                "Append normalized word game round data",
-                key_fields=["session_id", "round_number"],
-            )
-        if normalized_turn_rows:
-            _append_to_github_csv(
-                config["turns_path"],
-                TURNS_LOG_FIELDS,
-                [
-                    [row.get(field, "") for field in TURNS_LOG_FIELDS]
-                    for row in normalized_turn_rows
-                ],
-                "Append normalized word game turn data",
-                key_fields=["session_id", "round_number", "turn_number"],
-            )
-        _set_remote_saved()
-    except (HTTPError, URLError, TimeoutError, OSError) as error:
-        _set_remote_failure(error)
 
 
 def clean_interaction_history(history):
@@ -933,6 +418,7 @@ def clean_interaction_history(history):
                 "bomb_hit": bool(item.get("bomb_hit", False)),
                 "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
                 "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
+                "human_understanding_rating_before": item.get("human_understanding_rating_before"),
                 "hint_raw_response": item.get("hint_raw_response", ""),
                 "hint_response_time_sec": item.get("hint_response_time_sec"),
                 "hint_attempts": item.get("hint_attempts"),
@@ -1019,6 +505,7 @@ def _session_row(completed=False):
     if st.session_state.get("round_finished"):
         total_completed = max(total_completed, int(st.session_state.get("round", 0) or 0))
     questionnaire = st.session_state.get("post_game_questionnaire", {}) or {}
+    ai_questionnaire = st.session_state.get("ai_post_game_questionnaire", {}) or {}
     last_completed_stage = st.session_state.get("last_completed_stage", "")
     session_end_reason = st.session_state.get("session_end_reason", "")
     if last_completed_stage and last_completed_stage not in SESSION_STAGES:
@@ -1038,8 +525,8 @@ def _session_row(completed=False):
         "starting_role": st.session_state.get("starting_role", ""),
         "start_time": st.session_state.get("session_start_time", ""),
         "end_time": st.session_state.get("session_end_time", "") if completed else "",
-        "completed": str(bool(completed)).lower(),
-        "consent_given": str(bool(st.session_state.get("consent_given", False))).lower(),
+        "completed": bool(completed),
+        "consent_given": bool(st.session_state.get("consent_given", False)),
         "total_rounds_planned": N_ROUNDS,
         "total_rounds_completed": total_completed,
         "total_turns_completed": sum(
@@ -1063,6 +550,13 @@ def _session_row(completed=False):
         "post_game_reflection_helped": questionnaire.get("reflection_helped", ""),
         "post_game_shared_understanding": questionnaire.get("shared_understanding", ""),
         "post_game_questionnaire_json": json.dumps(questionnaire, ensure_ascii=False),
+        "ai_post_game_i_understood_human_clues": ai_questionnaire.get("i_understood_human_clues", ""),
+        "ai_post_game_predict_human_interpretation": ai_questionnaire.get("predict_human_interpretation", ""),
+        "ai_post_game_adapted_to_human_behavior": ai_questionnaire.get("adapted_to_human_behavior", ""),
+        "ai_post_game_reflection_helped": ai_questionnaire.get("reflection_helped", ""),
+        "ai_post_game_shared_understanding": ai_questionnaire.get("shared_understanding", ""),
+        "ai_post_game_reasoning": ai_questionnaire.get("reasoning", ""),
+        "ai_post_game_questionnaire_json": json.dumps(ai_questionnaire, ensure_ascii=False),
         "experiment_version": EXPERIMENT_VERSION,
         "schema_version": SCHEMA_VERSION,
         "code_commit": CODE_COMMIT,
@@ -1072,124 +566,35 @@ def _session_row(completed=False):
         "last_activity_at": st.session_state.get("last_activity_at", ""),
         "last_completed_stage": last_completed_stage,
         "session_end_reason": session_end_reason,
-        "withdrawal_requested": str(
-            bool(st.session_state.get("withdrawal_requested", False))
-        ).lower(),
-        "technical_termination": str(
-            bool(st.session_state.get("technical_termination", False))
-        ).lower(),
+        "withdrawal_requested": bool(st.session_state.get("withdrawal_requested", False)),
+        "technical_termination": bool(st.session_state.get("technical_termination", False)),
     }
 
 
-def _allocate_remote_condition_and_log_session():
-    """Atomically alternate condition and append the initial remote session snapshot."""
-    config = _github_storage_config()
-    if not config:
-        return None
-    path = config["sessions_path"]
-    encoded_path = "/".join(part.replace(" ", "%20") for part in path.split("/"))
-    get_url = (
-        f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
-        f"?ref={config['branch']}"
-    )
-    put_url = f"https://api.github.com/repos/{config['repo']}/contents/{encoded_path}"
-
-    for attempt in range(3):
-        sha = None
-        content = _csv_line(SESSIONS_LOG_FIELDS)
-        seed_last_condition = ""
-        try:
-            existing = _github_request(get_url, config["token"])
-            sha = existing.get("sha")
-            raw = base64.b64decode(existing.get("content", "")).decode("utf-8")
-            content = _migrate_csv_content(raw, SESSIONS_LOG_FIELDS)
-        except HTTPError as error:
-            if error.code != 404:
-                if error.code == 409 and attempt < 2:
-                    continue
-                raise
-            # First deployment of remote sessions.csv: continue the condition
-            # sequence from the existing durable round export when available.
-            round_encoded = "/".join(
-                part.replace(" ", "%20") for part in config["round_path"].split("/")
-            )
-            round_url = (
-                f"https://api.github.com/repos/{config['repo']}/contents/{round_encoded}"
-                f"?ref={config['branch']}"
-            )
-            try:
-                existing_rounds = _github_request(round_url, config["token"])
-                round_raw = base64.b64decode(existing_rounds.get("content", "")).decode("utf-8")
-                for round_row in csv.DictReader(io.StringIO(round_raw)):
-                    candidate = str(round_row.get("condition", "")).strip().lower()
-                    if candidate in VALID_CONDITIONS:
-                        seed_last_condition = candidate
-            except HTTPError as round_error:
-                if round_error.code != 404:
-                    raise
-
-        reader = csv.DictReader(io.StringIO(content))
-        last_condition = seed_last_condition
-        for row in reader:
-            candidate = str(row.get("condition", "")).strip().lower()
-            if candidate in VALID_CONDITIONS:
-                last_condition = candidate
-        condition = (
-            DEFAULT_CONDITION
-            if not last_condition
-            else ("adaptive" if last_condition == "baseline" else "baseline")
-        )
-        st.session_state.condition = condition
-        content += _csv_line([_session_row(completed=False).get(field, "") for field in SESSIONS_LOG_FIELDS])
-        payload = {
-            "message": "Assign study condition and start session",
-            "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
-            "branch": config["branch"],
-        }
-        if sha:
-            payload["sha"] = sha
-        try:
-            _github_request(put_url, config["token"], method="PUT", payload=payload)
-            return condition
-        except HTTPError as error:
-            if error.code == 409 and attempt < 2:
-                continue
-            raise
-    return None
-
-
-def _append_remote_session_snapshot(completed=False):
-    config = _github_storage_config()
-    if not config:
-        return
-    row = _session_row(completed=completed)
-    _append_to_github_csv(
-        config["sessions_path"],
-        SESSIONS_LOG_FIELDS,
-        [[row.get(field, "") for field in SESSIONS_LOG_FIELDS]],
-        "Append completed study session snapshot" if completed else "Append study session snapshot",
-        key_fields=SESSIONS_LOG_FIELDS,
-    )
-
-
-def log_session_state(completed=False, persist_remote=False):
-    data_file = ensure_sessions_data_file()
+def log_session_state(completed=False, persist_remote=True):
     if completed and not st.session_state.get("session_end_time"):
         st.session_state.session_end_time = _iso_now()
     if completed:
         st.session_state.session_end_reason = "completed"
         st.session_state.last_completed_stage = "completed"
-    _upsert_dict_row(
-        data_file,
-        SESSIONS_LOG_FIELDS,
-        _session_row(completed=completed),
-        ["participant_id", "session_id"],
-    )
-    if completed or persist_remote:
-        try:
-            _append_remote_session_snapshot(completed=completed)
-        except (HTTPError, URLError, TimeoutError, OSError) as error:
-            _set_remote_failure(error)
+    row = _session_row(completed=completed)
+    try:
+        ensure_flat_views()
+        db.upsert_row(
+            "sessions",
+            key_columns=["participant_id", "session_id"],
+            extra_columns={
+                "participant_id": row["participant_id"],
+                "session_id": row["session_id"],
+                "condition": row["condition"],
+                "completed": row["completed"],
+                "last_completed_stage": row["last_completed_stage"],
+            },
+            data=row,
+        )
+        _set_remote_saved()
+    except (psycopg2.Error, RuntimeError) as error:
+        _set_remote_failure(error)
 
 
 def mark_session_progress(stage, completed=False):
@@ -1203,40 +608,44 @@ def mark_session_progress(stage, completed=False):
 
 
 def log_event(event_type, payload=None, round_number=None, turn_number=None):
-    data_file = ensure_events_data_file()
     row = {
         "participant_id": st.session_state.get("participant_id", ""),
         "session_id": st.session_state.get("session_id", ""),
         "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "timestamp": _iso_now(),
         "event_type": event_type,
-        "round_number": round_number if round_number is not None else st.session_state.get("round", ""),
-        "turn_number": turn_number if turn_number is not None else st.session_state.get("round_interactions", ""),
-        "event_payload": _json_obj(payload or {}),
+        "round_number": str(
+            round_number if round_number is not None else st.session_state.get("round", "")
+        ),
+        "turn_number": str(
+            turn_number if turn_number is not None else st.session_state.get("round_interactions", "")
+        ),
+        "event_payload": payload or {},
     }
-    _append_dict_row(data_file, EVENTS_LOG_FIELDS, row)
     try:
-        config = _github_storage_config()
-        if not config:
-            if st.session_state.get("remote_log_status") != "github_failed":
-                st.session_state.remote_log_status = "local_only"
-                st.session_state.remote_log_error = (
-                    "GitHub logging is not configured. Add GITHUB_TOKEN and GITHUB_REPO "
-                    "to Streamlit secrets to save public runs durably."
-                )
-            return
-        _append_to_github_csv(
-            config["events_path"],
-            EVENTS_LOG_FIELDS,
-            [[row.get(field, "") for field in EVENTS_LOG_FIELDS]],
-            "Append word game event data",
-            # There is no event-id column. The complete immutable event row is the
-            # narrowest safe retry identity: it suppresses only an exact replay of
-            # the same timestamped event and cannot merge separately emitted events.
-            key_fields=EVENTS_LOG_FIELDS,
+        db.insert_row(
+            "events",
+            columns=[
+                "session_id",
+                "participant_id",
+                "condition",
+                "round_number",
+                "turn_number",
+                "event_type",
+                "event_payload",
+            ],
+            values=[
+                row["session_id"],
+                row["participant_id"],
+                row["condition"],
+                row["round_number"],
+                row["turn_number"],
+                row["event_type"],
+                json.dumps(row["event_payload"], ensure_ascii=False),
+            ],
         )
         _set_remote_saved()
-    except (HTTPError, URLError, TimeoutError, OSError) as error:
+    except (psycopg2.Error, RuntimeError) as error:
         _set_remote_failure(error)
 
 
@@ -1249,18 +658,14 @@ def initialize_session_log(participant_id):
     st.session_state.last_activity_at = _iso_now()
     st.session_state.last_completed_stage = "participant_profile"
     # Allocate only when a participant is actually registered. Ordinary Streamlit
-    # reruns therefore do not consume a slot in the alternating assignment.
-    with CONDITION_ASSIGNMENT_LOCK:
-        sessions_file = ensure_sessions_data_file()
-        remote_condition = None
-        try:
-            remote_condition = _allocate_remote_condition_and_log_session()
-        except (HTTPError, URLError, TimeoutError, OSError) as error:
-            st.session_state.remote_log_status = "github_failed"
-            st.session_state.remote_log_error = str(error)
-        st.session_state.condition = remote_condition or _next_balanced_condition(sessions_file)
-        st.session_state.condition_assigned = True
-        log_session_state(completed=False)
+    # reruns therefore do not consume a slot in the alternating assignment. The
+    # allocation itself is one atomic Postgres transaction (core/db.py
+    # allocate_condition), so concurrent registrations cannot corrupt the
+    # alternating adaptive/baseline balance the way a shared file or a
+    # process-local lock could.
+    st.session_state.condition = db.allocate_condition(VALID_CONDITIONS, DEFAULT_CONDITION)
+    st.session_state.condition_assigned = True
+    log_session_state(completed=False)
     log_event(
         "session_started",
         {
@@ -1333,14 +738,16 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "number_of_turns": st.session_state.round_interactions,
         "round_score": score_change,
         "medal": st.session_state.round_medal,
-        "round_completed": str(bool(st.session_state.round_finished)).lower(),
-        "round_terminated_by_bomb": str(bool(st.session_state.round_bomb_hit)).lower(),
-        "bomb_selected": str(bool(selected_bombs)).lower(),
+        "round_completed": bool(st.session_state.round_finished),
+        "round_terminated_by_bomb": bool(st.session_state.round_bomb_hit),
+        "bomb_selected": bool(selected_bombs),
         "selected_bomb_words": _json(selected_bombs),
         "round_start_time": round_start or "",
         "round_end_time": round_end,
         "round_duration_seconds": duration,
         "round_end_reason": round_end_reason,
+        "ai_round_reflection": st.session_state.get("ai_round_reflection", ""),
+        "human_round_feedback": st.session_state.get("human_round_feedback", ""),
     }
 
 
@@ -1445,7 +852,11 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "guesser": item.get("guesser", ""),
         "clue": item.get("hint", ""),
         "clue_number": item.get("hint_number", ""),
+        "hint_explanation": item.get("hint_explanation", ""),
+        "hint_attempts": item.get("hint_attempts"),
         "board_id": st.session_state.get("board_id", ""),
+        "outcome": item.get("outcome", "correct" if correct else "wrong"),
+        "bomb_hit": bool(item.get("bomb_hit", False)),
         "intended_cards": _json(item.get("intended_targets", [])),
         "intended_word_types": _json(_types_for_words(item.get("intended_targets", []), word_type_per_card)),
         "expected_guess_cards": _json(item.get("expected_guesses", [])),
@@ -1463,6 +874,12 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "correct_guess_word_types": _json(_types_for_words(correct, word_type_per_card)),
         "incorrect_guesses": _json(incorrect),
         "incorrect_guess_word_types": _json(_types_for_words(incorrect, word_type_per_card)),
+        "missed_intended_targets": _json(
+            [word for word in item.get("intended_targets", []) if word not in correct]
+        ),
+        "extra_correct_guesses": _json(
+            [word for word in correct if word not in item.get("intended_targets", [])]
+        ),
         "neutral_guesses": _json(neutral),
         "neutral_guess_word_types": _json(_types_for_words(neutral, word_type_per_card)),
         "bomb_guesses": _json(bombs),
@@ -1480,7 +897,7 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "turn_start_time": item.get("turn_start_time", ""),
         "turn_end_time": item.get("turn_end_time", ""),
         "turn_duration_seconds": _format_optional_float(item.get("turn_duration_seconds", "")),
-        "partial_skip": str(bool(item.get("partial_skip", False))).lower(),
+        "partial_skip": bool(item.get("partial_skip", False)),
         "skip_interpreted_cards": _json(item.get("skip_interpreted_cards", [])),
         "skip_interpreted_word_types": _json(
             _types_for_words(item.get("skip_interpreted_cards", []), word_type_per_card)
@@ -1511,26 +928,29 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         ),
         "completed_guesses": item.get("completed_guesses", len(guessed)),
         "skipped_guesses": item.get("skipped_guesses", 0),
-        "reflection_shown": str(bool(item.get("reflection_source"))).lower(),
+        "reflection_shown": bool(item.get("reflection_source")),
         "reflection_start_time": item.get("reflection_start_time", ""),
         "reflection_end_time": item.get("reflection_end_time", ""),
         "reflection_time_sec": _format_optional_float(item.get("reflection_time_sec")),
         "reflection_source": item.get("reflection_source", ""),
+        "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
+        "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
+        "human_understanding_rating_before": item.get("human_understanding_rating_before"),
         "human_understanding_rating": item.get("human_understanding_rating", ""),
         "human_relationship_type": item.get("human_relationship_type", ""),
         "human_explanation_raw": human_raw,
         "human_explanation_sanitized": human_sanitized if human_valid else "",
-        "human_explanation_is_valid": str(human_valid).lower(),
+        "human_explanation_is_valid": bool(human_valid),
         "human_explanation_blocked_reason": item.get("human_explanation_blocked_reason", ""),
         "human_explanation_source": item.get("human_explanation_source", ""),
         "human_explanation_collected_at": item.get("human_explanation_collected_at", ""),
         "ai_relationship_type": item.get("ai_relationship_type", ""),
         "ai_explanation_raw": item.get("ai_explanation_raw", ""),
         "ai_explanation_sanitized": ai_sanitized,
-        "ai_explanation_is_valid": str(ai_valid).lower(),
+        "ai_explanation_is_valid": bool(ai_valid),
         "ai_explanation_blocked_reason": item.get("ai_explanation_blocked_reason", ""),
         "ai_explanation": ai_sanitized,
-        "repair_applied_to_next_prompt": str(bool(item.get("repair_attempt"))).lower(),
+        "repair_applied_to_next_prompt": bool(item.get("repair_attempt")),
         "repair_context_used": _json_obj(
             {
                 "source_turn": item.get("repair_source_turn", ""),
@@ -1542,56 +962,102 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
             if item.get("repair_attempt")
             else {}
         ),
-        "repair_required": str(bool(item.get("repair_required", False))).lower(),
+        "repair_required": bool(item.get("repair_required", False)),
         "repair_source_turn": item.get("repair_source_turn", ""),
         "repair_source_targets": _json(item.get("repair_source_targets", [])),
         "repair_chain_id": item.get("repair_chain_id", ""),
         "repair_attempt_number": item.get("repair_attempt_number", ""),
-        "repair_attempt": str(bool(item.get("repair_attempt", False))).lower(),
-        "repair_same_targets_retried": str(bool(item.get("repair_same_targets_retried", False))).lower(),
-        "repair_success": str(bool(item.get("repair_success", False))).lower(),
+        "repair_attempt": bool(item.get("repair_attempt", False)),
+        "repair_same_targets_retried": bool(item.get("repair_same_targets_retried", False)),
+        "repair_success": bool(item.get("repair_success", False)),
         "timer_duration_seconds": item.get("timer_duration_seconds", ""),
         "clue_timer_started_at": item.get("clue_timer_started_at", ""),
         "human_decision_started_at": item.get("human_decision_started_at", ""),
         "human_decision_ended_at": item.get("human_decision_ended_at", ""),
         "human_decision_time_sec": _format_optional_float(item.get("human_decision_time_sec")),
-        "human_timed_out": str(bool(item.get("human_timed_out", False))).lower(),
+        "human_timed_out": bool(item.get("human_timed_out", False)),
         "timeout_timestamp": item.get("timeout_timestamp", ""),
-        "timed_out": str(bool(item.get("timed_out", False))).lower(),
-        "timeout_repair_attempt": str(bool(item.get("timeout_repair_attempt", False))).lower(),
+        "timed_out": bool(item.get("timed_out", False)),
+        "timeout_repair_attempt": bool(item.get("timeout_repair_attempt", False)),
         "timeout_selected_cards": _json(item.get("timeout_selected_cards", [])),
         **llm_fields,
     }
 
 
+def _board_card_rows():
+    """One row per board card for this round, for direct SQL/pandas access
+    to abstract/concrete composition (RQ3) without unpacking JSON per row."""
+    word_roles = st.session_state.get("word_roles", {})
+    word_type_per_card = st.session_state.get("word_type_per_card", {})
+    session_id = st.session_state.get("session_id", "")
+    round_number = st.session_state.round
+    board_id = st.session_state.get("board_id", "")
+    rows = []
+    for word in st.session_state.get("board", []) or []:
+        rows.append(
+            (
+                session_id,
+                round_number,
+                board_id,
+                word,
+                word_roles.get(word, ""),
+                word_type_per_card.get(word, ""),
+            )
+        )
+    return rows
+
+
 def append_analysis_logs(participant_id, timestamp, score_change, clean_history):
-    rounds_file = ensure_rounds_data_file()
-    turns_file = ensure_turns_data_file()
     round_row = _round_analysis_row(participant_id, timestamp, score_change)
-    _append_dict_row(rounds_file, ROUNDS_LOG_FIELDS, round_row)
+    db.upsert_row(
+        "rounds",
+        key_columns=["session_id", "round_number"],
+        extra_columns={
+            "session_id": round_row["session_id"],
+            "round_number": round_row["round_number"],
+            "condition": round_row["condition"],
+        },
+        data=round_row,
+    )
 
     word_type_per_card = st.session_state.get("word_type_per_card", {})
     turn_rows = []
     for item in clean_history:
         turn_row = _turn_analysis_row(participant_id, item, word_type_per_card)
-        _append_dict_row(
-            turns_file,
-            TURNS_LOG_FIELDS,
-            turn_row,
+        db.upsert_row(
+            "turns",
+            key_columns=["session_id", "round_number", "turn_number"],
+            extra_columns={
+                "session_id": turn_row["session_id"],
+                "round_number": turn_row["round_number"],
+                "turn_number": turn_row["turn_number"],
+                "condition": turn_row["condition"],
+                "action_type": turn_row["action_type"],
+                "alignment_applicability": turn_row["alignment_applicability"],
+            },
+            data=turn_row,
         )
         turn_rows.append(turn_row)
+
+    board_card_rows = _board_card_rows()
+    if board_card_rows:
+        db.insert_rows(
+            "board_cards",
+            columns=["session_id", "round_number", "board_id", "card_word", "card_role", "word_type"],
+            rows=board_card_rows,
+        )
+        # Re-running the same round (e.g. after a Streamlit rerun before the
+        # round advances) would otherwise violate the primary key; the ON
+        # CONFLICT clause below makes repeated calls idempotent.
+
     return round_row, turn_rows
 
 
 def log_round(participant_id):
-    data_file = ensure_data_file()
-    interaction_data_file = ensure_interaction_data_file()
     timestamp = datetime.utcnow().isoformat()
 
     guesses = st.session_state.guesses
-    correct = any(guess in st.session_state.target_words for guess in guesses)
     bomb_words = st.session_state.get("bomb_words") or [st.session_state.bomb_word]
-    bomb_hit = any(guess in bomb_words for guess in guesses)
     score_change = compute_score_change(
         guesses,
         st.session_state.target_words,
@@ -1600,305 +1066,21 @@ def log_round(participant_id):
     )
     clean_history = clean_interaction_history(st.session_state.interaction_history)
 
-    response_time = None
-    if st.session_state.start_time is not None:
-        response_time = (datetime.utcnow() - st.session_state.start_time).total_seconds()
-
-    clues_used = ";".join(
-        item.get("hint", "") for item in clean_history if item.get("hint")
-    )
-    reflection_ratings = ";".join(
-        str(item.get("reflection_rating", "")) for item in clean_history
-    )
-    alignment_statuses = ";".join(
-        item.get("alignment_status", "") for item in clean_history
-    )
-    error_types = ";".join(
-        item.get("error_type", "") for item in clean_history
-    )
-    human_understanding_ratings = ";".join(
-        str(item.get("human_understanding_rating", "")) for item in clean_history
-    )
-    human_relationship_types = ";".join(
-        item.get("human_relationship_type", "") for item in clean_history
-    )
-    human_explanations = ";".join(
-        item.get("human_explanation_raw", "") for item in clean_history
-    )
-    human_explanation_valid_flags = ";".join(
-        str(item.get("human_explanation_is_valid", "")) for item in clean_history
-    )
-    human_explanations_sanitized = ";".join(
-        item.get("human_explanation_sanitized", "") for item in clean_history
-    )
-    human_explanation_blocked_reasons = ";".join(
-        item.get("human_explanation_blocked_reason", "") for item in clean_history
-    )
-    ai_relationship_types = ";".join(
-        item.get("ai_relationship_type", "") for item in clean_history
-    )
-    ai_explanations_raw = ";".join(
-        item.get("ai_explanation_raw", "") for item in clean_history
-    )
-    ai_explanations_sanitized = ";".join(
-        item.get("ai_explanation_sanitized", item.get("ai_explanation", "")) for item in clean_history
-    )
-    ai_explanation_valid_flags = ";".join(
-        str(item.get("ai_explanation_is_valid", "")) for item in clean_history
-    )
-    ai_explanation_blocked_reasons = ";".join(
-        item.get("ai_explanation_blocked_reason", "") for item in clean_history
-    )
-    ai_explanations = ";".join(
-        item.get("ai_explanation_sanitized", item.get("ai_explanation", "")) for item in clean_history
-    )
-    reflection_sources = ";".join(
-        item.get("reflection_source", "") for item in clean_history
-    )
-    reflection_relationship_types = ";".join(
-        item.get("reflection_relationship_type", "") for item in clean_history
-    )
-    reflection_explanations = ";".join(
-        item.get("reflection_explanation_raw", "") for item in clean_history
-    )
-    reflection_valid_flags = ";".join(
-        str(item.get("reflection_explanation_is_valid", "")) for item in clean_history
-    )
-    reflection_blocked_reasons = ";".join(
-        item.get("reflection_blocked_reason", "") for item in clean_history
-    )
-
-    session_id = st.session_state.get("session_id", "")
-    condition = st.session_state.get("condition", DEFAULT_CONDITION)
-    starting_role = st.session_state.get("starting_role", "")
-    round_role = st.session_state.get("role", "")
-    word_type_per_card = st.session_state.get("word_type_per_card", {})
-    correct_guesses_all = [
-        guess for guess in guesses if guess in st.session_state.target_words
-    ]
-    incorrect_guesses_all = [
-        guess for guess in guesses if guess not in correct_guesses_all
-    ]
-    word_type_per_card_json = _format_word_type_per_card(
-        st.session_state.board,
-        word_type_per_card,
-    )
-
-    round_row = [
-        session_id,
-        timestamp,
-        participant_id,
-        condition,
-        starting_role,
-        st.session_state.round,
-        st.session_state.round,
-        round_role,
-        st.session_state.role,
-        st.session_state.word_type,
-        st.session_state.get("board_template_type", ""),
-        st.session_state.get("board_id", ""),
-        word_type_per_card_json,
-        ";".join(st.session_state.board),
-        ";".join(st.session_state.board),
-        ";".join(st.session_state.target_words),
-        ";".join(st.session_state.target_words),
-        _join_word_types(st.session_state.target_words, word_type_per_card),
-        ";".join(bomb_words),
-        ";".join(bomb_words),
-        _join_word_types(bomb_words, word_type_per_card),
-        ";".join(st.session_state.neutral_words),
-        _join_word_types(st.session_state.neutral_words, word_type_per_card),
-        clues_used,
-        ";".join(guesses),
-        _join_word_types(guesses, word_type_per_card),
-        _join_word_types(correct_guesses_all, word_type_per_card),
-        _join_word_types(incorrect_guesses_all, word_type_per_card),
-        st.session_state.round_interactions,
-        st.session_state.get("round_skips", 0),
-        len(st.session_state.found_targets),
-        int(correct),
-        int(st.session_state.round_success),
-        int(bomb_hit),
-        st.session_state.round_medal,
-        score_change,
-        _format_optional_float(response_time),
-        st.session_state.perception_rating,
-        st.session_state.get("ai_round_reflection", ""),
-        st.session_state.get("human_round_feedback", ""),
-        alignment_statuses,
-        error_types,
-        human_understanding_ratings,
-        human_relationship_types,
-        human_explanations,
-        human_explanations_sanitized,
-        human_explanation_valid_flags,
-        human_explanation_blocked_reasons,
-        ai_relationship_types,
-        ai_explanations_raw,
-        ai_explanations_sanitized,
-        ai_explanation_valid_flags,
-        ai_explanation_blocked_reasons,
-        ai_explanations,
-        reflection_sources,
-        reflection_ratings,
-        reflection_relationship_types,
-        reflection_explanations,
-        reflection_valid_flags,
-        reflection_blocked_reasons,
-    ]
-
-    interaction_rows = []
-    for item in clean_history:
-        interaction_rows.append(
-            [
-                session_id,
-                timestamp,
-                participant_id,
-                condition,
-                starting_role,
-                st.session_state.round,
-                st.session_state.round,
-                round_role,
-                st.session_state.role,
-                st.session_state.word_type,
-                st.session_state.get("board_template_type", ""),
-                st.session_state.get("board_id", ""),
-                word_type_per_card_json,
-                _join_word_types(st.session_state.target_words, word_type_per_card),
-                _join_word_types(st.session_state.neutral_words, word_type_per_card),
-                _join_word_types(bomb_words, word_type_per_card),
-                item["turn"],
-                item["turn"],
-                item.get("completed_turn_number", ""),
-                item.get("skip_number", ""),
-                item["clue_giver"],
-                item["guesser"],
-                item["hint"],
-                item["hint"],
-                item["hint_number"],
-                item["hint_number"],
-                ";".join(item["intended_targets"]),
-                ";".join(item["intended_targets"]),
-                ";".join(item["expected_guesses"]),
-                ";".join(item["expected_guesses"]),
-                _join_word_types(item["expected_guesses"], word_type_per_card),
-                item["guess_rationale"],
-                item["guess_rationale_word_count"],
-                item["hint_explanation"],
-                ";".join(item["guesses"]),
-                ";".join(item["guesses"]),
-                ";".join(
-                    f"{entry.get('position')}:{entry.get('word')}"
-                    for entry in item["guess_order"]
-                ),
-                _json(item["guess_order"]),
-                _join_word_types(item["guesses"], word_type_per_card),
-                ";".join(item["correct_guesses"]),
-                _join_word_types(item["correct_guesses"], word_type_per_card),
-                ";".join(item["incorrect_guesses"]),
-                _join_word_types(item["incorrect_guesses"], word_type_per_card),
-                ";".join(item["missed_intended_targets"]),
-                ";".join(item["extra_correct_guesses"]),
-                ";".join(item["neutral_guesses"]),
-                item["bomb_guess"] or "",
-                item["outcome"],
-                item["alignment_status"],
-                item["error_type"],
-                int(item["skipped"]),
-                item["skipped_by"],
-                int(item["partial_skip"]),
-                ";".join(item.get("skip_interpreted_cards", [])),
-                _join_word_types(
-                    item.get("skip_interpreted_cards", []), word_type_per_card
-                ),
-                len(item.get("skip_interpreted_cards", [])),
-                int(item.get("repair_required", False)),
-                item.get("repair_source_turn", ""),
-                ";".join(item.get("repair_source_targets", [])),
-                item.get("repair_chain_id", ""),
-                item.get("repair_attempt_number", ""),
-                int(item.get("repair_attempt", False)),
-                int(item.get("repair_same_targets_retried", False)),
-                int(item.get("repair_success", False)),
-                item.get("timer_duration_seconds", ""),
-                item.get("clue_timer_started_at", ""),
-                item.get("human_decision_started_at", ""),
-                item.get("human_decision_ended_at", ""),
-                _format_optional_float(item.get("human_decision_time_sec", "")),
-                int(item.get("human_timed_out", False)),
-                item.get("timeout_timestamp", ""),
-                int(item.get("timed_out", False)),
-                int(item.get("timeout_repair_attempt", False)),
-                ";".join(item.get("timeout_selected_cards", [])),
-                ";".join(item.get("wrong_guess_replacements", [])),
-                _join_word_types(
-                    item.get("wrong_guess_replacements", []), word_type_per_card
-                ),
-                len(item.get("wrong_guess_replacements", [])),
-                item.get("wrong_guess_replacement_actor", ""),
-                item.get("wrong_guess_replacement_raw_response", ""),
-                _format_optional_float(
-                    item.get("wrong_guess_replacement_response_time_sec", "")
-                ),
-                item.get("wrong_guess_replacement_attempts", ""),
-                item["completed_guesses"],
-                item["skipped_guesses"],
-                int(item["bomb_hit"]),
-                st.session_state.round_medal,
-                int(st.session_state.round_success),
-                item["ai_understanding_rating_before"] if item["ai_understanding_rating_before"] is not None else "",
-                item["ai_understanding_rating_after"] if item["ai_understanding_rating_after"] is not None else "",
-                _format_optional_float(item["hint_response_time_sec"]),
-                _format_optional_float(item["hint_time_sec"]),
-                item["hint_attempts"] if item["hint_attempts"] is not None else "",
-                _format_optional_float(item["guess_response_time_sec"]),
-                _format_optional_float(item["guess_time_sec"]),
-                item["hint_raw_response"] or "",
-                item["guess_raw_response"] or "",
-                item["human_understanding_rating"],
-                item["human_relationship_type"],
-                item["human_explanation_raw"],
-                item["human_explanation_sanitized"],
-                item["human_explanation_is_valid"],
-                item["human_explanation_blocked_reason"],
-                item["human_explanation_source"],
-                item["human_explanation_collected_at"],
-                item["ai_relationship_type"],
-                item["ai_explanation_raw"],
-                item["ai_explanation_sanitized"],
-                item["ai_explanation_is_valid"],
-                item["ai_explanation_blocked_reason"],
-                item["ai_explanation"],
-                item["reflection_source"],
-                item["reflection_rating"],
-                item["reflection_relationship_type"],
-                item["reflection_explanation_raw"],
-                item["reflection_explanation_is_valid"],
-                item["reflection_blocked_reason"],
-                item["reflection_start_time"],
-                item["reflection_end_time"],
-                _format_optional_float(item["reflection_time_sec"]),
-                item["recorded_at"],
-            ]
-        )
-
-    with data_file.open("a", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(round_row)
-
-    with interaction_data_file.open("a", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerows(interaction_rows)
-
     st.session_state.last_score_change = score_change
     st.session_state.score += score_change
 
-    normalized_round_row, normalized_turn_rows = append_analysis_logs(
-        participant_id,
-        timestamp,
-        score_change,
-        clean_history,
-    )
+    try:
+        normalized_round_row, normalized_turn_rows = append_analysis_logs(
+            participant_id,
+            timestamp,
+            score_change,
+            clean_history,
+        )
+        _set_remote_saved()
+    except (psycopg2.Error, RuntimeError) as error:
+        _set_remote_failure(error)
+        normalized_round_row, normalized_turn_rows = None, None
+
     log_event(
         "round_completed",
         {
@@ -1922,14 +1104,9 @@ def log_round(participant_id):
             round_number=st.session_state.round,
             turn_number=st.session_state.round_interactions,
         )
-    log_event("export_completed", {"files": ["rounds.csv", "turns.csv"]})
+    log_event("export_completed", {"tables": ["rounds", "turns"]})
     st.session_state.last_activity_at = timestamp
     st.session_state.last_completed_stage = "gameplay"
     log_session_state(completed=False, persist_remote=True)
 
-    append_remote_csv(
-        round_row,
-        interaction_rows,
-        normalized_round_row,
-        normalized_turn_rows,
-    )
+    return normalized_round_row, normalized_turn_rows

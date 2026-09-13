@@ -8,6 +8,7 @@ import streamlit as st
 from core.ai_service import (
     AIClueGenerationError,
     ai_guess,
+    generate_ai_post_game_reflection,
     generate_ai_round_reflection,
     generate_ai_hint,
     generate_ai_turn_explanation,
@@ -42,7 +43,6 @@ from core.storage import (
     log_round,
     mark_session_progress,
 )
-from core.state import restart_game
 from core.tutorial import (
     TUTORIAL_BOARD,
     TUTORIAL_BOMB,
@@ -83,6 +83,7 @@ from ui.game_guide import (
     GUIDE_SECTIONS,
 )
 from ui.study_documents import (
+    CONSENT_CHECKLIST_ITEMS,
     INFORMATION_SHEET_CONTACT,
     INFORMATION_SHEET_INTRODUCTION,
     INFORMATION_SHEET_SECTIONS,
@@ -202,6 +203,15 @@ def screen_consent():
             unsafe_allow_html=True,
         )
     with st.container(border=True, key="consent_action_panel"):
+        st.markdown(
+            "<h2>Consent Form</h2>"
+            "<p class='information-consent-lead'>"
+            "PARTICIPATION IN THIS RESEARCH STUDY IS VOLUNTARY</p>"
+            "<ul class='information-consent-list'>"
+            + "".join(f"<li>{escape(item)}</li>" for item in CONSENT_CHECKLIST_ITEMS)
+            + "</ul>",
+            unsafe_allow_html=True,
+        )
         agreed = st.checkbox(
             "I consent voluntarily to participate in this study.",
             key="consent_confirmation",
@@ -1297,6 +1307,7 @@ def _sync_reflection_to_round_summary(item):
                     "reflection_end_time",
                     "reflection_time_sec",
                     "human_understanding_rating",
+                    "ai_understanding_rating_after",
                     "human_relationship_type",
                     "human_explanation_raw",
                     "human_explanation_is_valid",
@@ -1319,12 +1330,18 @@ def _sync_reflection_to_round_summary(item):
                     summary_item[key] = item.get(key, "")
 
 
-def _save_turn_reflection(item, rating, relationship_type, explanation):
+def _save_turn_reflection(item, understood_ai_rating, ai_understood_me_rating, relationship_type, explanation):
     explanation = (explanation or "").strip()
-    rating = int(rating)
-    item["reflection_rating"] = rating
-    item["human_understanding_rating"] = rating
-    st.session_state.perception_rating = rating
+    understood_ai_rating = int(understood_ai_rating)
+    ai_understood_me_rating = int(ai_understood_me_rating)
+    # human_understanding_rating: how well the human thinks THEY understood
+    # the AI this turn. ai_understanding_rating_after: how well the human
+    # thinks the AI understood THEM. These are two directions of the same
+    # question, not one mutual score.
+    item["reflection_rating"] = understood_ai_rating
+    item["human_understanding_rating"] = understood_ai_rating
+    item["ai_understanding_rating_after"] = ai_understood_me_rating
+    st.session_state.perception_rating = understood_ai_rating
     if item.get("clue_giver") == "human":
         item["reflection_relationship_type"] = relationship_type or ""
         item["human_relationship_type"] = relationship_type or ""
@@ -1431,12 +1448,20 @@ def render_turn_reflection():
 
         with rating_col:
             st.radio(
-                "After the guesses, how well do you think you and the AI understood each other?",
+                "After the guesses, how well do you think you understood the AI?",
                 options=list(RATING_OPTIONS.keys()),
                 index=None,
                 format_func=lambda option: f"{option}",
                 horizontal=True,
                 key=f"reflection_rating_{st.session_state.round}_{item.get('turn')}",
+            )
+            st.radio(
+                "How well do you think the AI understood you?",
+                options=list(RATING_OPTIONS.keys()),
+                index=None,
+                format_func=lambda option: f"{option}",
+                horizontal=True,
+                key=f"reflection_rating_ai_understood_me_{st.session_state.round}_{item.get('turn')}",
             )
         replacement_key = (
             f"wrong_guess_replacements_{st.session_state.round}_{item.get('turn')}"
@@ -1463,9 +1488,14 @@ def render_turn_reflection():
             )
 
         if st.button("Continue", type="primary", use_container_width=True):
-            rating = st.session_state[f"reflection_rating_{st.session_state.round}_{item.get('turn')}"]
-            if rating is None:
-                st.error("Please select a rating before continuing.")
+            understood_ai_rating = st.session_state[
+                f"reflection_rating_{st.session_state.round}_{item.get('turn')}"
+            ]
+            ai_understood_me_rating = st.session_state[
+                f"reflection_rating_ai_understood_me_{st.session_state.round}_{item.get('turn')}"
+            ]
+            if understood_ai_rating is None or ai_understood_me_rating is None:
+                st.error("Please select both ratings before continuing.")
                 return True
             if replacement_count and len(replacement_cards) != replacement_count:
                 st.error(
@@ -1501,7 +1531,7 @@ def render_turn_reflection():
                     },
                     turn_number=item.get("turn", ""),
                 )
-            _save_turn_reflection(item, rating, relationship_type, explanation)
+            _save_turn_reflection(item, understood_ai_rating, ai_understood_me_rating, relationship_type, explanation)
             log_event(
                 "reflection_submitted",
                 {"reflection_source": item.get("reflection_source", "")},
@@ -1972,6 +2002,26 @@ def screen_human_guesser():
             st.session_state.hint_number,
             st.session_state.previous_hint,
         )
+        with st.container(border=True, key="before_human_guess_panel"):
+            prompt_col, rating_col = st.columns([1.45, 1])
+            with prompt_col:
+                st.markdown(
+                    """
+                    <div class="panel-title">Before you guess</div>
+                    <p class="subtle-text before-ai-question">How well do you think you understand the AI's clue?</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with rating_col:
+                human_pre_guess_rating = st.radio(
+                    "Before guessing rating",
+                    options=list(RATING_OPTIONS.keys()),
+                    index=None,
+                    format_func=lambda option: f"{option}",
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key=f"human_pre_guess_rating_{st.session_state.round}_{_current_action_index()}",
+                )
         guess_rationale, rationale_is_valid = _render_guess_rationale_input()
 
     with st.container(border=True):
@@ -1993,7 +2043,9 @@ def screen_human_guesser():
                 clickable=True,
                 max_clicks=st.session_state.hint_number + len(st.session_state.guesses),
             )
-            if clicked and not rationale_is_valid:
+            if clicked and human_pre_guess_rating is None:
+                st.error("Please rate how well you understand the AI's clue before guessing.")
+            elif clicked and not rationale_is_valid:
                 rationale_text = st.session_state.get("current_guess_rationale", "")
                 _, rationale_reason = validate_guess_rationale(
                     rationale_text,
@@ -2020,6 +2072,7 @@ def screen_human_guesser():
                         expected_guesses=st.session_state.get("hint_expected_guesses", []),
                         guess_rationale=guess_rationale,
                         hint_explanation=st.session_state.get("hint_explanation", ""),
+                        human_understanding_rating_before=human_pre_guess_rating,
                         hint_raw_response=pending_meta.get("raw_response", ""),
                         hint_time_sec=pending_meta.get("hint_time_sec"),
                         hint_response_time_sec=pending_meta.get("response_time_sec"),
@@ -2119,7 +2172,9 @@ def screen_human_guesser():
             disabled=not can_skip_current_clue(),
         ):
             pending_meta = st.session_state.get("pending_hint_meta") or {}
-            if len(skip_interpretation) != remaining_guess_slots:
+            if human_pre_guess_rating is None:
+                st.error("Please rate how well you understand the AI's clue before skipping.")
+            elif len(skip_interpretation) != remaining_guess_slots:
                 st.error(
                     f"Please select exactly {remaining_guess_slots} card(s) before skipping."
                 )
@@ -2135,6 +2190,7 @@ def screen_human_guesser():
                 common = {
                     "guess_rationale": guess_rationale if rationale_is_valid else "",
                     "hint_explanation": st.session_state.get("hint_explanation", ""),
+                    "human_understanding_rating_before": human_pre_guess_rating,
                     "hint_raw_response": pending_meta.get("raw_response", ""),
                     "hint_time_sec": pending_meta.get("hint_time_sec"),
                     "hint_response_time_sec": pending_meta.get("response_time_sec"),
@@ -2332,6 +2388,7 @@ def screen_round_summary():
 
 def screen_game_over():
     player_name = _display_player_name()
+    player_name_html = escape(player_name)
     total_score = st.session_state.get("score", 0)
     if not st.session_state.get("session_completed_logged"):
         if not st.session_state.get("completion_code"):
@@ -2340,19 +2397,19 @@ def screen_game_over():
             )
     if total_score >= 16:
         title = "Elite team!"
-        subtitle = f"Fantastic finish, {player_name}! Your team was sharp, fast, and beautifully in sync."
+        subtitle = f"Fantastic finish, {player_name_html}! Your team was sharp, fast, and beautifully in sync."
         tier = "Elite team"
     elif total_score >= 14:
         title = "Excellent team!"
-        subtitle = f"Great work, {player_name}! That was a confident run with strong clue-reading."
+        subtitle = f"Great work, {player_name_html}! That was a confident run with strong clue-reading."
         tier = "Excellent team"
     elif total_score >= TEAM_GOAL_SCORE:
         title = "Strong team!"
-        subtitle = f"Nice work, {player_name}! You cleared the target score and built a solid rhythm."
+        subtitle = f"Nice work, {player_name_html}! You cleared the target score and built a solid rhythm."
         tier = "Strong team"
     else:
         title = "Run finished"
-        subtitle = f"{player_name}, you were close. A few cleaner clue connections and this team can jump a tier."
+        subtitle = f"{player_name_html}, you were close. A few cleaner clue connections and this team can jump a tier."
         tier = "Building team"
 
     st.markdown(
@@ -2417,20 +2474,37 @@ def screen_game_over():
                     st.session_state.completion_code = (
                         str(st.session_state.get("session_id", "")).replace("-", "")[-8:].upper()
                     )
-                mark_session_progress("post_study_questionnaire")
                 log_event(
                     "post_game_questionnaire_submitted",
                     st.session_state.post_game_questionnaire,
                     round_number="",
                     turn_number="",
                 )
+                # A private, structured self-report mirroring the human's
+                # questionnaire, collected for research comparison only.
+                # Never shown to the participant, regardless of condition.
+                with st.spinner("Saving your answers..."):
+                    st.session_state.ai_post_game_questionnaire = generate_ai_post_game_reflection(
+                        st.session_state.get("ai_round_summaries", []),
+                        condition=st.session_state.get("condition", DEFAULT_CONDITION),
+                    )
+                log_event(
+                    "ai_post_game_questionnaire_generated",
+                    st.session_state.ai_post_game_questionnaire,
+                    round_number="",
+                    turn_number="",
+                )
+                mark_session_progress("post_study_questionnaire")
                 st.rerun()
         return
 
     if not st.session_state.get("debriefing_acknowledged"):
         with st.container(key="debriefing_document"):
             st.markdown(
-                render_debriefing_document(st.session_state.get("condition")),
+                render_debriefing_document(
+                    st.session_state.get("condition"),
+                    st.session_state.get("completion_code"),
+                ),
                 unsafe_allow_html=True,
             )
         with st.container(border=True, key="debriefing_action_panel"):
@@ -2469,19 +2543,11 @@ def screen_game_over():
 
     remote_status = st.session_state.get("remote_log_status")
     remote_error = st.session_state.get("remote_log_error", "")
-    if remote_status == "github_saved":
-        st.success(f"Thank you, {player_name}. Your answers and game data have been saved.")
-    elif remote_status == "github_failed":
+    if remote_status == "db_failed":
         st.warning(
-            f"Thank you, {player_name}. Your answers were saved locally, but GitHub logging failed: {remote_error}"
+            f"Thank you, {player_name}. Your answers were recorded, but saving to the database failed: {remote_error}"
         )
-    elif remote_status == "local_only":
-        st.success(f"Thank you, {player_name}. Your answers and game data have been saved locally.")
     else:
-        st.success(f"Thank you, {player_name}. Your answers and game data have been saved locally.")
+        st.success(f"Thank you, {player_name}. Your answers and game data have been saved.")
 
-    st.markdown('<div class="center-actions">', unsafe_allow_html=True)
-    if st.button("Play again", type="primary", use_container_width=True):
-        restart_game(keep_participant=True)
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.caption("You may now close this browser tab.")

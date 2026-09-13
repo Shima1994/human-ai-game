@@ -3,6 +3,7 @@ import math
 
 import streamlit as st
 import streamlit.components.v1 as st_components
+from streamlit_autorefresh import st_autorefresh
 
 from core.constants import (
     BOARD_SIZE,
@@ -126,7 +127,6 @@ def render_clue_timer(remaining_seconds):
         </div>
         <script>
           let remaining = {remaining};
-          let reloaded = false;
           const el = document.getElementById('clue-timer');
           const tick = () => {{
             remaining = Math.max(0, remaining - 1);
@@ -134,16 +134,19 @@ def render_clue_timer(remaining_seconds):
             const seconds = String(remaining % 60).padStart(2, '0');
             el.textContent = `${{minutes}}:${{seconds}}`;
             el.style.color = remaining <= 15 ? '#b42318' : 'inherit';
-            if (remaining === 0 && !reloaded) {{
-              reloaded = true;
-              window.parent.location.reload();
-            }}
           }};
           if (remaining > 0) window.setInterval(tick, 1000);
         </script>
         """,
         height=42,
     )
+    # Trigger a normal Streamlit rerun (preserves st.session_state) every few
+    # seconds so the server-side timeout check in screens.py gets a chance to
+    # fire once the deadline passes. A full browser reload was used here
+    # previously, which wiped the participant's entire session on every
+    # timeout instead of just consuming the current turn.
+    if remaining > 0:
+        st_autorefresh(interval=3000, key="clue_timer_autorefresh")
 
 
 def _render_static_card(word, role, revealed, guessed=False):

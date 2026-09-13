@@ -1,3 +1,5 @@
+from html import escape
+
 CONSENT_DOCUMENT = """
 # Information Sheet for Participation in Research
 
@@ -7,7 +9,7 @@ Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.
 
 Department of Human-centered Computing and Cognitive Science
 
-July 2026
+September 2026
 
 ## Information for Participants
 
@@ -98,6 +100,26 @@ If you have any questions about the study, please use the contact details listed
 - I understand that anonymized data may be used for academic analysis, the Master’s thesis, possible academic publications, and future research.
 - I consent voluntarily to participate in this study.
 """
+
+
+CONSENT_CHECKLIST_ITEMS = (
+    "I have read and understood the information sheet for this study.",
+    "I am 18 years old or older.",
+    "I understand that demographic categories (e.g., age group and prior experience with AI "
+    "tools) will be collected for research purposes and that providing a nickname is optional.",
+    "I understand that my participation is voluntary.",
+    "I understand that I can stop participating at any time during the study without giving "
+    "a reason.",
+    "I understand that I will play a cooperative word association game with an AI system.",
+    "I understand that my clues, guesses, ratings, reflection responses, game logs, and "
+    "performance data will be collected anonymously for research purposes.",
+    "I understand that different technical versions of the AI system may share and use "
+    "reflection information differently while the core game mechanics remain the same.",
+    "I understand that no directly identifying personal information will be collected in "
+    "the game data.",
+    "I understand that anonymized data may be used for academic analysis, the Master's "
+    "thesis, possible academic publications, and future research.",
+)
 
 
 INFORMATION_SHEET_TITLE = (
@@ -207,12 +229,13 @@ INFORMATION_SHEET_SECTIONS = (
 INFORMATION_SHEET_CONTACT = (
     "If you have any questions about the study, please contact: "
     "Shima Ghasempour, "
-    "<a href='mailto:shima.ghasempour-ardestani@stud.unidue.de'>"
-    "shima.ghasempour-ardestani@stud.unidue.de</a>"
+    "<a href='mailto:shima.ghasempoour-ardestani@stud.uni-due.de'>"
+    "shima.ghasempoour-ardestani@stud.uni-due.de</a>"
 )
 
 
 DEBRIEFING_CONDITION_PLACEHOLDER = "[Static Baseline / Adaptive AI]"
+DEBRIEFING_COMPLETION_CODE_PLACEHOLDER = "[COMPLETION_CODE]"
 
 DEBRIEFING_DOCUMENT = """
 <section class="debrief-contact">
@@ -258,6 +281,12 @@ DEBRIEFING_DOCUMENT = """
     <p>Results will only be reported in aggregated or anonymized form</p>
 </section>
 
+<section class="debrief-section debrief-completion-code-section">
+    <h2>Your completion code</h2>
+    <p>Enter this code on the platform where you found this study (e.g. Amazon Mechanical Turk) to confirm your participation:</p>
+    <p class="debrief-completion-code">[COMPLETION_CODE]</p>
+</section>
+
 <section class="debrief-section debrief-final-section">
     <h2>Do you have any questions?</h2>
     <p>If you have any questions about this study or would like to learn more about the results, you can contact:</p>
@@ -267,7 +296,7 @@ DEBRIEFING_DOCUMENT = """
 """
 
 
-def render_debriefing_document(condition):
+def render_debriefing_document(condition, completion_code):
     condition_labels = {
         "baseline": "Static Baseline",
         "adaptive": "Adaptive AI",
@@ -277,7 +306,13 @@ def render_debriefing_document(condition):
         condition_label = condition_labels[normalized_condition]
     except KeyError as error:
         raise ValueError("Cannot render debriefing without a valid assigned condition.") from error
+    cleaned_completion_code = str(completion_code or "").strip()
+    if not cleaned_completion_code:
+        raise ValueError("Cannot render debriefing without a completion code.")
     return DEBRIEFING_DOCUMENT.replace(
         DEBRIEFING_CONDITION_PLACEHOLDER,
         condition_label,
+    ).replace(
+        DEBRIEFING_COMPLETION_CODE_PLACEHOLDER,
+        escape(cleaned_completion_code),
     )

@@ -47,10 +47,22 @@ def _debug_visuals():
 def inject_css():
     debug_css, debug_label = _debug_visuals()
     css = """
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
         <style>
+        /* Self-hosted from static/fonts/ (no third-party font CDN request). */
+        @font-face {
+            font-family: "Inter";
+            font-style: normal;
+            font-weight: 100 900;
+            font-display: swap;
+            src: url("app/static/fonts/inter-variable-latin.woff2") format("woff2");
+        }
+        @font-face {
+            font-family: "Source Serif 4";
+            font-style: normal;
+            font-weight: 100 900;
+            font-display: swap;
+            src: url("app/static/fonts/source-serif-4-variable-latin.woff2") format("woff2");
+        }
         :root {
             --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
             --font-reading: "Source Serif 4", Georgia, "Times New Roman", serif;
@@ -989,6 +1001,23 @@ def inject_css():
             padding-left: 1.3rem;
             background: #f7faff;
         }
+        .information-consent-lead {
+            margin: 0 0 0.5rem;
+            color: #123b76;
+            font: 720 0.92rem/1.4 var(--font-sans);
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+        .information-consent-list {
+            margin: 0 0 1rem;
+            padding-left: 1.25rem;
+            color: #294b77;
+            font-size: 0.94rem;
+            line-height: 1.55;
+        }
+        .information-consent-list li {
+            margin-bottom: 0.35rem;
+        }
         .st-key-debriefing_document {
             max-width: none;
             padding: clamp(1rem, 2.6vw, 2rem);
@@ -1082,6 +1111,22 @@ def inject_css():
             background: #edf6ff;
             color: #103b78 !important;
             font-weight: 720;
+        }
+        .debrief-completion-code-section {
+            border: 1px solid rgba(11, 110, 232, 0.25);
+            background: #edf6ff;
+        }
+        .debrief-completion-code {
+            margin: 0.6rem 0 0 !important;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            background: #ffffff;
+            border: 1px dashed rgba(11, 110, 232, 0.45);
+            color: #103b78 !important;
+            font: 750 1.4rem/1.3 "Courier New", monospace !important;
+            letter-spacing: 0.12em;
+            text-align: center;
+            user-select: all;
         }
         .debrief-final-section {
             background: #f7faff;
@@ -1302,11 +1347,6 @@ def inject_css():
             font-size: 0.92rem;
             line-height: 1.45;
         }
-        .center-actions {
-            max-width: 420px;
-            margin: 0.95rem auto 0 auto;
-        }
-
         /* Reflection / explanation panel */
         .st-key-reflection_panel,
         .st-key-reflection_panel [data-testid="stVerticalBlockBorderWrapper"] {
@@ -2014,6 +2054,145 @@ def inject_css():
             border-radius: var(--radius-md);
             border: 1px solid var(--color-border-strong);
             font-family: var(--font-sans);
+        }
+
+        /* Compact study-page mastheads: keep the first content visible on laptops. */
+        .st-key-consent_document,
+        .st-key-game_guide_document,
+        .st-key-participant_profile_page {
+            padding: clamp(0.8rem, 1.5vw, 1.25rem);
+        }
+        .st-key-consent_logos,
+        .st-key-game_guide_logos,
+        .st-key-participant_profile_logos {
+            margin-bottom: 0.28rem;
+            padding: 0 0.35rem 0.25rem;
+        }
+        .st-key-consent_logos [data-testid="stImage"],
+        .st-key-game_guide_logos [data-testid="stImage"],
+        .st-key-participant_profile_logos [data-testid="stImage"] {
+            min-height: 44px;
+        }
+        .st-key-consent_logos img,
+        .st-key-game_guide_logos img,
+        .st-key-participant_profile_logos img {
+            max-height: 42px;
+        }
+        .information-hero {
+            grid-template-columns: minmax(0, 2fr) minmax(150px, 0.42fr);
+            gap: 0.8rem;
+            padding: clamp(0.95rem, 1.8vw, 1.35rem);
+        }
+        .information-eyebrow {
+            margin-bottom: 0.42rem;
+            padding: 0.24rem 0.55rem;
+            font-size: 0.66rem;
+        }
+        .information-hero h1 {
+            font-size: clamp(1.65rem, 2.7vw, 2.3rem);
+        }
+        .information-study-title {
+            margin: 0.38rem 0 0.75rem;
+            font-size: clamp(0.92rem, 1.35vw, 1.08rem);
+            line-height: 1.38;
+        }
+        .information-meta {
+            gap: 0.65rem;
+            font-size: 0.78rem;
+            line-height: 1.3;
+        }
+        .information-word-cards {
+            min-height: 125px;
+        }
+        .information-word-cards span {
+            width: 78px;
+            padding: 0.72rem 0.35rem;
+            font-size: 0.76rem;
+        }
+        .information-word-cards span:nth-child(1) { top: 2px; left: 5%; }
+        .information-word-cards span:nth-child(2) { top: 38px; left: 39%; }
+        .information-word-cards span:nth-child(3) { top: 74px; left: 12%; }
+        .information-intro,
+        .information-section,
+        .information-contact {
+            margin-top: 0.65rem;
+        }
+        .game-guide-hero {
+            grid-template-columns: minmax(0, 2fr) minmax(145px, 0.42fr);
+            min-height: 128px;
+            padding: clamp(0.9rem, 1.7vw, 1.25rem) clamp(1rem, 2vw, 1.5rem);
+        }
+        .game-guide-hero h1 {
+            font-size: clamp(1.75rem, 3vw, 2.4rem);
+        }
+        .game-guide-hero h2 {
+            margin: 0.22rem 0 0.3rem;
+            font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+        }
+        .game-guide-hero p {
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        .game-guide-word-cards {
+            min-height: 100px;
+        }
+        .game-guide-word-cards span {
+            width: 70px;
+            padding: 0.65rem 0.3rem;
+            font-size: 0.7rem;
+        }
+        .game-guide-word-cards span:nth-child(1) { top: 0; left: 4%; }
+        .game-guide-word-cards span:nth-child(2) { top: 31px; left: 40%; }
+        .game-guide-word-cards span:nth-child(3) { top: 62px; left: 12%; }
+        .participant-profile-hero {
+            grid-template-columns: minmax(0, 2fr) minmax(140px, 0.4fr);
+            min-height: 124px;
+            margin-bottom: 0.65rem;
+            padding: clamp(0.9rem, 1.7vw, 1.25rem) clamp(1rem, 2vw, 1.5rem);
+        }
+        .participant-profile-hero h1 {
+            margin: 0.05rem 0 0.28rem;
+            font-size: clamp(1.75rem, 3vw, 2.4rem);
+        }
+        .participant-profile-hero p {
+            font-size: 0.92rem;
+        }
+        .participant-profile-card-art {
+            width: 130px;
+            height: 82px;
+            border-radius: 13px;
+        }
+        .profile-avatar {
+            top: 18px;
+            left: 20px;
+            width: 34px;
+            height: 34px;
+        }
+        .profile-avatar::after {
+            left: -6px;
+            bottom: -21px;
+            width: 46px;
+            height: 23px;
+        }
+        .participant-profile-card-art i {
+            right: 18px;
+            width: 42px;
+            height: 5px;
+        }
+        .participant-profile-card-art i:nth-of-type(1) { top: 23px; }
+        .participant-profile-card-art i:nth-of-type(2) { top: 38px; width: 34px; }
+        .participant-profile-card-art i:nth-of-type(3) { top: 53px; width: 28px; }
+        .st-key-participant_profile_panel [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 0.25rem 1.15rem 0.9rem;
+            background: linear-gradient(135deg, #ffffff 0%, #fbfdff 100%) !important;
+        }
+        .st-key-participant_profile_panel div[class*="st-key-profile_"][class*="_group"] {
+            padding: 0.72rem 0 0.82rem;
+        }
+        .profile-aside {
+            border-color: rgba(24, 111, 226, 0.16);
+            background: linear-gradient(180deg, #eff7ff 0%, #f8fbff 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
 
         /* Tablet */

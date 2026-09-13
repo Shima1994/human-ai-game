@@ -1392,6 +1392,84 @@ def generate_ai_round_reflection(
         )
 
 
+AI_POST_GAME_SYSTEM_PROMPT = """You are an AI teammate who just finished a full cooperative word-game session with one human partner across several rounds. You are now answering a private end-of-study self-assessment about the collaboration, mirroring the questions the human partner answers about you. Your answers are never shown to the human and are used only for research analysis.
+
+Rate your agreement with each of the following statements about the whole session, from 1 (strongly disagree) to 5 (strongly agree):
+1. i_understood_human_clues: "I felt that I understood what the human meant when they gave clues."
+2. predict_human_interpretation: "By the end of the game, I could predict how the human would interpret my clues."
+3. adapted_to_human_behavior: "I adapted my communication based on the human's behaviour."
+4. reflection_helped: "The reflection steps helped me recover from misunderstandings with the human."
+5. shared_understanding: "By the end of the game, I felt that the human and I had developed a shared understanding."
+
+Base every rating strictly on the game history provided below; do not assume a generically positive outcome.
+
+Return strict JSON only, no markdown, no commentary outside the JSON. Schema:
+{
+  "i_understood_human_clues": <integer 1-5>,
+  "predict_human_interpretation": <integer 1-5>,
+  "adapted_to_human_behavior": <integer 1-5>,
+  "reflection_helped": <integer 1-5>,
+  "shared_understanding": <integer 1-5>,
+  "reasoning": "<one or two sentences justifying the ratings; logged for research analysis, never shown to the player>"
+}
+"""
+
+AI_POST_GAME_RATING_KEYS = (
+    "i_understood_human_clues",
+    "predict_human_interpretation",
+    "adapted_to_human_behavior",
+    "reflection_helped",
+    "shared_understanding",
+)
+
+
+def _empty_ai_post_game_reflection(raw="", reason="generation_failed"):
+    return {
+        **{key: None for key in AI_POST_GAME_RATING_KEYS},
+        "reasoning": "",
+        "raw_response": raw,
+        "blocked_reason": reason,
+    }
+
+
+def generate_ai_post_game_reflection(round_summaries, condition=DEFAULT_CONDITION):
+    """A structured, private end-of-game self-report from the AI, mirroring
+    the human's post-game questionnaire so the two can be compared directly.
+    Never shown to the participant."""
+    user_prompt = (
+        "Full game history across all rounds:\n"
+        + (
+            format_round_memory(round_summaries or [])
+            if condition == "adaptive"
+            else format_baseline_round_memory(round_summaries or [])
+        )
+        + "\n\nAnswer the private self-assessment now. Respond with the JSON object only."
+    )
+    try:
+        raw, _ = call_openai_chat(
+            AI_POST_GAME_SYSTEM_PROMPT,
+            user_prompt,
+            temperature=0.2,
+            model=REFLECTION_MODEL_NAME,
+            json_mode=True,
+        )
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            return _empty_ai_post_game_reflection(raw, "invalid_response")
+        ratings = {}
+        for key in AI_POST_GAME_RATING_KEYS:
+            value = data.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or not (1 <= value <= 5):
+                return _empty_ai_post_game_reflection(raw, "invalid_rating")
+            ratings[key] = value
+        ratings["reasoning"] = limit_words(str(data.get("reasoning", "") or "").strip(), 60)
+        ratings["raw_response"] = raw
+        ratings["blocked_reason"] = ""
+        return ratings
+    except Exception as error:
+        return _empty_ai_post_game_reflection(f"<api_error: {error}>", "generation_failed")
+
+
 def validate_human_hint(hint, board_words):
     cleaned = hint.strip().lower()
     if not cleaned:

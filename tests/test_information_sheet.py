@@ -45,7 +45,7 @@ class InformationSheetTests(unittest.TestCase):
             "open data repositories (e.g. zenodo)",
             "closing the browser window",
             "This study is considered low risk",
-            "shima.ghasempour-ardestani@stud.unidue.de",
+            "shima.ghasempoour-ardestani@stud.uni-due.de",
         )
         for phrase in required_phrases:
             self.assertIn(phrase, rendered)

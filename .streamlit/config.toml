@@ -1,0 +1,4 @@
+[server]
+# Required so the self-hosted fonts under static/fonts/ can be served
+# instead of loading them from the Google Fonts CDN.
+enableStaticServing = true

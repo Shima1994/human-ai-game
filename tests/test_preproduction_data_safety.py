@@ -1,12 +1,9 @@
-import csv
 import json
-import tempfile
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core import game_logic, storage
+from core import db, game_logic, storage
 from core.constants import (
     CONDITION_ASSIGNMENT_VERSION,
     EXPERIMENT_VERSION,
@@ -15,6 +12,48 @@ from core.constants import (
     REFLECTION_MODEL_NAME,
     SCHEMA_VERSION,
 )
+
+
+class FakeCursor:
+    def __init__(self, fetchone_results=None):
+        self.executed = []
+        self._fetchone_results = list(fetchone_results or [])
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    def fetchone(self):
+        return self._fetchone_results.pop(0)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+class FakeConnection:
+    def __init__(self, fetchone_results=None):
+        self.cursor_obj = FakeCursor(fetchone_results)
+        self.committed = False
+        self.closed = False
+
+    def cursor(self):
+        return self.cursor_obj
+
+    def commit(self):
+        self.committed = True
+
+    def close(self):
+        self.closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            self.commit()
+        return False
 
 
 class State(dict):
@@ -99,17 +138,23 @@ class ProvenanceAndLifecycleTests(unittest.TestCase):
         with patch.object(storage, "CODE_COMMIT", ""):
             self.assertEqual(storage._session_row()["code_commit"], "")
 
-    def test_condition_assignment_version_does_not_change_assignment(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "sessions.csv"
-            with path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=storage.SESSIONS_LOG_FIELDS)
-                writer.writeheader()
-                writer.writerow({
-                    **{field: "" for field in storage.SESSIONS_LOG_FIELDS},
-                    "condition": "adaptive",
-                })
-            self.assertEqual(storage._next_balanced_condition(path), "baseline")
+    def test_condition_assignment_alternates_atomically_via_db_counter(self):
+        db._schema_ready = True
+        try:
+            fake_conn = FakeConnection(fetchone_results=[(1,)])
+            with patch.object(db, "get_connection", return_value=fake_conn):
+                condition = db.allocate_condition(
+                    {"adaptive", "baseline"}, "adaptive"
+                )
+            self.assertEqual(condition, "baseline")
+            select_sql = fake_conn.cursor_obj.executed[0][0]
+            self.assertIn("FOR UPDATE", select_sql)
+            update_sql = fake_conn.cursor_obj.executed[1][0]
+            self.assertIn("UPDATE condition_counter", update_sql)
+            self.assertTrue(fake_conn.committed)
+            self.assertTrue(fake_conn.closed)
+        finally:
+            db._schema_ready = False
 
     def test_meaningful_progress_updates_lifecycle_but_row_render_does_not(self):
         with patch.object(storage, "log_session_state") as persist, patch.object(
@@ -125,22 +170,19 @@ class ProvenanceAndLifecycleTests(unittest.TestCase):
         self.assertEqual(self.state.last_activity_at, before)
 
     def test_completion_sets_known_end_reason_without_inventing_attrition(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(
-            storage, "ensure_sessions_data_file", return_value=Path(directory) / "sessions.csv"
-        ), patch.object(storage, "_append_remote_session_snapshot"):
-            storage._ensure_csv_fields(Path(directory) / "sessions.csv", storage.SESSIONS_LOG_FIELDS)
+        with patch.object(storage.db, "upsert_row"):
             storage.log_session_state(completed=True)
         row = storage._session_row(completed=True)
         self.assertEqual(row["session_end_reason"], "completed")
         self.assertEqual(row["last_completed_stage"], "completed")
-        self.assertEqual(row["withdrawal_requested"], "false")
-        self.assertEqual(row["technical_termination"], "false")
+        self.assertEqual(row["withdrawal_requested"], False)
+        self.assertEqual(row["technical_termination"], False)
 
     def test_unknown_disappearance_and_api_failure_are_not_misclassified(self):
         row = storage._session_row(completed=False)
         self.assertEqual(row["session_end_reason"], "")
-        self.assertEqual(row["withdrawal_requested"], "false")
-        self.assertEqual(row["technical_termination"], "false")
+        self.assertEqual(row["withdrawal_requested"], False)
+        self.assertEqual(row["technical_termination"], False)
 
 
 class ActionAndRoundClassificationTests(unittest.TestCase):

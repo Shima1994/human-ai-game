@@ -1,6 +1,5 @@
 import json
 import os
-from pathlib import Path
 
 HINT_MODEL_NAME = "gpt-4o"
 GUESS_MODEL_NAME = "gpt-4o"
@@ -55,11 +54,3 @@ MEDAL_POINTS = {
 AI_REROLLS_PER_GAME = 2
 HUMAN_REROLLS_PER_GAME = 2
 TOTAL_HINT_CHANCES = AI_REROLLS_PER_GAME + HUMAN_REROLLS_PER_GAME
-DATA_DIR = Path("data")
-ROUND_DATA_FILE = DATA_DIR / "game_rounds.csv"
-INTERACTION_DATA_FILE = DATA_DIR / "game_interactions.csv"
-SESSIONS_DATA_FILE = DATA_DIR / "sessions.csv"
-ROUNDS_DATA_FILE = DATA_DIR / "rounds.csv"
-TURNS_DATA_FILE = DATA_DIR / "turns.csv"
-EVENTS_DATA_FILE = DATA_DIR / "events.csv"
-DATA_FILE = ROUND_DATA_FILE
