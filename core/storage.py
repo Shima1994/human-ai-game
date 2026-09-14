@@ -1,5 +1,6 @@
 import json
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 
 import psycopg2
 import streamlit as st
@@ -15,7 +16,6 @@ from core.constants import (
     HINT_MODEL_NAME,
     MODEL_IDENTIFIER,
     N_ROUNDS,
-    REFLECTION_MODEL_NAME,
     SCHEMA_VERSION,
     VALID_CONDITIONS,
 )
@@ -483,10 +483,6 @@ def _types_for_words(words, word_type_per_card):
     return [word_type_per_card[word] for word in words or []]
 
 
-def _join_word_types(words, word_type_per_card):
-    return ";".join(_types_for_words(words, word_type_per_card))
-
-
 def _format_word_type_per_card(board, word_type_per_card):
     _types_for_words(board or [], word_type_per_card)
     return json.dumps(
@@ -496,11 +492,10 @@ def _format_word_type_per_card(board, word_type_per_card):
 
 
 def _iso_now():
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _session_row(completed=False):
-    history = st.session_state.get("interaction_history", [])
     total_completed = len(st.session_state.get("ai_round_summaries", []))
     if st.session_state.get("round_finished"):
         total_completed = max(total_completed, int(st.session_state.get("round", 0) or 0))
@@ -650,20 +645,52 @@ def log_event(event_type, payload=None, round_number=None, turn_number=None):
 
 
 def initialize_session_log(participant_id):
+    """Register the participant and allocate their condition.
+
+    Returns True on success, False if the database could not be reached
+    after retrying. Callers must check the return value: on False, nothing
+    was recorded as initialized, so simply calling this again (e.g. the
+    participant pressing Continue a second time) retries cleanly.
+    """
     if st.session_state.get("session_log_initialized"):
-        return
+        return True
+
+    # Allocate before touching any session_state. app.py's routing decides
+    # whether to show this profile screen again purely from whether
+    # participant_id is set, so nothing participant-identifying may be
+    # committed until registration actually succeeds -- otherwise a failed
+    # attempt would still look "registered" on the next rerun and the
+    # participant would be routed straight past this screen with no
+    # condition ever assigned.
+    #
+    # This is the participant's very first contact with the database, and
+    # every request opens its own direct Postgres connection (no pooling
+    # yet), so a transient connection failure here is realistic under
+    # concurrent load. Retry a couple of times with a short backoff before
+    # giving up, rather than letting it raise into an uncaught exception
+    # and strand the participant on a generic error page before they've
+    # even started the study.
+    condition = None
+    for attempt in range(3):
+        try:
+            condition = db.allocate_condition(VALID_CONDITIONS, DEFAULT_CONDITION)
+            break
+        except (psycopg2.Error, RuntimeError):
+            if attempt < 2:
+                time.sleep(min(1.0 * (attempt + 1), 3.0))
+    if condition is None:
+        st.error(
+            "We couldn't connect to the study database just now. "
+            "Please wait a moment and press Continue again."
+        )
+        return False
+
     st.session_state.participant_id = participant_id
     st.session_state.nickname = st.session_state.get("nickname", participant_id) or participant_id
     st.session_state.consent_given = True
     st.session_state.last_activity_at = _iso_now()
     st.session_state.last_completed_stage = "participant_profile"
-    # Allocate only when a participant is actually registered. Ordinary Streamlit
-    # reruns therefore do not consume a slot in the alternating assignment. The
-    # allocation itself is one atomic Postgres transaction (core/db.py
-    # allocate_condition), so concurrent registrations cannot corrupt the
-    # alternating adaptive/baseline balance the way a shared file or a
-    # process-local lock could.
-    st.session_state.condition = db.allocate_condition(VALID_CONDITIONS, DEFAULT_CONDITION)
+    st.session_state.condition = condition
     st.session_state.condition_assigned = True
     log_session_state(completed=False)
     log_event(
@@ -683,6 +710,7 @@ def initialize_session_log(participant_id):
     log_event("consent_given", {}, round_number="", turn_number="")
     log_event("instruction_viewed", {}, round_number="", turn_number="")
     st.session_state.session_log_initialized = True
+    return True
 
 
 def _role_pair(round_role):
@@ -1054,7 +1082,7 @@ def append_analysis_logs(participant_id, timestamp, score_change, clean_history)
 
 
 def log_round(participant_id):
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()
 
     guesses = st.session_state.guesses
     bomb_words = st.session_state.get("bomb_words") or [st.session_state.bomb_word]

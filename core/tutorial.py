@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.constants import CLUE_TIMER_SECONDS
 from core.validation import validate_guess_rationale
@@ -85,5 +85,5 @@ def tutorial_time_remaining(started_at, now=None):
         started = datetime.fromisoformat(started_at)
     except (TypeError, ValueError):
         return 0.0
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     return max(0.0, float(CLUE_TIMER_SECONDS) - (now - started).total_seconds())

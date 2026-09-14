@@ -85,25 +85,53 @@ def render_app_header():
 
 
 def render_top_status():
-    role_label = "Clue-giver" if st.session_state.role == "human_clue" else "Guesser"
+    is_clue_giver = st.session_state.role == "human_clue"
+    role_label = "You're giving the clue" if is_clue_giver else "AI clues — you guess"
+    role_variant = "human" if is_clue_giver else "ai"
     player_name = st.session_state.get("participant_id") or "-"
+    initials = "".join(part[0] for part in str(player_name).replace("_", " ").split()[:2]).upper() or "P"
     found = len(st.session_state.get("found_targets", []))
     interactions = st.session_state.get("round_interactions", 0)
     skips = st.session_state.get("round_skips", 0)
     medals = st.session_state.get("medal_counts", {})
 
+    def _bar(value, total):
+        pct = 0 if not total else max(0, min(100, round(100 * value / total)))
+        return pct
+
     st.markdown(
         f"""
-        <div class="top-status-shell">
-            <div class="top-status">
-                <div class="status-pill"><div class="status-label">Player</div><div class="status-value">{escape(str(player_name))}</div></div>
-                <div class="status-pill"><div class="status-label">Round</div><div class="status-value">{st.session_state.round} / {N_ROUNDS}</div></div>
-                <div class="status-pill medal-pill"><div class="status-label">Medals</div><div class="status-value medal-row"><span class="medal gold">&#129351; {medals.get("gold", 0)}</span><span class="medal silver">&#129352; {medals.get("silver", 0)}</span></div></div>
-                <div class="status-pill"><div class="status-label">Target words</div><div class="status-value">{found} / {TARGET_COUNT}</div></div>
-                <div class="status-pill"><div class="status-label">Turns</div><div class="status-value">{interactions} / {MAX_INTERACTIONS_PER_ROUND}</div></div>
-                <div class="status-pill"><div class="status-label">Next clue</div><div class="status-value">{skips} / {MAX_SKIPS_PER_ROUND}</div></div>
-                <div class="status-pill"><div class="status-label">Human role</div><div class="status-value">{role_label}</div></div>
+        <div class="status-bar">
+            <div class="status-id">
+                <div class="status-avatar">{escape(initials)}</div>
+                <div>
+                    <div class="status-name">{escape(str(player_name))}</div>
+                    <div class="status-round">Round {st.session_state.round} of {N_ROUNDS}</div>
+                </div>
             </div>
+            <div class="status-sep"></div>
+            <div class="status-stats">
+                <div class="stat-block">
+                    <div class="stat-label">Targets found</div>
+                    <div class="stat-value-row"><span class="big">{found}</span><span class="of">/ {TARGET_COUNT}</span></div>
+                    <div class="mini-bar"><span style="width:{_bar(found, TARGET_COUNT)}%"></span></div>
+                </div>
+                <div class="stat-block">
+                    <div class="stat-label">Turns used</div>
+                    <div class="stat-value-row"><span class="big">{interactions}</span><span class="of">/ {MAX_INTERACTIONS_PER_ROUND}</span></div>
+                    <div class="mini-bar"><span style="width:{_bar(interactions, MAX_INTERACTIONS_PER_ROUND)}%"></span></div>
+                </div>
+                <div class="stat-block">
+                    <div class="stat-label">Skips left</div>
+                    <div class="stat-value-row"><span class="big">{MAX_SKIPS_PER_ROUND - skips}</span><span class="of">/ {MAX_SKIPS_PER_ROUND}</span></div>
+                    <div class="mini-bar warn"><span style="width:{_bar(MAX_SKIPS_PER_ROUND - skips, MAX_SKIPS_PER_ROUND)}%"></span></div>
+                </div>
+            </div>
+            <div class="medal-cluster">
+                <span class="medal-chip gold">&#129351; {medals.get("gold", 0)}</span>
+                <span class="medal-chip silver">&#129352; {medals.get("silver", 0)}</span>
+            </div>
+            <span class="role-badge {role_variant}"><span class="role-dot"></span>{escape(role_label)}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -213,6 +241,32 @@ def render_board_legend():
             <div class="legend-pill legend-neutral">Gray neutral</div>
             <div class="legend-pill legend-neutral-miss">Blue wrong neutral</div>
             <div class="legend-pill legend-bomb">Red bombs ({BOMB_COUNT})</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_rating_scale_endpoints():
+    """Anchor labels under a RATING_OPTIONS radio (1-5). The radio itself only
+    ever shows bare numbers, so without this the scale has no visible meaning."""
+    st.markdown(
+        f"""
+        <div class="scale-endpoints">
+            <span>{RATING_OPTIONS[1]}</span>
+            <span>{RATING_OPTIONS[5]}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_board_lock_note(message):
+    st.markdown(
+        f"""
+        <div class="board-lock-note">
+            <span class="lock-icon">&#128274;</span>
+            <span>{escape(message)}</span>
         </div>
         """,
         unsafe_allow_html=True,

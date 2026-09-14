@@ -1,17 +1,15 @@
 ﻿import hashlib
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 import streamlit as st
 
 from core.constants import (
     BOARD_SIZE,
-    BOMB_COUNT,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
     MEDAL_POINTS,
     N_ROUNDS,
-    TARGET_COUNT,
     CLUE_TIMER_SECONDS,
 )
 from core.words import BOARD_TEMPLATES, WORD_BANKS
@@ -23,7 +21,7 @@ class BoardGenerationError(ValueError):
 
 def start_participant_decision_timer(started_at=None):
     """Start a deadline for a new human task; ordinary reruns never call this."""
-    started_at = started_at or datetime.utcnow().isoformat()
+    started_at = started_at or datetime.now(timezone.utc).isoformat()
     st.session_state.clue_timer_started_at = started_at
     st.session_state.clue_timer_duration_seconds = CLUE_TIMER_SECONDS
     st.session_state.clue_timer_timeout_consumed = False
@@ -43,7 +41,7 @@ def participant_decision_time_remaining(now=None):
         started = datetime.fromisoformat(started_raw)
     except (TypeError, ValueError):
         return 0.0
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     duration = st.session_state.get("clue_timer_duration_seconds") or CLUE_TIMER_SECONDS
     return max(0.0, float(duration) - (now - started).total_seconds())
 
@@ -286,7 +284,7 @@ def setup_new_round():
     st.session_state.ai_understanding_rating_after = None
     st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
-    st.session_state.start_time = datetime.utcnow()
+    st.session_state.start_time = datetime.now(timezone.utc)
     st.session_state.round_start_time = st.session_state.start_time.isoformat()
     st.session_state.current_turn_start_time = ""
     st.session_state.current_hint_start_time = ""
@@ -367,7 +365,7 @@ def record_interaction(
         {"position": position, "word": guess}
         for position, guess in enumerate(guesses or [], start=1)
     ]
-    turn_end = datetime.utcnow()
+    turn_end = datetime.now(timezone.utc)
     turn_start_raw = st.session_state.get("current_turn_start_time") or turn_end.isoformat()
     try:
         turn_start = datetime.fromisoformat(turn_start_raw)
@@ -608,7 +606,7 @@ def record_skip(
     timeout_selected_cards = timeout_selected_cards or []
     guess_rationale = (guess_rationale or "").strip()
     guess_order = []
-    turn_end = datetime.utcnow()
+    turn_end = datetime.now(timezone.utc)
     turn_start_raw = st.session_state.get("current_turn_start_time") or turn_end.isoformat()
     try:
         turn_start = datetime.fromisoformat(turn_start_raw)
@@ -784,7 +782,7 @@ def record_timeout(
     if st.session_state.get("clue_timer_timeout_consumed", False):
         return None
     st.session_state.clue_timer_timeout_consumed = True
-    timeout_timestamp = datetime.utcnow().isoformat()
+    timeout_timestamp = datetime.now(timezone.utc).isoformat()
     record_skip(
         hint,
         hint_number,

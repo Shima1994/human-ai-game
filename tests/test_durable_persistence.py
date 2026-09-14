@@ -187,6 +187,46 @@ class DurablePersistenceTests(unittest.TestCase):
             storage.log_round("p1")  # must not raise despite the DB error
         self.assertEqual(self.state.remote_log_status, "db_failed")
 
+    def test_initialize_session_log_retries_then_succeeds_after_transient_failures(self):
+        del self.state["participant_id"]
+        self.state.condition_assigned = False
+        storage.st = SimpleNamespace(session_state=self.state, error=lambda *a, **k: None)
+
+        failing_conn = FakeConnection(raise_on_execute=psycopg2.OperationalError("db down"))
+        working_conn = FakeConnection(fetchone_results=[(0,)])
+        # allocate_condition's first attempt gets the failing connection; every
+        # later get_connection() call (the successful retry, plus the
+        # log_session_state/log_event writes that follow registration) gets
+        # the working one.
+        with patch.object(
+            db, "get_connection", side_effect=[failing_conn] + [working_conn] * 10
+        ), patch.object(storage.time, "sleep", return_value=None):
+            result = storage.initialize_session_log("participant_abc12345")
+
+        self.assertTrue(result)
+        self.assertEqual(self.state.participant_id, "participant_abc12345")
+        self.assertTrue(self.state.condition_assigned)
+        self.assertIn(self.state.condition, ("adaptive", "baseline"))
+
+    def test_initialize_session_log_gives_up_after_repeated_failure(self):
+        del self.state["participant_id"]
+        self.state.condition_assigned = False
+        storage.st = SimpleNamespace(session_state=self.state, error=lambda *a, **k: None)
+
+        always_failing = FakeConnection(raise_on_execute=psycopg2.OperationalError("db down"))
+        with patch.object(db, "get_connection", return_value=always_failing), patch.object(
+            storage.time, "sleep", return_value=None
+        ):
+            result = storage.initialize_session_log("participant_abc12345")
+
+        self.assertFalse(result)
+        # Nothing participant-identifying may be committed on failure: app.py
+        # routes past the profile screen purely on participant_id being set,
+        # so a half-registered participant must never look "registered".
+        self.assertNotIn("participant_id", self.state)
+        self.assertFalse(self.state.condition_assigned)
+        self.assertFalse(self.state.get("session_log_initialized"))
+
 
 if __name__ == "__main__":
     unittest.main()

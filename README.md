@@ -28,7 +28,7 @@ Medals are awarded only when all five targets are found without a bomb:
 
 ## Experimental conditions
 
-Conditions are assigned when a participant profile is registered, not on ordinary Streamlit reruns. Assignment alternates persistently using `data/sessions.csv`:
+Conditions are assigned when a participant profile is registered, not on ordinary Streamlit reruns. Assignment alternates persistently using a single-row counter (`condition_counter`) in Postgres, updated inside a `SELECT ... FOR UPDATE` transaction so two participants registering at the same instant cannot be assigned the same slot:
 
 ```text
 adaptive → baseline → adaptive → baseline → ...
@@ -53,20 +53,24 @@ Baseline prompt construction uses dedicated fact-only history formatters. Intend
 
 - In round 1, the participant presses **Ask AI for a clue**, giving them time to inspect the initial board.
 - In later rounds, AI clues are generated automatically when the screen loads.
-- Before selecting cards, the participant writes a 3–30 word English rationale.
-- Before the AI guesses, the human clue-giver must provide a 3–20 word English General Link that contains no board/card names. After the turn, a separate shared-understanding rating is required.
+- Before the board unlocks, the participant rates how well they understand the AI's clue and writes a 3–30 word English rationale.
+- After the turn, the participant rates the shared understanding in both directions: how well they understood the AI, and how well they think the AI understood them.
 
 ### Human clue-giver / AI guesser
 
 - The participant enters a one-word English clue and `N`.
-- The participant marks intended targets, predicts the AI guesses, and rates expected understanding.
+- The participant marks intended targets, predicts the AI's guesses, and rates expected understanding before the AI guesses.
 - The AI returns guesses plus a research rationale.
-- The result is previewed in History and is committed with **Save this turn**.
+- The result is previewed in History and is committed with **Save this turn**, then the same bidirectional shared-understanding rating is collected.
+
+At the end of the game, the AI also privately answers a short self-report mirroring the human's final questionnaire (e.g. "I felt I understood the human's clues," "I adapted to the human's behavior"). This is generated once via the LLM, logged for analysis, and never shown to the participant.
 
 ### Full and partial skips
 
 At most two skips are available per round independently of the three completed-turn limit. A full skip consumes no completed turn; a partial skip retains its completed guesses as one interaction and does not add another turn for the repair action.
-Each human clue-giving or guessing task has a configurable decision countdown (currently 90 seconds). AI/API processing uses a separate 120-second technical timeout and never reduces the participant's decision window. A human timeout consumes the turn without submitting guesses or consuming a skip.
+
+Each human clue-giving or guessing task has a configurable decision countdown (currently 90 seconds), rendered as a component that triggers ordinary Streamlit reruns (via `streamlit-autorefresh`) rather than a browser reload, so an expiring timer never wipes session state. AI/API calls use a separate, much shorter 20-second technical timeout per request, bounded further by a capped retry with backoff (at most 2–3 attempts depending on the call, short delays between them, and `max_retries=1` on the OpenAI client itself) — this never reduces the participant's decision window. A human timeout consumes the turn without submitting guesses or consuming a skip.
+
 When a human skips an AI clue, the AI's next clue retries the same unresolved intended targets with a different clue. Adaptive sessions may use the participant's recorded interpretation and reflection to improve that repair; baseline sessions retry the targets without receiving reflection context.
 
 - **Full skip:** no card is selected; the clue is abandoned; one full skip is consumed.
@@ -93,64 +97,86 @@ After a non-bomb turn containing one or more wrong neutral guesses, the guesser 
 ```text
 app.py                    Streamlit entry point and screen routing
 core/
-  ai_service.py           Prompt construction, OpenAI calls, parsing, retries
-  constants.py            Models, scoring, limits, and data paths
+  ai_service.py           Prompt construction, OpenAI calls, parsing, retries/backoff
+  constants.py            Models, scoring, timers, and other tunable limits
+  db.py                   Postgres connection, schema, atomic condition allocation, flat views
   game_logic.py           Board generation, turns, skips, scoring, summaries
-  state.py                Session-state initialization and resets
-  storage.py              CSV schemas, migration, local logging, GitHub mirror
+  state.py                Session-state initialization (incl. request-derived device/locale defaults)
+  storage.py              Field-list schemas and row-builders that persist into Postgres
+  tutorial.py             Practice-round content and logic (isolated from real study data)
   validation.py           Board-word detection for explanations
   words.py                Abstract/concrete word banks and board templates
 ui/
-  components.py           Board, hint, status, and History components
-  screens.py              Consent, profile, gameplay, reflection, and results
+  components.py           Board, hint, status bar, rating scale, and History components
+  screens.py              Consent, profile, gameplay, reflection, and results screens
+  game_guide.py            Onboarding/guide copy shown before the study starts
   study_documents.py      Information sheet, consent, and debriefing text
-  styles.py               Responsive CSS and visual tokens
+  styles.py               Reads, minifies, and injects static/app.css
+static/
+  app.css                  All app CSS (plain stylesheet, not embedded in Python)
+  fonts/                   Self-hosted font files
+.streamlit/
+  config.toml              enableStaticServing, showErrorDetails="none", gatherUsageStats=false
+  secrets.toml              OPENAI_API_KEY, DATABASE_URL (not committed)
+tests/                      pytest suite (unit tests + Streamlit AppTest screen smoke tests)
 AI_PROMPTS.md              Prompt and condition-isolation documentation
-data/                      Runtime CSV output
 ```
 
 ## Data model
 
-Six CSV files are maintained under `data/`:
+All experimental data is written to Postgres (a managed Supabase instance in the current deployment) via `core/db.py`. Each table keeps a small number of real, indexed columns used for joins and filtering, plus one `data JSONB` column holding every field for that row — the field lists in `core/storage.py` (`SESSIONS_LOG_FIELDS`, `ROUNDS_LOG_FIELDS`, `TURNS_LOG_FIELDS`, `EVENTS_LOG_FIELDS`) are the source of truth for exactly which keys live in that JSON document.
 
-| File | Grain | Purpose |
+| Table | Grain | Real (indexed) columns |
 | --- | --- | --- |
-| `sessions.csv` | one row per session | participant profile, condition, completion, final questionnaire |
-| `rounds.csv` | one row per round | normalized board, role, outcome, score, timing |
-| `turns.csv` | one row per turn | normalized guesses, alignment, timing, reflection, model metadata |
-| `events.csv` | one row per event | timestamped UI/game audit trail with JSON payload |
-| `game_rounds.csv` | one row per round | wide backward-compatible research export |
-| `game_interactions.csv` | one row per turn | wide backward-compatible interaction export |
+| `sessions` | one row per session | `participant_id`, `session_id`, `condition`, `completed`, `last_completed_stage` |
+| `rounds` | one row per round | `session_id`, `round_number`, `condition` |
+| `turns` | one row per turn | `session_id`, `round_number`, `turn_number`, `condition`, `action_type`, `alignment_applicability` |
+| `board_cards` | one row per board card per round | `session_id`, `round_number`, `board_id`, `card_word`, `card_role`, `word_type` |
+| `events` | one row per event | `session_id`, `participant_id`, `condition`, `round_number`, `turn_number`, `event_type`, `timestamp` |
+| `condition_counter` | single row | atomic alternation counter (not experimental data) |
 
-For primary analysis, use the normalized `sessions.csv`, `rounds.csv`, `turns.csv`, and `events.csv` tables. The `game_rounds.csv` and `game_interactions.csv` files are backward-compatible wide/audit exports; do not combine their duplicate measures with normalized rows as if they were additional observations. All six datasets are mirrored durably when GitHub storage is enabled.
+`board_cards` is a fully flat table (every card's word/role/word_type as real columns, no JSON) so a card-level query — e.g. "how often was each target word actually guessed" — never requires unpacking JSON.
 
-`session_id`, `participant_id`, `condition`, `round_number`, and `turn_number` are the primary join keys. Exact schemas are defined by the field lists in `core/storage.py`; these lists are the source of truth.
+For analysts who prefer plain SQL/pandas/R over unpacking JSON, three read-only views expand each JSONB `data` column into one text column per field: `sessions_flat`, `rounds_flat`, `turns_flat`. These are created (and recreated, since Postgres won't let `CREATE OR REPLACE VIEW` reorder columns) by `core/db.py:ensure_flat_views`, called once per process from `core/storage.py`.
+
+`session_id`, `participant_id`, `condition`, `round_number`, and `turn_number` are the primary join keys.
 
 Important turn-level fields include:
 
 - clue, `N`, intended cards, expected guesses, actual guess order;
 - correct, incorrect, neutral, and bomb selections;
-- `outcome`, alignment status, error type, and score contribution;
-- action-sequence `turn_number`, `completed_turn_number`, `skip_number`, `skipped`, `skipped_by`, `partial_skip`, `completed_guesses`, and `skipped_guesses`;
+- `outcome`, `bomb_hit`, alignment status, error type, and score contribution;
+- action-sequence `turn_number`, `completed_turn_number`, `skip_number`, `skipped_by`, `partial_skip`, `completed_guesses`, and `skipped_guesses`;
 - `skip_interpreted_cards`, their word types, and interpretation count;
+- `missed_intended_targets` and `extra_correct_guesses` (set differences between intended and actual guesses);
 - counterfactual wrong-guess replacements, actor, word types, count, and AI-call metadata;
 - raw and sanitized human/AI explanations plus validation status and block reason;
-- reflection rating and timing;
-- explicit human-decision start/end/duration/timeout fields, separate from LLM latency;
+- `hint_explanation` and `hint_attempts`;
+- explicit per-turn timing: `hint_time_sec`, `guess_time_sec`, `human_decision_time_sec`, `reflection_time_sec`, separate from LLM latency;
 - raw LLM response, parsed response, model, temperature, retries, and latency;
-- `repair_applied_to_next_prompt`, immediate `repair_source_turn`, stable `repair_chain_id`, and `repair_attempt_number` for repeated repairs.
+- `repair_applied_to_next_prompt`, immediate `repair_source_turn`, stable `repair_chain_id`, and `repair_attempt_number` for repeated repairs;
 - canonical `action_type` and `alignment_applicability` classifications derived from the raw action fields without changing stored outcome metrics.
+
+Round-level fields additionally include `ai_round_reflection` and `human_round_feedback`, the AI's and the human's end-of-round messages to each other.
+
+Session-level fields additionally include the AI's private end-of-game self-report: `ai_post_game_i_understood_human_clues`, `ai_post_game_predict_human_interpretation`, `ai_post_game_adapted_to_human_behavior`, `ai_post_game_reflection_helped`, `ai_post_game_shared_understanding`, `ai_post_game_reasoning`, and the full `ai_post_game_questionnaire_json`.
 
 Turn metrics use the live game outcome: `hit_rate` is target guesses divided by all submitted guesses, `target_yield` and `turn_score_delta` are newly found targets, and `jaccard_alignment` compares intended and guessed-card sets. Skip/timeout rows have zero outcome metrics because no guesses were finalized; unavailable legacy/incomplete metrics remain blank.
 
-Rating fields intentionally represent different stages. `ai_understanding_rating_before` is the human clue-giver's expectation before the AI guess. `human_understanding_rating` is the post-turn shared-understanding rating and is also retained as `reflection_rating` in the wide compatibility exports. `human_explanation_*` is the canonical pre-AI General Link, with `human_explanation_source=pre_ai_human_clue_form` and `human_explanation_collected_at` marking its origin and submission time; `reflection_explanation_*` remains a compatibility alias for that text on human-clue turns. `perception_rating_end` in `game_rounds.csv` is the latest post-turn shared-understanding rating at round end, not a separate end-of-round scale. `human_round_feedback` is the qualitative end-of-round response. The five `post_game_*` session fields are the final questionnaire items. `ai_understanding_rating_after` is retained only for backward schema compatibility and is currently non-applicable.
+Rating fields represent different stages and directions, not one mutual score:
+
+- `ai_understanding_rating_before` — the human clue-giver's expectation, before the AI guesses, of how well the AI will understand their clue.
+- `human_understanding_rating_before` — the human guesser's rating, before guessing, of how well they understand the AI's clue.
+- `human_understanding_rating` — after the turn, how well the human feels they understood the AI (also retained as `reflection_rating`).
+- `ai_understanding_rating_after` — after the turn, how well the human thinks the AI understood *them*. This is genuinely collected on every turn now (both clue-giver and guesser turns); it is not a placeholder.
+- `human_explanation_*` is the canonical pre-AI General Link, with `human_explanation_source=pre_ai_human_clue_form` and `human_explanation_collected_at` marking its origin and submission time.
+- `human_round_feedback` is the qualitative end-of-round response. The five `post_game_*` session fields are the human's final questionnaire items; the `ai_post_game_*` fields are the AI's mirrored self-report.
 
 ### Serialization conventions
 
-- Normalized tables (`sessions.csv`, `rounds.csv`, `turns.csv`, `events.csv`) use JSON strings for nested arrays/objects where appropriate.
-- Legacy wide exports use semicolon-separated values for many list columns and JSON for ordered structures such as `guess_order_json`.
-- Booleans are written consistently as `true`/`false` in normalized dict-based tables; legacy exports retain integer-compatible `0`/`1` fields where required.
-- Timestamps are recorded as UTC ISO-8601 strings. Older rows may be timezone-naive but are UTC by convention.
+- Nested arrays/objects (card lists, LLM raw responses, the AI questionnaire, etc.) are stored as JSON inside each row's `data` column, or as JSON strings within the flat views' text columns.
+- Booleans are native Postgres `BOOLEAN` values (`true`/`false`), not CSV-style strings.
+- Timestamps are recorded as UTC ISO-8601 strings (timezone-aware, `+00:00` suffix).
 - Raw invalid explanations are retained for audit; sanitized fields are blank when validation fails.
 
 ### Provenance and lifecycle
@@ -161,31 +187,20 @@ Session lifecycle fields are updated only at persisted stage boundaries: partici
 
 Normalized turn `action_type` values are `interaction`, `full_skip`, `partial_skip`, and `timeout`. `alignment_applicability` values are `observed_completed_selection`, `partial_selection`, `interpreted_only_skip`, `timeout_no_behavioral_selection`, and `not_applicable`. Existing Jaccard and hit-rate values are unchanged; this metadata identifies structural placeholder zeros. Normalized round `round_end_reason` values produced by the current state machine are `all_targets_found`, `bomb`, and `completed_turn_limit`. Retryable technical events are not round terminations.
 
-`storage.py` includes schema migration and a repair path for legacy `game_interactions.csv` rows that were historically written with two duplicated values. Existing recoverable rows are realigned before the current schema is written.
+## Storage
 
-## Durable storage
-
-Local CSV files are always written. When GitHub storage is configured, all six experimental datasets are also mirrored so they remain recoverable if the Streamlit host filesystem is restarted.
+All experimental data is written directly to Postgres — there is no local CSV or GitHub mirroring step. `core/db.py` creates the schema on first use (`ensure_schema`, idempotent, cached per process) and every write is an `INSERT ... ON CONFLICT DO UPDATE` upsert keyed by the table's real columns, so retried/rerun writes are safe. `log_event` failures are caught and reported into `st.session_state.remote_log_status`/`remote_log_error` rather than raising, so a transient database issue degrades gracefully instead of crashing the participant's session.
 
 Configure `.streamlit/secrets.toml`:
 
 ```toml
 OPENAI_API_KEY = "your-openai-key"
-
-GITHUB_TOKEN = "token-with-repository-contents-write-access"
-GITHUB_REPO = "owner/repository"
-GITHUB_BRANCH = "main"
-GITHUB_ROUND_CSV_PATH = "data/game_rounds.csv"
-GITHUB_INTERACTION_CSV_PATH = "data/game_interactions.csv"
-GITHUB_SESSIONS_CSV_PATH = "data/sessions.csv"
-GITHUB_NORMALIZED_ROUNDS_CSV_PATH = "data/rounds.csv"
-GITHUB_TURNS_CSV_PATH = "data/turns.csv"
-GITHUB_EVENTS_CSV_PATH = "data/events.csv"
+DATABASE_URL = "postgresql://postgres:[PASSWORD]@<host>:5432/postgres"
 ```
 
-Condition allocation uses the remote sessions file as an optimistic transaction when GitHub is configured, so a Streamlit instance restart does not reset alternation. On the first deployment of `sessions.csv`, the allocator seeds itself from the last condition in the existing remote round export. Completed session snapshots preserve demographics and final-questionnaire values remotely. Wide and normalized round/turn exports are mirrored after every completed round, and events are mirrored when emitted.
+`DATABASE_URL` is the direct Postgres connection string (Supabase: Project Settings → Database → Connection string → URI), not the REST API URL/key shown elsewhere in a Supabase project.
 
-GitHub Contents API writes use optimistic retries for update conflicts. Round rows are idempotent by session and round; turn rows are idempotent by session, round, and action number. Because the event schema has no event ID, exact timestamped event rows are deduplicated only when the complete row is replayed, preserving separately emitted events. For high-volume or multi-instance production data collection, a transactional database/object store is preferable to GitHub-backed CSV because GitHub is not an atomic multi-table database.
+Condition allocation reads and increments `condition_counter` inside a single `SELECT ... FOR UPDATE` transaction, so Postgres itself serializes concurrent registrations — there is no optimistic-retry or CAS logic to reason about, and a Streamlit instance restart does not reset alternation.
 
 ## Installation and local execution
 
@@ -198,25 +213,27 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Set `OPENAI_API_KEY` in `.streamlit/secrets.toml`. The default models are configured in `core/constants.py` and currently use `gpt-4o` for clue generation, guessing, turn explanation, and round reflection.
+Set `OPENAI_API_KEY` and `DATABASE_URL` in `.streamlit/secrets.toml` (see Storage above). The default models are configured in `core/constants.py` and currently use `gpt-4o` for clue generation, guessing, turn explanation, and round reflection.
 
 ## Verification
 
-At minimum, run:
+Run the test suite:
 
 ```bash
-python -m compileall app.py core ui
+pip install -r requirements-dev.txt
+pytest
 ```
+
+This is a mix of behavioral unit tests (game logic, validation, storage row-shaping, condition allocation) and some tests that check the presence of specific code/CSS rather than exercising behavior — a known gap, not a design goal. `streamlit.testing.v1.AppTest` (bundled with Streamlit) can drive a real screen end-to-end — fill in widgets, click buttons, assert no unhandled exception — without making real OpenAI calls or Postgres writes as long as those code paths aren't triggered; it is the intended direction for replacing the source-grepping tests, but that migration hasn't happened yet.
 
 Recommended study-release checks additionally include:
 
-- schema field uniqueness;
-- schema/row length equality for both legacy exports;
-- a synthetic round write through all local CSV writers;
+- schema field uniqueness (`core/storage.py`'s `*_LOG_FIELDS` lists);
 - baseline prompt leak tests using sentinel rationale/reflection values;
 - adaptive/baseline alternation tests;
 - full-skip, partial-skip, bomb, all-targets-found, and four-turn termination scenarios;
-- desktop and mobile Streamlit smoke tests.
+- desktop and mobile Streamlit smoke tests;
+- a real round played end-to-end against the live Supabase instance before each deployment, with the test rows deleted afterward.
 
 ## Research purpose
 

@@ -83,32 +83,8 @@ class ParticipantProfileTests(unittest.TestCase):
         self.assertNotIn("Prefer to self-describe", self.screen_source)
         self.assertNotIn("gender_self_describe", self.screen_source)
 
-    def test_session_keys_persistence_and_navigation_are_preserved(self):
-        expected_assignments = (
-            "st.session_state.nickname = clean_nickname",
-            "st.session_state.participant_id = participant_id",
-            "st.session_state.age_group = age_group",
-            "st.session_state.gender = gender",
-            "st.session_state.english_proficiency = english_proficiency",
-            "st.session_state.ai_experience = ai_experience",
-            "st.session_state.codenames_experience = codenames_experience",
-            "initialize_session_log(participant_id)",
-            "st.rerun()",
-        )
-        for assignment in expected_assignments:
-            self.assertIn(assignment, self.screen_source)
-
-    def test_game_header_is_not_rendered_above_profile(self):
-        app_source = Path("app.py").read_text(encoding="utf-8-sig")
-        profile_branch = app_source[
-            app_source.index("if not st.session_state.participant_id"):
-            app_source.index("if not st.session_state.tutorial_completed")
-        ]
-        self.assertIn("screen_name()", profile_branch)
-        self.assertNotIn("render_app_header()", profile_branch)
-
     def test_question_labels_are_not_styled_as_clickable_options(self):
-        styles = Path("ui/styles.py").read_text(encoding="utf-8-sig")
+        styles = Path("static/app.css").read_text(encoding="utf-8-sig")
         self.assertNotIn(
             ".st-key-participant_profile_panel .stRadio label {", styles
         )

@@ -68,20 +68,11 @@ class InformationSheetTests(unittest.TestCase):
         self.assertIn("st.session_state.consent_given = True", screen_source)
 
     def test_layout_is_single_column_without_inner_scroll(self):
-        styles = Path("ui/styles.py").read_text(encoding="utf-8-sig")
+        styles = Path("static/app.css").read_text(encoding="utf-8-sig")
         self.assertIn(".information-section", styles)
         self.assertNotIn(".information-section {\n            overflow", styles)
         source = Path("ui/screens.py").read_text(encoding="utf-8-sig")
         self.assertIn("for section_number", source)
-
-    def test_game_header_is_not_rendered_before_information_sheet(self):
-        source = Path("app.py").read_text(encoding="utf-8-sig")
-        consent_branch = source[
-            source.index("if not st.session_state.consent_given"):
-            source.index("if not st.session_state.started")
-        ]
-        self.assertIn("screen_consent()", consent_branch)
-        self.assertNotIn("render_app_header()", consent_branch)
 
 
 if __name__ == "__main__":

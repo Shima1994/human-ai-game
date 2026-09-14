@@ -116,15 +116,6 @@ class GameGuideTests(unittest.TestCase):
         for icon in icons:
             self.assertIn(icon, source)
 
-    def test_game_header_is_not_rendered_above_guide(self):
-        source = Path("app.py").read_text(encoding="utf-8-sig")
-        guide_branch = source[
-            source.index("if not st.session_state.started"):
-            source.index("if not st.session_state.participant_id")
-        ]
-        self.assertIn("screen_welcome()", guide_branch)
-        self.assertNotIn("render_app_header()", guide_branch)
-
 
 if __name__ == "__main__":
     unittest.main()

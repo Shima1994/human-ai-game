@@ -241,14 +241,3 @@ def allocate_condition(valid_conditions, default_condition):
         return condition
     finally:
         conn.close()
-
-
-def fetch_one(sql, params=None):
-    ensure_schema()
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(sql, params or ())
-            return cur.fetchone()
-    finally:
-        conn.close()

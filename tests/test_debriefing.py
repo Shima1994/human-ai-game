@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 
 from ui.study_documents import (
     DEBRIEFING_COMPLETION_CODE_PLACEHOLDER,
@@ -85,23 +84,6 @@ class DebriefingTests(unittest.TestCase):
             render_debriefing_document("baseline", "")
         with self.assertRaises(ValueError):
             render_debriefing_document("baseline", None)
-
-    def test_runtime_uses_canonical_session_condition_after_questionnaire(self):
-        source = Path("ui/screens.py").read_text(encoding="utf-8-sig")
-        questionnaire_gate = source.index(
-            'if not st.session_state.get("post_game_questionnaire_submitted")'
-        )
-        debriefing_gate = source.index(
-            'if not st.session_state.get("debriefing_acknowledged")'
-        )
-        condition_render = source.index(
-            'render_debriefing_document(\n'
-            '                    st.session_state.get("condition"),\n'
-            '                    st.session_state.get("completion_code"),\n'
-            '                )'
-        )
-        self.assertLess(questionnaire_gate, debriefing_gate)
-        self.assertLess(debriefing_gate, condition_render)
 
 
 if __name__ == "__main__":

@@ -2,3 +2,12 @@
 # Required so the self-hosted fonts under static/fonts/ can be served
 # instead of loading them from the Google Fonts CDN.
 enableStaticServing = true
+
+[client]
+# Never show participants a Python traceback on an unhandled exception.
+# "none" is the modern, unambiguous value (hides type/stacktrace/message);
+# the legacy boolean "false" maps to the same thing but is being phased out.
+showErrorDetails = "none"
+
+[browser]
+gatherUsageStats = false

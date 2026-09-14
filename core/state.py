@@ -1,6 +1,6 @@
 ﻿import uuid
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 import streamlit as st
 
@@ -31,7 +31,45 @@ def _new_starting_role():
     return random.choice(["human_clue", "ai_clue"])
 
 
+def _device_type_from_user_agent(user_agent):
+    ua = (user_agent or "").lower()
+    if not ua:
+        return "unknown"
+    if "ipad" in ua or "tablet" in ua or ("android" in ua and "mobile" not in ua):
+        return "tablet"
+    if "mobi" in ua or "iphone" in ua or "android" in ua:
+        return "mobile"
+    return "desktop"
+
+
+def _client_context_defaults():
+    """Request metadata read server-side via st.context (Streamlit 1.37+):
+    the real User-Agent header and the browser's own navigator.language,
+    with no custom JS component needed. st.context is unavailable in some
+    embedding/test contexts, so every access is defensive.
+
+    screen_size has no server-side source (it's client-only) and is left as
+    "unknown" until a small bidirectional JS component captures it.
+    """
+    user_agent = ""
+    browser_language = ""
+    try:
+        user_agent = str(st.context.headers.get("User-Agent", "") or "")
+    except Exception:
+        pass
+    try:
+        browser_language = str(st.context.locale or "")
+    except Exception:
+        pass
+    return {
+        "user_agent": user_agent or "unknown",
+        "device_type": _device_type_from_user_agent(user_agent),
+        "browser_language": browser_language or "unknown",
+    }
+
+
 def init_session_state():
+    client_context = _client_context_defaults()
     defaults = {
         "session_id": _new_session_id(),
         "condition": _condition_from_query_params(),
@@ -81,8 +119,12 @@ def init_session_state():
         "round_skips": 0,
         "round_finished": False,
         "start_time": None,
-        "session_start_time": datetime.utcnow().isoformat(),
+        "session_start_time": datetime.now(timezone.utc).isoformat(),
         "session_end_time": "",
+        "user_agent": client_context["user_agent"],
+        "device_type": client_context["device_type"],
+        "screen_size": "unknown",
+        "browser_language": client_context["browser_language"],
         "last_activity_at": "",
         "last_completed_stage": "",
         "session_end_reason": "",
@@ -135,53 +177,3 @@ def init_session_state():
             st.session_state[key] = value
 
 
-def reset_round_state():
-    st.session_state.board = None
-    st.session_state.role = None
-    st.session_state.word_type = None
-    st.session_state.board_template_type = ""
-    st.session_state.board_id = ""
-    st.session_state.word_type_per_card = {}
-    st.session_state.target_words = []
-    st.session_state.bomb_words = []
-    st.session_state.bomb_word = None
-    st.session_state.neutral_words = []
-    st.session_state.word_roles = {}
-    st.session_state.hint = ""
-    st.session_state.hint_number = 1
-    st.session_state.hint_targets = []
-    st.session_state.hint_expected_guesses = []
-    st.session_state.hint_explanation = ""
-    st.session_state.guesses = []
-    st.session_state.pending_guesses = []
-    st.session_state.current_guess_rationale = ""
-    st.session_state.found_targets = []
-    st.session_state.interaction_history = []
-    st.session_state.round_interactions = 0
-    st.session_state.round_skips = 0
-    st.session_state.round_finished = False
-    st.session_state.start_time = None
-    st.session_state.round_start_time = ""
-    st.session_state.current_turn_start_time = ""
-    st.session_state.current_hint_start_time = ""
-    st.session_state.current_guess_start_time = ""
-    st.session_state.current_reflection_start_time = ""
-    st.session_state.clue_timer_started_at = ""
-    st.session_state.clue_timer_duration_seconds = 0
-    st.session_state.clue_timer_timeout_consumed = False
-    st.session_state.perception_rating = None
-    st.session_state.ai_understanding_rating_before = None
-    st.session_state.ai_understanding_rating_after = None
-    st.session_state.pending_ai_guess_review = None
-    st.session_state.previous_hint = None
-    st.session_state.last_ai_guesses = []
-    st.session_state.last_ai_hint = ""
-    st.session_state.ai_round_reflection = ""
-    st.session_state.human_round_feedback = ""
-    st.session_state.last_score_change = 0
-    st.session_state.round_medal = "none"
-    st.session_state.round_success = False
-    st.session_state.round_bomb_hit = False
-    st.session_state.round_end_reason = ""
-    st.session_state.pending_hint_meta = None
-    st.session_state.pending_reflection_turn = None

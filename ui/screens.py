@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+﻿from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 import re
@@ -49,14 +49,12 @@ from core.tutorial import (
     TUTORIAL_CLUE,
     TUTORIAL_CLUE_NUMBER,
     TUTORIAL_AI_EXPLANATION,
-    TUTORIAL_NEUTRALS,
     TUTORIAL_ROUND_2_BOARD,
     TUTORIAL_ROUND_2_TARGETS,
     TUTORIAL_ROUND_2_WORD_ROLES,
     TUTORIAL_TARGETS,
     TUTORIAL_WORD_ROLES,
     simulated_ai_guesses,
-    tutorial_selection_is_correct,
     tutorial_repair_clue,
     tutorial_time_remaining,
 )
@@ -66,10 +64,12 @@ from ui.components import (
     RATING_OPTIONS,
     render_board,
     render_board_legend,
+    render_board_lock_note,
     render_clue_timer,
     render_hint_panel,
     render_hint_target_selector,
     render_interaction_history,
+    render_rating_scale_endpoints,
     render_round_chip,
     render_top_status,
 )
@@ -899,28 +899,27 @@ def screen_name():
                     st.error("Please complete: " + ", ".join(missing) + ".")
                 else:
                     clean_nickname = nickname.strip()
-                    participant_id = clean_nickname or _anonymous_participant_id()
+                    # participant_id is always the anonymous, session-derived
+                    # ID -- never the free-text nickname. Two participants
+                    # could otherwise pick the same nickname (colliding their
+                    # data under one participant_id), or type something that
+                    # de-anonymizes them despite the "do not enter your real
+                    # name" hint. Nickname stays a separate, display-only field.
+                    participant_id = _anonymous_participant_id()
                     gender = gender_choice
+                    # participant_id itself is set inside initialize_session_log,
+                    # only once registration actually succeeds -- app.py's
+                    # routing treats a set participant_id as "registered", so
+                    # it must never be committed ahead of a DB call that might
+                    # still fail.
                     st.session_state.nickname = clean_nickname
-                    st.session_state.participant_id = participant_id
                     st.session_state.age_group = age_group
                     st.session_state.gender = gender
                     st.session_state.english_proficiency = english_proficiency
                     st.session_state.ai_experience = ai_experience
                     st.session_state.codenames_experience = codenames_experience
-                    initialize_session_log(participant_id)
-                    st.rerun()
-
-
-def _skip_help_text():
-    used = st.session_state.get("round_skips", 0)
-    remaining = max(0, MAX_SKIPS_PER_ROUND - used)
-    if not can_skip_current_clue():
-        return "Next clue is not available now because both skips were used."
-    return (
-        f"Use only when the clue feels too risky. It does not use one of the 3 completed turns. "
-        f"Remaining skips this round: {remaining}."
-    )
+                    if initialize_session_log(participant_id):
+                        st.rerun()
 
 
 def _current_action_index():
@@ -1188,7 +1187,7 @@ def _is_english_text(text):
 
 
 def _now_iso():
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _seconds_between(start_iso, end_iso=None):
@@ -1196,7 +1195,7 @@ def _seconds_between(start_iso, end_iso=None):
         return None
     try:
         start = datetime.fromisoformat(start_iso)
-        end = datetime.fromisoformat(end_iso) if end_iso else datetime.utcnow()
+        end = datetime.fromisoformat(end_iso) if end_iso else datetime.now(timezone.utc)
         return round((end - start).total_seconds(), 3)
     except (TypeError, ValueError):
         return None
@@ -1455,6 +1454,7 @@ def render_turn_reflection():
                 horizontal=True,
                 key=f"reflection_rating_{st.session_state.round}_{item.get('turn')}",
             )
+            render_rating_scale_endpoints()
             st.radio(
                 "How well do you think the AI understood you?",
                 options=list(RATING_OPTIONS.keys()),
@@ -1463,6 +1463,7 @@ def render_turn_reflection():
                 horizontal=True,
                 key=f"reflection_rating_ai_understood_me_{st.session_state.round}_{item.get('turn')}",
             )
+            render_rating_scale_endpoints()
         replacement_key = (
             f"wrong_guess_replacements_{st.session_state.round}_{item.get('turn')}"
         )
@@ -1539,10 +1540,14 @@ def render_turn_reflection():
             )
             st.rerun()
 
-    render_interaction_history(
-        st.session_state.interaction_history,
-        share_explanations=_share_explanations(),
-    )
+    with st.expander(
+        f"History · {len(st.session_state.interaction_history)} past turn(s)",
+        expanded=False,
+    ):
+        render_interaction_history(
+            st.session_state.interaction_history,
+            share_explanations=_share_explanations(),
+        )
     return True
 
 
@@ -1643,10 +1648,12 @@ def screen_human_clue():
                 st.session_state.current_guess_start_time = ""
                 st.session_state.current_reflection_start_time = ""
             st.rerun()
-        render_interaction_history(
-            _history_with_pending_ai_guess(pending_review),
-            share_explanations=_share_explanations(),
-        )
+        history_for_review = _history_with_pending_ai_guess(pending_review)
+        with st.expander(f"History · {len(history_for_review)} past turn(s)", expanded=False):
+            render_interaction_history(
+                history_for_review,
+                share_explanations=_share_explanations(),
+            )
         return
 
     st.markdown(
@@ -1754,6 +1761,7 @@ def screen_human_clue():
                 label_visibility="collapsed",
                 key=f"before_ai_guess_rating_{st.session_state.round}_{_current_action_index()}",
             )
+            render_rating_scale_endpoints()
     st.session_state.ai_understanding_rating_before = rating_before
 
     general_link_key = (
@@ -1770,7 +1778,45 @@ def screen_human_clue():
         general_link, st.session_state.get("board", [])
     )
 
-    if st.button("Let AI Guess", type="primary", use_container_width=True):
+    hint_is_valid, _hint_error_preview = validate_human_hint_with_history(
+        hint,
+        st.session_state.board,
+        st.session_state.interaction_history,
+        st.session_state.used_hints,
+    )
+    targets_ready = len(st.session_state.hint_targets) == selected_count
+    predicted_ready = len(st.session_state.hint_expected_guesses) == selected_count
+    rating_ready = rating_before is not None
+    turn_ready = (
+        hint_is_valid
+        and targets_ready
+        and predicted_ready
+        and rating_ready
+        and general_link_is_valid
+    )
+
+    def _checklist_item(done, label):
+        mark = "&#10003;" if done else "&#9675;"
+        state = "ok" if done else ""
+        return f"<li class='{state}'><span class='mark'>{mark}</span> {escape(label)}</li>"
+
+    st.markdown(
+        "<ul class='turn-checklist'>"
+        + _checklist_item(hint_is_valid, "Clue and count set")
+        + _checklist_item(targets_ready, "Cards you mean selected")
+        + _checklist_item(predicted_ready, "Predicted AI guesses selected")
+        + _checklist_item(rating_ready, "Confidence rated")
+        + _checklist_item(general_link_is_valid, "Connection explained")
+        + "</ul>",
+        unsafe_allow_html=True,
+    )
+
+    if st.button(
+        "Let AI Guess",
+        type="primary",
+        use_container_width=True,
+        disabled=not turn_ready,
+    ):
         is_valid, error_message = validate_human_hint_with_history(
             hint,
             st.session_state.board,
@@ -1947,10 +1993,14 @@ def screen_human_clue():
                 }
                 st.rerun()
 
-    render_interaction_history(
-        st.session_state.interaction_history,
-        share_explanations=_share_explanations(),
-    )
+    with st.expander(
+        f"History · {len(st.session_state.interaction_history)} past turn(s)",
+        expanded=False,
+    ):
+        render_interaction_history(
+            st.session_state.interaction_history,
+            share_explanations=_share_explanations(),
+        )
 
 
 def screen_human_guesser():
@@ -2022,7 +2072,9 @@ def screen_human_guesser():
                     label_visibility="collapsed",
                     key=f"human_pre_guess_rating_{st.session_state.round}_{_current_action_index()}",
                 )
+                render_rating_scale_endpoints()
         guess_rationale, rationale_is_valid = _render_guess_rationale_input()
+        guess_gate_ready = human_pre_guess_rating is not None and rationale_is_valid
 
     with st.container(border=True):
         st.markdown('<div class="panel-title">Board</div>', unsafe_allow_html=True)
@@ -2035,12 +2087,16 @@ def screen_human_guesser():
                 reveal_all=False,
             )
         else:
+            if not guess_gate_ready:
+                render_board_lock_note(
+                    "Rate the clue and add your reasoning above to start guessing."
+                )
             clicked = render_board(
                 st.session_state.board,
                 st.session_state.word_roles,
                 guesses=st.session_state.guesses + st.session_state.pending_guesses,
                 reveal_all=False,
-                clickable=True,
+                clickable=guess_gate_ready,
                 max_clicks=st.session_state.hint_number + len(st.session_state.guesses),
             )
             if clicked and human_pre_guess_rating is None:
@@ -2169,7 +2225,7 @@ def screen_human_guesser():
         if st.button(
             "Stop guessing and use 1 skip",
             use_container_width=True,
-            disabled=not can_skip_current_clue(),
+            disabled=not can_skip_current_clue() or not guess_gate_ready,
         ):
             pending_meta = st.session_state.get("pending_hint_meta") or {}
             if human_pre_guess_rating is None:
@@ -2250,10 +2306,14 @@ def screen_human_guesser():
                     _attach_ai_explanation_to_latest_turn()
                 _clear_current_clue()
                 st.rerun()
-    render_interaction_history(
-        st.session_state.interaction_history,
-        share_explanations=_share_explanations(),
-    )
+    with st.expander(
+        f"History · {len(st.session_state.interaction_history)} past turn(s)",
+        expanded=False,
+    ):
+        render_interaction_history(
+            st.session_state.interaction_history,
+            share_explanations=_share_explanations(),
+        )
 
 
 def screen_round_summary():
@@ -2289,11 +2349,15 @@ def screen_round_summary():
             """,
             unsafe_allow_html=True,
         )
-        render_interaction_history(
-            st.session_state.interaction_history,
-            show_ai_intended=True,
-            share_explanations=_share_explanations(),
-        )
+        with st.expander(
+            f"History · {len(st.session_state.interaction_history)} past turn(s)",
+            expanded=False,
+        ):
+            render_interaction_history(
+                st.session_state.interaction_history,
+                show_ai_intended=True,
+                share_explanations=_share_explanations(),
+            )
 
     with action_col:
         if not st.session_state.get("ai_round_reflection"):

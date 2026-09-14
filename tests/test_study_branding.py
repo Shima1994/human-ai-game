@@ -9,7 +9,7 @@ class StudyBrandingTests(unittest.TestCase):
         self.assertEqual(source.count('"colaps.png"), width=180'), 3)
 
     def test_compact_branding_css_is_shared_and_responsive(self):
-        styles = Path("ui/styles.py").read_text(encoding="utf-8-sig")
+        styles = Path("static/app.css").read_text(encoding="utf-8-sig")
         for key in (
             ".st-key-consent_logos",
             ".st-key-game_guide_logos",

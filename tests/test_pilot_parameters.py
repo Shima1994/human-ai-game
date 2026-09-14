@@ -113,11 +113,16 @@ class PilotParameterTests(unittest.TestCase):
         self.assertTrue(repaired["repair_same_targets_retried"])
         self.assertTrue(repaired["repair_success"])
 
-    def test_human_timer_is_90_seconds_and_api_timeout_is_unchanged(self):
+    def test_human_timer_is_90_seconds_and_api_timeout_is_bounded(self):
         started = datetime(2026, 1, 1, 12, 0, 0)
         game_logic.start_participant_decision_timer(started.isoformat())
         self.assertEqual(CLUE_TIMER_SECONDS, 90)
-        self.assertEqual(AI_API_TIMEOUT_SECONDS, 120)
+        # Kept well under a minute: this is a per-request HTTP timeout, and it
+        # compounds with the outer content-validation retry loops in
+        # ai_service.py (2-3 attempts) and the OpenAI client's own
+        # max_retries=1, so a large value here turns a real outage into
+        # several minutes of silent, spinner-only waiting for a participant.
+        self.assertLessEqual(AI_API_TIMEOUT_SECONDS, 30)
         self.assertEqual(
             game_logic.participant_decision_time_remaining(started + timedelta(seconds=89)),
             1.0,

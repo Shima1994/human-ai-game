@@ -5,8 +5,6 @@ HINT_MODEL_NAME = "gpt-4o"
 GUESS_MODEL_NAME = "gpt-4o"
 REFLECTION_MODEL_NAME = "gpt-4o"
 
-MODEL_NAME = HINT_MODEL_NAME
-
 # Canonical build metadata. Deployments should set the environment-backed
 # values to their platform's exact identifiers; blank means unavailable and is
 # preferable to fabricated provenance.
@@ -45,7 +43,7 @@ BOMB_COUNT = 2
 MAX_INTERACTIONS_PER_ROUND = 3
 MAX_SKIPS_PER_ROUND = 2
 CLUE_TIMER_SECONDS = 90
-AI_API_TIMEOUT_SECONDS = 120
+AI_API_TIMEOUT_SECONDS = 20
 MEDAL_POINTS = {
     "gold": 5,
     "silver": 4,
@@ -53,4 +51,3 @@ MEDAL_POINTS = {
 }
 AI_REROLLS_PER_GAME = 2
 HUMAN_REROLLS_PER_GAME = 2
-TOTAL_HINT_CHANCES = AI_REROLLS_PER_GAME + HUMAN_REROLLS_PER_GAME

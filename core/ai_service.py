@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import re
 import time
 
@@ -14,7 +13,6 @@ from core.constants import (
     HINT_MODEL_NAME,
     MAX_HINT_NUMBER,
     REFLECTION_MODEL_NAME,
-    TARGET_COUNT,
 )
 from core.validation import mentions_board_word
 
@@ -37,8 +35,20 @@ def _get_openai_client():
         raise RuntimeError(
             "OPENAI_API_KEY is not configured. Add it to the Streamlit app secrets."
         )
-    client = OpenAI(api_key=api_key)
+    # max_retries bounds the SDK's own internal retry-on-transient-error
+    # behavior (network blips, 429, 5xx). Left at the library default (2) this
+    # compounds badly with our own outer retry loops below and with
+    # AI_API_TIMEOUT_SECONDS, since each internal retry gets its own full
+    # timeout budget.
+    client = OpenAI(api_key=api_key, max_retries=1)
     return client
+
+
+def _backoff_before_retry(attempt):
+    """Short, capped delay before an outer retry (attempt is 0-indexed and
+    refers to the attempt that just failed). Gives a transient rate limit or
+    network blip a moment to clear instead of hammering the API instantly."""
+    time.sleep(min(1.0 * (attempt + 1), 4.0))
 
 
 class AIClueGenerationError(RuntimeError):
@@ -730,6 +740,8 @@ def generate_ai_turn_explanation(
                 "ai_explanation_blocked_reason": "",
             }
         except Exception:
+            if attempt < 1:
+                _backoff_before_retry(attempt)
             continue
 
     reason = "board_word" if last_raw_explanation else "generation_failed"
@@ -798,7 +810,8 @@ def _generate_hint_with_forbidden(
             )
         except Exception as error:
             last_raw = f"<api_error: {error}>"
-            total_time += 0.0
+            if attempts < 3:
+                _backoff_before_retry(attempts - 1)
             continue
 
         last_raw = raw
@@ -855,31 +868,6 @@ def generate_ai_hint(
         forbidden_hint=(repair_context or {}).get("skipped_hint"),
         condition=condition,
         repair_context=repair_context,
-    )
-
-
-def generate_ai_hint_reroll(
-    target_words,
-    bomb_words,
-    neutral_words,
-    word_type,
-    previous_hint,
-    history=None,
-    used_hints=None,
-    round_summaries=None,
-    condition=DEFAULT_CONDITION,
-):
-    return _generate_hint_with_forbidden(
-        target_words,
-        bomb_words,
-        neutral_words,
-        word_type,
-        history or [],
-        used_hints or [],
-        round_summaries or [],
-        forbidden_hint=previous_hint,
-        condition=condition,
-        repair_context=None,
     )
 
 
