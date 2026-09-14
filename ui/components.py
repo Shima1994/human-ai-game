@@ -41,25 +41,35 @@ RATING_OPTIONS = {
 }
 
 
-def scroll_page_to_top():
-    """Reset the parent Streamlit viewport after navigating to a new study view."""
+def scroll_page_to_top(should_scroll):
+    """Reset the parent Streamlit viewport after navigating to a new study view.
+
+    Rendered on every rerun (the caller passes should_scroll rather than us
+    only being called on transitions), so this component's own DOM node is
+    never added on one rerun and removed on the next. Removing a component
+    iframe -- even a zero-size one -- shifts the layout by its wrapper's
+    spacing and was showing up as a one-time visible "jump" on the first
+    widget interaction right after arriving at a new screen.
+    """
     st_components.html(
-        """
+        f"""
         <script>
-          const resetScroll = () => {
-            const parentWindow = window.parent;
-            const parentDocument = parentWindow.document;
-            parentWindow.scrollTo({ top: 0, left: 0, behavior: "instant" });
-            parentDocument.documentElement.scrollTop = 0;
-            parentDocument.body.scrollTop = 0;
-            const appViewport = parentDocument.querySelector(
-              '[data-testid="stAppViewContainer"]'
-            );
-            if (appViewport) appViewport.scrollTo({ top: 0, left: 0, behavior: "instant" });
-            const main = parentDocument.querySelector('[data-testid="stMain"]');
-            if (main) main.scrollTo({ top: 0, left: 0, behavior: "instant" });
-          };
-          requestAnimationFrame(() => requestAnimationFrame(resetScroll));
+          if ({str(bool(should_scroll)).lower()}) {{
+            const resetScroll = () => {{
+              const parentWindow = window.parent;
+              const parentDocument = parentWindow.document;
+              parentWindow.scrollTo({{ top: 0, left: 0, behavior: "instant" }});
+              parentDocument.documentElement.scrollTop = 0;
+              parentDocument.body.scrollTop = 0;
+              const appViewport = parentDocument.querySelector(
+                '[data-testid="stAppViewContainer"]'
+              );
+              if (appViewport) appViewport.scrollTo({{ top: 0, left: 0, behavior: "instant" }});
+              const main = parentDocument.querySelector('[data-testid="stMain"]');
+              if (main) main.scrollTo({{ top: 0, left: 0, behavior: "instant" }});
+            }};
+            requestAnimationFrame(() => requestAnimationFrame(resetScroll));
+          }}
         </script>
         """,
         height=0,
@@ -146,35 +156,58 @@ def render_round_chip(text):
 
 
 def render_clue_timer(remaining_seconds):
+    """A small, right-aligned pill instead of a full-width iframe block.
+
+    This used to be a custom HTML/JS component (st_components.html), which
+    renders inside its own sandboxed iframe document and so could never pick
+    up the app's own fonts/colors -- that's why it always looked like plain
+    unstyled browser text no matter what the rest of the page looked like.
+    A plain st.markdown element has none of that isolation and is far less
+    likely to cause the page to visibly shift when the component's DOM node
+    is added or removed across reruns. The 3-second autorefresh already
+    forces a rerun regardless, so a server-rendered value updated every few
+    seconds is all that's needed -- no client-side per-second ticking.
+    """
     remaining = max(0, int(math.ceil(remaining_seconds or 0)))
-    st_components.html(
+    warn_class = " warn" if remaining <= 15 else ""
+    st.markdown(
         f"""
-        <div style="font-family:system-ui;text-align:center;font-weight:700;font-size:1.05rem;"
-             aria-live="polite">
-          Decision time remaining: <span id="clue-timer">{remaining // 60:02d}:{remaining % 60:02d}</span>
+        <div class="timer-row">
+            <span class="timer-pill{warn_class}" aria-live="polite">
+                <span class="timer-dot"></span>
+                {remaining // 60:02d}:{remaining % 60:02d} left to decide
+            </span>
         </div>
-        <script>
-          let remaining = {remaining};
-          const el = document.getElementById('clue-timer');
-          const tick = () => {{
-            remaining = Math.max(0, remaining - 1);
-            const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
-            const seconds = String(remaining % 60).padStart(2, '0');
-            el.textContent = `${{minutes}}:${{seconds}}`;
-            el.style.color = remaining <= 15 ? '#b42318' : 'inherit';
-          }};
-          if (remaining > 0) window.setInterval(tick, 1000);
-        </script>
         """,
-        height=42,
+        unsafe_allow_html=True,
     )
     # Trigger a normal Streamlit rerun (preserves st.session_state) every few
     # seconds so the server-side timeout check in screens.py gets a chance to
     # fire once the deadline passes. A full browser reload was used here
     # previously, which wiped the participant's entire session on every
     # timeout instead of just consuming the current turn.
-    if remaining > 0:
-        st_autorefresh(interval=3000, key="clue_timer_autorefresh")
+    #
+    # This must keep firing even once remaining hits 0 (previously gated on
+    # remaining > 0): the *next* rerun is what actually calls
+    # _consume_human_clue_timeout()/_consume_human_guess_timeout() and clears
+    # the expired turn. Stopping autorefresh exactly at 0 meant the app never
+    # rendered again on its own once time ran out -- the participant's next
+    # click was the one that silently triggered the timeout instead of
+    # submitting what they clicked, which looked exactly like "the button
+    # doesn't work." Once the timeout is actually consumed, the screen moves
+    # on to a fresh timer (or away from this one), so this keeps working
+    # correctly rather than looping.
+    #
+    # Interval is a tradeoff: Streamlit aborts an in-flight script run (and
+    # discards that run's not-yet-applied widget state) whenever a new rerun
+    # is triggered before it finishes, including one from this autorefresh --
+    # so a shorter interval means more chances for a real click's rerun to
+    # get interrupted and silently dropped, which is exactly what showed up
+    # as "the board card I clicked didn't register" and "the screen randomly
+    # refreshes itself." 5s keeps timeout detection close enough (a 90s
+    # decision timer noticing a few seconds late is harmless) while meaningfully
+    # cutting how often this collides with an actual participant click.
+    st_autorefresh(interval=5000, key="clue_timer_autorefresh")
 
 
 def _render_static_card(word, role, revealed, guessed=False):
@@ -261,10 +294,17 @@ def render_rating_scale_endpoints():
     )
 
 
-def render_board_lock_note(message):
+def render_board_lock_note(message, visible=True):
+    """Always render this note (rather than only when locked) and hide it
+    with CSS when not needed, so its DOM node is never added/removed across
+    reruns -- removing it (e.g. the instant reasoning becomes valid) shifted
+    the board and everything below it up by the note's height, which showed
+    up as a one-time visible "jump" right when the lock note should have
+    just quietly gone away. Same fix pattern as scroll_page_to_top."""
+    hidden_class = "" if visible else " board-lock-note-hidden"
     st.markdown(
         f"""
-        <div class="board-lock-note">
+        <div class="board-lock-note{hidden_class}">
             <span class="lock-icon">&#128274;</span>
             <span>{escape(message)}</span>
         </div>
@@ -310,31 +350,37 @@ def render_hint_target_selector(
         """,
         unsafe_allow_html=True,
     )
-    cols = st.columns(column_count or (5 if len(target_words) >= 5 else 4))
-    for index, word in enumerate(target_words):
-        is_selected = word in selected_targets
-        label = f"[x] {word}" if is_selected else word
-        with cols[index % len(cols)]:
-            if st.button(
-                label,
-                key=(
-                    f"{key_prefix}_{st.session_state.get('round', 0)}_"
-                    f"{len(st.session_state.get('interaction_history', []))}_{word}"
-                ),
-                use_container_width=True,
-                disabled=(
-                    disabled
-                    or word not in selectable_set
-                    or (not is_selected and len(selected_targets) >= max_targets)
-                ),
-            ):
-                if is_selected:
-                    st.session_state[state_key] = [
-                        item for item in selected_targets if item != word
-                    ]
-                else:
-                    st.session_state[state_key] = selected_targets + [word]
-                st.rerun()
+    # Wrapped in a keyed container so these render as small pill chips
+    # (styled below via the "..._chips" class) instead of inheriting the
+    # board's full-size hidden-card button style, which made this look like
+    # a confusing second board.
+    with st.container(key=f"{key_prefix}_chips"):
+        cols = st.columns(column_count or (5 if len(target_words) >= 5 else 4))
+        for index, word in enumerate(target_words):
+            is_selected = word in selected_targets
+            label = f"✓ {word}" if is_selected else word
+            with cols[index % len(cols)]:
+                if st.button(
+                    label,
+                    key=(
+                        f"{key_prefix}_{st.session_state.get('round', 0)}_"
+                        f"{len(st.session_state.get('interaction_history', []))}_{word}"
+                    ),
+                    use_container_width=True,
+                    type="primary" if is_selected else "secondary",
+                    disabled=(
+                        disabled
+                        or word not in selectable_set
+                        or (not is_selected and len(selected_targets) >= max_targets)
+                    ),
+                ):
+                    if is_selected:
+                        st.session_state[state_key] = [
+                            item for item in selected_targets if item != word
+                        ]
+                    else:
+                        st.session_state[state_key] = selected_targets + [word]
+                    st.rerun()
 
 
 def render_interaction_history(history, show_ai_intended=False, share_explanations=True):
@@ -351,7 +397,9 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
         return
 
     rows = []
-    for index, item in enumerate(history, start=1):
+    # Most recent turn first -- keep each item's original position as its
+    # number so turn numbering stays stable while newest reads on top.
+    for index, item in reversed(list(enumerate(history, start=1))):
         guesses = item.get("guesses", [])
         skip_interpreted_cards = item.get("skip_interpreted_cards", [])
         wrong_guess_replacements = item.get("wrong_guess_replacements", [])

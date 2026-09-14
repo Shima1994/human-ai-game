@@ -94,7 +94,12 @@ class TutorialTests(unittest.TestCase):
         self.assertIn('clickable=not bool(st.session_state.get("tutorial_practice_result"))', source)
         self.assertIn('key_prefix=f"tutorial_board_button_{repair_attempt}"', source)
         self.assertIn('key_prefix="tutorial_hint_target"', source)
-        self.assertIn("selectable_words=tutorial_target_options", source)
+        # Only the real target words are offered, like the real game -- not
+        # the whole board with non-targets shown disabled.
+        self.assertIn(
+            "render_hint_target_selector(\n                tutorial_target_options,",
+            source,
+        )
         self.assertIn("Stop guessing and use 1 skip", source)
         self.assertIn("tutorial_skip_interpretation_", source)
         self.assertIn("MAX_SKIPS_PER_ROUND", source)

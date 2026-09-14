@@ -184,8 +184,6 @@ TURNS_LOG_FIELDS = [
     "reflection_time_sec",
     "reflection_source",
     "ai_understanding_rating_before",
-    "ai_understanding_rating_after",
-    "human_understanding_rating_before",
     "human_understanding_rating",
     "human_relationship_type",
     "human_explanation_raw",
@@ -417,8 +415,6 @@ def clean_interaction_history(history):
                 "skipped_guesses": item.get("skipped_guesses", 0),
                 "bomb_hit": bool(item.get("bomb_hit", False)),
                 "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
-                "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
-                "human_understanding_rating_before": item.get("human_understanding_rating_before"),
                 "hint_raw_response": item.get("hint_raw_response", ""),
                 "hint_response_time_sec": item.get("hint_response_time_sec"),
                 "hint_attempts": item.get("hint_attempts"),
@@ -962,8 +958,6 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "reflection_time_sec": _format_optional_float(item.get("reflection_time_sec")),
         "reflection_source": item.get("reflection_source", ""),
         "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
-        "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
-        "human_understanding_rating_before": item.get("human_understanding_rating_before"),
         "human_understanding_rating": item.get("human_understanding_rating", ""),
         "human_relationship_type": item.get("human_relationship_type", ""),
         "human_explanation_raw": human_raw,
@@ -1073,10 +1067,11 @@ def append_analysis_logs(participant_id, timestamp, score_change, clean_history)
             "board_cards",
             columns=["session_id", "round_number", "board_id", "card_word", "card_role", "word_type"],
             rows=board_card_rows,
+            # Re-running the same round (e.g. a Streamlit rerun interrupting
+            # this save before the round actually advances) must not raise
+            # on the primary key -- a card's row is identical either way.
+            conflict_columns=["session_id", "round_number", "card_word"],
         )
-        # Re-running the same round (e.g. after a Streamlit rerun before the
-        # round advances) would otherwise violate the primary key; the ON
-        # CONFLICT clause below makes repeated calls idempotent.
 
     return round_row, turn_rows
 

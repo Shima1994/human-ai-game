@@ -166,9 +166,7 @@ Turn metrics use the live game outcome: `hit_rate` is target guesses divided by 
 Rating fields represent different stages and directions, not one mutual score:
 
 - `ai_understanding_rating_before` — the human clue-giver's expectation, before the AI guesses, of how well the AI will understand their clue.
-- `human_understanding_rating_before` — the human guesser's rating, before guessing, of how well they understand the AI's clue.
 - `human_understanding_rating` — after the turn, how well the human feels they understood the AI (also retained as `reflection_rating`).
-- `ai_understanding_rating_after` — after the turn, how well the human thinks the AI understood *them*. This is genuinely collected on every turn now (both clue-giver and guesser turns); it is not a placeholder.
 - `human_explanation_*` is the canonical pre-AI General Link, with `human_explanation_source=pre_ai_human_clue_form` and `human_explanation_collected_at` marking its origin and submission time.
 - `human_round_feedback` is the qualitative end-of-round response. The five `post_game_*` session fields are the human's final questionnaire items; the `ai_post_game_*` fields are the AI's mirrored self-report.
 

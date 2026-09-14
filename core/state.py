@@ -151,7 +151,6 @@ def init_session_state():
         "post_game_questionnaire": {},
         "perception_rating": None,
         "ai_understanding_rating_before": None,
-        "ai_understanding_rating_after": None,
         "pending_ai_guess_review": None,
         "previous_hint": None,
         "last_ai_guesses": [],

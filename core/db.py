@@ -93,13 +93,20 @@ def _database_url():
 
 
 def get_connection():
-    """Open a new connection. Callers are responsible for closing it."""
+    """Open a new connection. Callers are responsible for closing it.
+
+    An explicit connect_timeout keeps a single attempt from hanging on the
+    OS's own (much longer) default when the database is briefly unreachable
+    -- e.g. Supabase's free tier pauses a project after inactivity and takes
+    a few seconds to wake back up. Without this, one slow attempt could eat
+    the whole retry budget in callers like initialize_session_log.
+    """
     database_url = _database_url()
     if not database_url:
         raise RuntimeError(
             "DATABASE_URL is not configured. Add it to the Streamlit app secrets."
         )
-    return psycopg2.connect(database_url)
+    return psycopg2.connect(database_url, connect_timeout=8)
 
 
 _schema_ready = False
@@ -199,13 +206,20 @@ def insert_row(table, columns, values):
         conn.close()
 
 
-def insert_rows(table, columns, rows):
+def insert_rows(table, columns, rows, conflict_columns=None):
+    """Bulk insert. Pass conflict_columns (the table's primary/unique key)
+    to make repeated calls with the same rows a no-op instead of raising --
+    needed wherever a Streamlit rerun could plausibly replay the same
+    insert (e.g. board_cards being logged again after a rerun interrupts
+    the save before the round actually advances)."""
     if not rows:
         return
     ensure_schema()
     column_list = ", ".join(columns)
     placeholders = ", ".join(["%s"] * len(columns))
     sql = f"INSERT INTO {table} ({column_list}) VALUES ({placeholders})"
+    if conflict_columns:
+        sql += f" ON CONFLICT ({', '.join(conflict_columns)}) DO NOTHING"
     conn = get_connection()
     try:
         with conn.cursor() as cur:

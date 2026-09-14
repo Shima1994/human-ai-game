@@ -49,9 +49,12 @@ def _current_view_key():
 def _scroll_after_view_change():
     current_view = _current_view_key()
     previous_view = st.session_state.get("_rendered_view_key")
-    if previous_view is not None and previous_view != current_view:
-        scroll_page_to_top()
+    should_scroll = previous_view is not None and previous_view != current_view
     st.session_state._rendered_view_key = current_view
+    # Called every rerun (not just on a transition) so this component's DOM
+    # node is never added/removed between reruns -- see scroll_page_to_top's
+    # docstring for why that mattered.
+    scroll_page_to_top(should_scroll)
 
 
 def main():
@@ -72,7 +75,6 @@ def main():
         return
 
     if not st.session_state.tutorial_completed:
-        render_app_header()
         screen_tutorial()
         return
 

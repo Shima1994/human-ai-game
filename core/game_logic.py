@@ -281,7 +281,6 @@ def setup_new_round():
     st.session_state.last_ai_hint = ""
     st.session_state.perception_rating = None
     st.session_state.ai_understanding_rating_before = None
-    st.session_state.ai_understanding_rating_after = None
     st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.now(timezone.utc)
@@ -333,8 +332,6 @@ def record_interaction(
     guess_rationale="",
     hint_explanation="",
     ai_understanding_rating_before=None,
-    ai_understanding_rating_after=None,
-    human_understanding_rating_before=None,
     hint_raw_response="",
     hint_time_sec=None,
     hint_response_time_sec=None,
@@ -510,8 +507,6 @@ def record_interaction(
             "alignment_status": alignment_status,
             "error_type": error_type,
             "ai_understanding_rating_before": ai_understanding_rating_before,
-            "ai_understanding_rating_after": ai_understanding_rating_after,
-            "human_understanding_rating_before": human_understanding_rating_before,
             "hint_raw_response": hint_raw_response,
             "hint_time_sec": hint_time_sec,
             "hint_response_time_sec": hint_response_time_sec,
@@ -576,7 +571,6 @@ def record_skip(
     guess_rationale="",
     hint_explanation="",
     skipped_by=None,
-    human_understanding_rating_before=None,
     hint_raw_response="",
     hint_time_sec=None,
     hint_response_time_sec=None,
@@ -702,8 +696,6 @@ def record_skip(
             "completed_guesses": 0,
             "skipped_guesses": int(hint_number or 0),
             "ai_understanding_rating_before": None,
-            "ai_understanding_rating_after": None,
-            "human_understanding_rating_before": human_understanding_rating_before,
             "hint_raw_response": hint_raw_response,
             "hint_time_sec": hint_time_sec,
             "hint_response_time_sec": hint_response_time_sec,
@@ -921,8 +913,6 @@ def append_ai_round_summary():
                     "completed_guesses": item.get("completed_guesses", len(item.get("guesses", []))),
                     "skipped_guesses": item.get("skipped_guesses", 0),
                     "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
-                    "ai_understanding_rating_after": item.get("ai_understanding_rating_after"),
-                    "human_understanding_rating_before": item.get("human_understanding_rating_before"),
                     "reflection_rating": item.get("reflection_rating", ""),
                     "reflection_relationship_type": item.get("reflection_relationship_type", ""),
                     "reflection_explanation_raw": item.get("reflection_explanation_raw", ""),

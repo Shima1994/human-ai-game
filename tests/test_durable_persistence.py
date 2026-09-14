@@ -167,6 +167,44 @@ class DurablePersistenceTests(unittest.TestCase):
         self.assertEqual(returned_round, round_row)
         self.assertEqual(returned_turns, [turn_row])
 
+    def test_board_card_rows_insert_is_idempotent_on_session_round_card_key(self):
+        """A Streamlit rerun can interrupt the save before the round
+        actually advances, so a retry replays the same board_cards insert.
+        Confirmed against a real error: 'duplicate key value violates
+        unique constraint "board_cards_pkey"' when this had no ON CONFLICT
+        clause -- the round's other data still saved, but board_cards
+        silently failed to log for that round."""
+        round_row = {field: "" for field in storage.ROUNDS_LOG_FIELDS}
+        round_row.update(session_id="s1", round_number=3, condition="adaptive")
+        turn_row = {field: "" for field in storage.TURNS_LOG_FIELDS}
+        turn_row.update(
+            session_id="s1",
+            round_number=3,
+            turn_number=1,
+            condition="adaptive",
+            action_type="interaction",
+            alignment_applicability="observed_completed_selection",
+        )
+        board_card_rows = [("s1", 3, "b1", "Castle", "target", "concrete")]
+
+        fake_conn = FakeConnection()
+        with patch.object(db, "get_connection", return_value=fake_conn), patch.object(
+            storage, "_round_analysis_row", return_value=round_row
+        ), patch.object(
+            storage, "_turn_analysis_row", return_value=turn_row
+        ), patch.object(
+            storage, "_board_card_rows", return_value=board_card_rows
+        ), patch("psycopg2.extras.execute_batch") as mock_execute_batch:
+            storage.append_analysis_logs("p1", "2026-01-01T00:00:00", 1, [{}])
+
+        self.assertTrue(mock_execute_batch.called)
+        called_sql = mock_execute_batch.call_args[0][1]
+        self.assertIn("INSERT INTO board_cards", called_sql)
+        self.assertIn(
+            "ON CONFLICT (session_id, round_number, card_word) DO NOTHING",
+            called_sql,
+        )
+
     def test_log_round_reports_failure_without_losing_the_completed_interaction_events(self):
         self.state.update(
             guesses=[],
