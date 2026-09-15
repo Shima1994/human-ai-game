@@ -398,8 +398,11 @@ def screen_tutorial():
         )
         if remaining <= 0 and not st.session_state.get("tutorial_practice_result"):
             st.session_state.tutorial_practice_result = "timeout"
-        render_clue_timer(remaining)
-        st.markdown("### Round 1 of 2 · AI Clue-Giver")
+        head_col, timer_col = st.columns([3, 1], vertical_alignment="center")
+        with head_col:
+            st.markdown("### Round 1 of 2 · AI Clue-Giver")
+        with timer_col:
+            render_clue_timer(remaining)
         st.caption("You are the Guesser. Interpret the clue, explain your reasoning, then guess or use a skip just as in the real game.")
         with st.container(border=True, key="tutorial_ai_clue_panel"):
             repair_attempt = int(st.session_state.get("tutorial_repair_attempt", 0) or 0)
@@ -594,8 +597,11 @@ def screen_tutorial():
         remaining = tutorial_time_remaining(
             st.session_state.get("tutorial_practice_started_at", "")
         )
-        render_clue_timer(remaining)
-        st.markdown("### Round 2 of 2 · Human Clue-Giver")
+        head_col, timer_col = st.columns([3, 1], vertical_alignment="center")
+        with head_col:
+            st.markdown("### Round 2 of 2 · Human Clue-Giver")
+        with timer_col:
+            render_clue_timer(remaining)
         st.caption("The card roles are visible because you are the Clue-Giver. Complete every field before the simulated AI guesses.")
         if remaining <= 0 and not st.session_state.get("tutorial_human_clue_submitted"):
             st.warning("Practice time expired. This does not affect your study participation or score.")
