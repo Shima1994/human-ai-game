@@ -235,4 +235,4 @@ Recommended study-release checks additionally include:
 
 ## Research purpose
 
-The application supports a Master's thesis on intersubjective alignment in human–AI collaboration. Its central comparison is whether exchanging and reusing short explanations improves subsequent coordination relative to a baseline that collects the same explanation data without sharing it between teammates.
+The application supports a Master's thesis titled *"Investigating Intersubjective Alignment in Human–AI Collaboration Through a Cooperative Word Association Game"*. Its central comparison is whether exchanging and reusing short explanations improves subsequent coordination relative to a baseline that collects the same explanation data without sharing it between teammates.

@@ -8,9 +8,9 @@ Models are configured in `core/constants.py`:
 
 | Constant | Current default | Purpose |
 | --- | --- | --- |
-| `HINT_MODEL_NAME` | `gpt-4o` | AI clue generation and clue rerolls |
-| `GUESS_MODEL_NAME` | `gpt-4o` | AI card selection and partial-skip decision |
-| `REFLECTION_MODEL_NAME` | `gpt-4o` | AI turn explanations and round reflections |
+| `HINT_MODEL_NAME` | `gpt-4o` | AI clue generation, including skip-repair clues |
+| `GUESS_MODEL_NAME` | `gpt-4o` | AI card selection, partial-skip decision, and post-hoc wrong-guess replacement suggestions |
+| `REFLECTION_MODEL_NAME` | `gpt-4o` | AI turn explanations, round reflections, and the end-of-game self-report |
 
 All requests pass through:
 
@@ -63,14 +63,13 @@ The UI separately prevents AI reasoning/explanations from being shown to the hum
 
 ## 1. AI clue generation
 
-Functions:
+Function:
 
 ```python
 generate_ai_hint(...)
-generate_ai_hint_reroll(...)
 ```
 
-Used when the AI is clue-giver and the human is guesser. In round 1 generation starts after the participant presses **Ask AI for a clue**; in later AI-clue rounds it starts automatically.
+Used when the AI is clue-giver and the human is guesser. In round 1 generation starts after the participant presses **Ask AI for a clue**; in later AI-clue rounds it starts automatically. There is no separate reroll function: when the human skips an AI clue (fully or partially), the same `generate_ai_hint(...)` call is reused with a `repair_context` argument that forbids the skipped clue and requires the new clue's targets to exactly match the unresolved targets (see Section 3).
 
 ### System behavior
 
@@ -117,7 +116,7 @@ Adaptive additionally receives participant feedback and persistent teammate memo
 - Temperature: `0.55`.
 - JSON mode: enabled.
 - Maximum initial attempts: three.
-- A reroll forbids the rejected clue and uses the same strict validation rules.
+- A skip-repair call forbids the skipped clue and uses the same strict validation rules (see Section 1's opening paragraph and Section 4).
 - Invalid JSON, schema violations, invalid clues, API errors, and timeouts consume an attempt.
 - After three failed attempts, clue generation raises an error. No clue, intended targets, or expected guesses are fabricated, and the UI asks the participant to try again.
 - The failure event retains the attempt count, last raw response/error, and elapsed response time for debugging.
@@ -217,7 +216,25 @@ Primary-call temperature is `0.2`; forced JSON mode is disabled so the reroll li
 - completed and abandoned guess counts;
 - correctness, alignment, error type, and bomb outcome.
 
-## 3. AI turn explanation
+## 3. AI wrong-guess replacement suggestions
+
+Function:
+
+```python
+generate_ai_wrong_guess_replacements(...)
+```
+
+Runs once the AI-as-guesser's turn is scored and at least one selected card was a wrong neutral (never after a bomb, which ends the round). It asks the same guesser model, at temperature `0.0`, to choose the cards it would have picked instead of each wrong one, from the board words not already selected that turn. This is the AI-side counterpart of the human reflection screen's "which card would you choose instead" question, so both directions of that data are collected the same way.
+
+Output schema:
+
+```json
+{"replacement_cards": ["<exact available card>", "..."]}
+```
+
+The response is accepted only if it returns exactly as many distinct, valid available cards as there were wrong guesses; otherwise the stored replacement list is empty. Stored fields: `wrong_guess_replacements`, `wrong_guess_replacement_actor` (`"ai"` here, `"human"` for the mirrored reflection-screen case), raw response, and response time.
+
+## 4. AI turn explanation
 
 Function:
 
@@ -244,7 +261,7 @@ Adaptive may show the sanitized explanation to the human. Baseline stores it but
 
 Stored fields include raw/sanitized explanation, validity, block reason, relationship type, and reflection source.
 
-## 4. AI end-of-round reflection
+## 5. AI end-of-round reflection
 
 Function:
 
@@ -259,8 +276,24 @@ The model summarizes clue interpretation, successes, errors, skips, and one acti
 - Baseline context uses fact-only history and therefore excludes human/AI explanation exchange.
 - Adaptive displays the reflection and may reuse it in later memory.
 - Baseline stores it without displaying or reusing it.
+- On failure, a fixed fallback sentence is returned instead of the AI's own text (never fabricated as if it were a real model reflection).
 
-## 5. Human-input validation relevant to prompts
+## 6. AI end-of-game self-report
+
+Function:
+
+```python
+generate_ai_post_game_reflection(round_summaries, condition)
+```
+
+Runs once, after the human's own post-game questionnaire, so the two can be compared directly. The AI answers five 1–5 agreement ratings mirroring the human's questionnaire (`i_understood_human_clues`, `predict_human_interpretation`, `adapted_to_human_behavior`, `reflection_helped`, `shared_understanding`) plus a short `reasoning` string, based strictly on the full game history (adaptive: full history; baseline: fact-only history). Never shown to the participant.
+
+- Temperature: `0.2`; forced JSON mode.
+- Every rating must be an integer 1–5; `reasoning` is capped at 60 words.
+- If the response is not valid JSON, is not an object, or any rating is missing/out of range, all ratings are stored as `None` with a `blocked_reason` (`"invalid_response"`, `"invalid_rating"`, or `"generation_failed"` on an API error) rather than a guessed value.
+- Stored fields: the five `ai_post_game_*` ratings, `ai_post_game_reasoning`, and the full `ai_post_game_questionnaire_json`.
+
+## 7. Human-input validation relevant to prompts
 
 Human clues are validated locally before any AI call:
 
@@ -279,9 +312,9 @@ Human explanation inputs are also local validations:
 
 Invalid raw text and its block reason can be retained for research audit, while sanitized fields remain empty.
 
-## 6. Prompt/data audit fields
+## 8. Prompt/data audit fields
 
-The normalized `turns.csv` includes model and prompt audit columns:
+All experimental data is written directly to Postgres (see `README.md` for the schema) — there is no CSV export step. The `turns` table's JSONB `data` column includes model and prompt audit fields, also queryable as plain text columns through the read-only `turns_flat` view:
 
 - `llm_model`;
 - `llm_temperature`;
@@ -294,9 +327,9 @@ The normalized `turns.csv` includes model and prompt audit columns:
 - `repair_applied_to_next_prompt`;
 - `repair_context_used`.
 
-All datasets include `condition`. Researchers should use the normalized tables for analysis and treat `game_rounds.csv` / `game_interactions.csv` as backward-compatible wide exports.
+Every table also carries a real `condition` column.
 
-## 7. Safety and reproducibility notes
+## 9. Safety and reproducibility notes
 
 - Model outputs remain stochastic; raw responses and latency are retained for audit.
 - Fallback use and repair attempts must be included as covariates when relevant.

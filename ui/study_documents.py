@@ -3,7 +3,7 @@ from html import escape
 CONSENT_DOCUMENT = """
 # Information Sheet for Participation in Research
 
-## Investigating Intersubjective Alignment in Human–AI Collaboration Through a Word Association Game
+## Investigating Intersubjective Alignment in Human–AI Collaboration Through a Cooperative Word Association Game
 
 Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.ghasempoour-ardestani@stud.uni-due.de)
 
@@ -124,7 +124,7 @@ CONSENT_CHECKLIST_ITEMS = (
 
 INFORMATION_SHEET_TITLE = (
     "Investigating Intersubjective Alignment in Human–AI Collaboration "
-    "Through a Word Association Game"
+    "Through a Cooperative Word Association Game"
 )
 
 INFORMATION_SHEET_INTRODUCTION = (
@@ -248,7 +248,7 @@ DEBRIEFING_DOCUMENT = """
 
 <section class="debrief-hero">
     <h1>Debriefing</h1>
-    <p class="debrief-study-title"><strong>Study:</strong> “Investigating Intersubjective Alignment in Human–AI Collaboration Through a Word Association Game”</p>
+    <p class="debrief-study-title"><strong>Study:</strong> “Investigating Intersubjective Alignment in Human–AI Collaboration Through a Cooperative Word Association Game”</p>
     <p class="debrief-thanks">Thank you for participating!</p>
 </section>
 

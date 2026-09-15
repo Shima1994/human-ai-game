@@ -667,14 +667,23 @@ def initialize_session_log(participant_id):
     # and strand the participant on a generic error page before they've
     # even started the study.
     condition = None
+    last_error = None
     for attempt in range(3):
         try:
             condition = db.allocate_condition(VALID_CONDITIONS, DEFAULT_CONDITION)
             break
-        except (psycopg2.Error, RuntimeError):
+        except (psycopg2.Error, RuntimeError) as error:
+            last_error = error
             if attempt < 2:
                 time.sleep(min(1.0 * (attempt + 1), 3.0))
     if condition is None:
+        # There is nowhere in the database to log this failure (it's the
+        # participant's first contact with it), so print to stdout -- the
+        # only place this is visible is Streamlit Cloud's "Manage app" logs
+        # panel. Without this, a failure here is a dead end: the
+        # participant sees a generic message and nobody can tell whether it
+        # was a one-off blip, a bad DATABASE_URL secret, or something else.
+        print(f"initialize_session_log: allocate_condition failed after 3 attempts: {last_error!r}")
         st.error(
             "We couldn't connect to the study database just now. "
             "Please wait a moment and press Continue again."
