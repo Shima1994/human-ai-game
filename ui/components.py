@@ -1,5 +1,6 @@
 from html import escape
 import math
+import time
 
 import streamlit as st
 import streamlit.components.v1 as st_components
@@ -156,30 +157,103 @@ def render_round_chip(text):
 
 
 def render_clue_timer(remaining_seconds):
-    """A small, right-aligned pill instead of a full-width iframe block.
+    """A small pill, sticky to the top of the viewport instead of scrolling
+    away with the page -- so it stays visible during every timed decision,
+    not just while the participant happens to be scrolled to the top.
 
-    This used to be a custom HTML/JS component (st_components.html), which
-    renders inside its own sandboxed iframe document and so could never pick
-    up the app's own fonts/colors -- that's why it always looked like plain
-    unstyled browser text no matter what the rest of the page looked like.
-    A plain st.markdown element has none of that isolation and is far less
-    likely to cause the page to visibly shift when the component's DOM node
-    is added or removed across reruns. The 3-second autorefresh already
-    forces a rerun regardless, so a server-rendered value updated every few
-    seconds is all that's needed -- no client-side per-second ticking.
+    The pill itself (label, color, border) is a plain st.markdown element,
+    not a custom HTML/JS component -- those render inside a sandboxed iframe
+    document and so could never pick up the app's own fonts/colors, which is
+    why an earlier iframe-based version of this always looked like plain
+    unstyled browser text. Only the countdown digits are ticked by a tiny,
+    invisible (height=0) iframe that reaches into the *parent* document once
+    a second and rewrites the .timer-clock span's text -- the same
+    cross-frame-write technique scroll_page_to_top() already uses elsewhere
+    in this file. That component decides nothing; it is purely cosmetic. The
+    real timeout/skip/loss logic still only runs from the server-side check
+    on the autorefresh below (every few seconds), same as before, so a
+    participant's clock being off can't desync the actual game state.
+
+    The phase label (giving a clue vs. guessing) and the forced-final-guess
+    state are both read from st.session_state rather than taken as
+    parameters, so every call site automatically stays in sync with no
+    signature to keep updated -- this is the one timer implementation used
+    everywhere a participant has a timed decision to make.
     """
     remaining = max(0, int(math.ceil(remaining_seconds or 0)))
-    warn_class = " warn" if remaining <= 15 else ""
+    # The tutorial runs its own step machine without touching st.session_state.role,
+    # so check tutorial_step first (when present) and fall back to role for the
+    # real game.
+    tutorial_step = st.session_state.get("tutorial_step")
+    if tutorial_step:
+        is_clue_giver = tutorial_step == "human_clue_round"
+    else:
+        is_clue_giver = st.session_state.get("role") == "human_clue"
+    action_label = "Giving your clue" if is_clue_giver else "Guessing"
+    is_final_guess = bool(st.session_state.get("final_guess_deadline_active"))
+    clock = f"{remaining // 60:02d}:{remaining % 60:02d}"
+    # Absolute deadline (ms since epoch, matches JS Date.now()) so the tiny
+    # ticking script below can compute "seconds left" independently on every
+    # tick rather than needing a fresh value from the server each time.
+    deadline_ms = int((time.time() + max(0.0, remaining_seconds or 0)) * 1000)
+    if is_final_guess:
+        state_class = " final"
+        prefix, suffix = "Final chance — ", " left"
+    elif remaining <= 0:
+        state_class = " expired"
+        prefix, suffix = f"{action_label} — ", " time's up"
+    elif remaining <= 15:
+        state_class = " warn"
+        prefix, suffix = f"{action_label} — ", " left"
+    else:
+        state_class = ""
+        prefix, suffix = f"{action_label} — ", " left"
+    clock_html = (
+        ""
+        if remaining <= 0
+        else f'<span class="timer-clock" data-deadline-ms="{deadline_ms}">{clock}</span>'
+    )
     st.markdown(
         f"""
         <div class="timer-row">
-            <span class="timer-pill{warn_class}" aria-live="polite">
+            <span class="timer-pill{state_class}" aria-live="polite">
                 <span class="timer-dot"></span>
-                {remaining // 60:02d}:{remaining % 60:02d} left to decide
+                {escape(prefix)}{clock_html}{escape(suffix)}
             </span>
         </div>
         """,
         unsafe_allow_html=True,
+    )
+    # The pill's text is otherwise only as fresh as the last rerun (every
+    # few seconds, see the autorefresh below) -- which read as choppy
+    # ("every 5-6 seconds" per feedback) rather than an actually running
+    # clock. This tiny invisible iframe does nothing but tick the .timer-clock
+    # text in the *parent* document once a second between reruns, the same
+    # cross-frame-write technique scroll_page_to_top() already uses elsewhere
+    # in this file. It never decides anything -- the real timeout/skip/loss
+    # logic still only runs from the server-side check on the autorefresh
+    # below, unchanged, so this can't desync the actual game state even if
+    # the participant's clock is off.
+    st_components.html(
+        """
+        <script>
+          function tickClueTimer() {
+            const parentDoc = window.parent.document;
+            parentDoc.querySelectorAll(".timer-clock").forEach((el) => {
+              const deadline = parseInt(el.dataset.deadlineMs, 10);
+              if (!deadline) return;
+              const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+              const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+              const ss = String(remaining % 60).padStart(2, "0");
+              el.textContent = mm + ":" + ss;
+            });
+          }
+          tickClueTimer();
+          setInterval(tickClueTimer, 1000);
+        </script>
+        """,
+        height=0,
+        width=0,
     )
     # Trigger a normal Streamlit rerun (preserves st.session_state) every few
     # seconds so the server-side timeout check in screens.py gets a chance to

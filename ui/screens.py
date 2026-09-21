@@ -24,6 +24,9 @@ from core.constants import (
     N_ROUNDS,
     TEAM_GOAL_SCORE,
     CLUE_TIMER_SECONDS,
+    CLUE_GIVER_TIMER_SECONDS,
+    GUESSER_TIMER_SECONDS,
+    FINAL_GUESS_TIMER_SECONDS,
     DEFAULT_CONDITION,
 )
 from core.game_logic import (
@@ -31,6 +34,7 @@ from core.game_logic import (
     clear_participant_decision_timer,
     participant_decision_timer_expired,
     participant_decision_time_remaining,
+    record_forced_timeout_loss,
     record_interaction,
     record_skip,
     record_timeout,
@@ -619,12 +623,19 @@ def screen_tutorial():
             )
             render_board_legend()
             form_locked = bool(st.session_state.get("tutorial_human_clue_submitted"))
+            st.markdown(
+                """
+                <div class="panel-title section-gap">Enter your clue for the AI guesser</div>
+                """,
+                unsafe_allow_html=True,
+            )
             clue_col, number_col = st.columns([2, 1])
             with clue_col:
                 clue = st.text_input(
                     "One-word clue",
                     key="tutorial_human_clue",
                     placeholder="Example: Fruit",
+                    label_visibility="collapsed",
                     disabled=form_locked,
                 )
             with number_col:
@@ -633,6 +644,7 @@ def screen_tutorial():
                     options=[1, 2],
                     index=1,
                     key="tutorial_human_clue_number",
+                    label_visibility="collapsed",
                     disabled=form_locked,
                 )
             tutorial_target_options = [
@@ -658,22 +670,44 @@ def screen_tutorial():
                 disabled=form_locked,
             )
             intended = st.session_state.tutorial_intended_targets
+            st.markdown(
+                """
+                <div class="panel-title section-gap">Select the cards you think the AI will choose</div>
+                """,
+                unsafe_allow_html=True,
+            )
             expected = st.multiselect(
                 f"Which cards do you expect the AI to guess? · select exactly {clue_number}",
                 options=list(TUTORIAL_ROUND_2_BOARD),
                 max_selections=clue_number,
+                placeholder=f"Choose {clue_number} card(s)...",
+                label_visibility="collapsed",
                 key="tutorial_expected_guesses",
                 disabled=form_locked,
             )
-            rating_before = st.radio(
-                "How well do you expect the AI to understand your clue?",
-                options=RATING_OPTIONS,
-                index=None,
-                horizontal=True,
-                key="tutorial_rating_before",
-                disabled=form_locked,
-            )
-            render_rating_scale_endpoints()
+            st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
+            with st.container(border=True, key="before_ai_guess_panel"):
+                prompt_col, rating_col = st.columns([1.45, 1])
+                with prompt_col:
+                    st.markdown(
+                        """
+                        <div class="panel-title">Before AI guesses</div>
+                        <p class="subtle-text before-ai-question">How well do you expect the AI understood your clue?</p>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with rating_col:
+                    rating_before = st.radio(
+                        "How well do you expect the AI to understand your clue?",
+                        options=RATING_OPTIONS,
+                        index=None,
+                        format_func=lambda option: f"{option}",
+                        horizontal=True,
+                        label_visibility="collapsed",
+                        key="tutorial_rating_before",
+                        disabled=form_locked,
+                    )
+                    render_rating_scale_endpoints()
             general_link = st.text_area(
                 "General link (3–20 English words, no card names)",
                 key="tutorial_general_link",
@@ -966,6 +1000,7 @@ def _clear_current_clue():
     st.session_state.current_reflection_start_time = ""
     st.session_state.pending_ai_guess_review = None
     st.session_state.pending_hint_meta = None
+    st.session_state.final_guess_deadline_active = False
     clear_participant_decision_timer()
 
 
@@ -1001,10 +1036,32 @@ def _log_timeout(timeout_timestamp, repair_context):
     )
 
 
+def _handle_skip_exhausted_timeout(hint, hint_number, intended_targets, expected_guesses):
+    """The decision timer expired with no skips left to absorb it. The first
+    time this happens, start one final short countdown instead of ending the
+    turn -- if that also expires with nothing submitted, the round ends
+    automatically as a loss (see FINAL_GUESS_TIMER_SECONDS)."""
+    if not st.session_state.get("final_guess_deadline_active"):
+        st.session_state.final_guess_deadline_active = True
+        start_participant_decision_timer(_now_iso(), duration_seconds=FINAL_GUESS_TIMER_SECONDS)
+        st.session_state.final_guess_warning_notice = True
+        st.rerun()
+    record_forced_timeout_loss(hint, hint_number, intended_targets, expected_guesses)
+    _clear_current_clue()
+    return True
+
+
 def _consume_human_guess_timeout():
     """Consume an expired AI-clue turn once, preserving unsubmitted analysis input."""
     if not st.session_state.get("hint") or not participant_decision_timer_expired():
         return False
+    if not can_skip_current_clue():
+        return _handle_skip_exhausted_timeout(
+            st.session_state.hint,
+            st.session_state.hint_number,
+            st.session_state.get("hint_targets", []),
+            st.session_state.get("hint_expected_guesses", []),
+        )
     pending_meta = st.session_state.get("pending_hint_meta") or {}
     repair_context = pending_meta.get("repair_context")
     interpretation_key = (
@@ -1050,6 +1107,13 @@ def _consume_human_clue_timeout():
             f"expected_guesses_{st.session_state.round}_{turn_index}", []
         )
     )
+    if not can_skip_current_clue():
+        return _handle_skip_exhausted_timeout(
+            hint,
+            hint_number,
+            list(st.session_state.get("hint_targets", [])),
+            expected_guesses,
+        )
     rating_before = st.session_state.get(
         f"before_ai_guess_rating_{st.session_state.round}_{turn_index}"
     )
@@ -1161,7 +1225,7 @@ def _generate_and_store_ai_hint():
     st.session_state.current_hint_start_time = hint_start_time
     st.session_state.current_turn_start_time = hint_end_time
     st.session_state.current_guess_start_time = hint_end_time
-    start_participant_decision_timer(hint_end_time)
+    start_participant_decision_timer(hint_end_time, duration_seconds=GUESSER_TIMER_SECONDS)
     st.session_state.pending_hint_meta = {
         "raw_response": hint_result.get("raw_response", ""),
         "hint_time_sec": hint_time_sec,
@@ -1566,7 +1630,12 @@ def screen_human_clue():
     render_top_status()
 
     if st.session_state.pop("last_timeout_notice", False):
-        st.warning("Time expired. The clue used one turn and no guesses were submitted.")
+        st.warning("Time expired. That used one of your skips.")
+    if st.session_state.pop("final_guess_warning_notice", False):
+        st.error(
+            f"Both skips are used. You have {FINAL_GUESS_TIMER_SECONDS} seconds to submit "
+            "your clue or the round ends automatically."
+        )
     if st.session_state.pop("ai_reroll_notice", False):
         st.warning("The AI asked for another clue.")
 
@@ -1673,7 +1742,8 @@ def screen_human_clue():
     _ensure_timer("current_hint_start_time")
     if participant_decision_time_remaining() is None:
         start_participant_decision_timer(
-            st.session_state.get("current_hint_start_time") or _now_iso()
+            st.session_state.get("current_hint_start_time") or _now_iso(),
+            duration_seconds=CLUE_GIVER_TIMER_SECONDS,
         )
         st.session_state.current_turn_start_time = st.session_state.get(
             "current_hint_start_time", ""
@@ -2037,7 +2107,12 @@ def screen_human_guesser():
     render_top_status()
 
     if st.session_state.pop("last_timeout_notice", False):
-        st.warning("Time expired. The clue used one turn and no guesses were submitted.")
+        st.warning("Time expired. That used one of your skips.")
+    if st.session_state.pop("final_guess_warning_notice", False):
+        st.error(
+            f"Both skips are used. You have {FINAL_GUESS_TIMER_SECONDS} seconds to submit "
+            "a guess or the round ends automatically."
+        )
 
     if _consume_human_guess_timeout():
         st.rerun()
@@ -2156,6 +2231,7 @@ def screen_human_guesser():
                     st.session_state.current_guess_rationale = ""
                     st.session_state.current_hint_start_time = ""
                     st.session_state.current_guess_start_time = ""
+                    st.session_state.final_guess_deadline_active = False
                     if not st.session_state.round_finished:
                         st.session_state.previous_hint = st.session_state.hint
                         st.session_state.hint = ""
@@ -2317,12 +2393,20 @@ def screen_round_summary():
 
         guesses_text = ", ".join(st.session_state.guesses) if st.session_state.guesses else "No guesses"
         medal_label = MEDAL_LABELS.get(st.session_state.round_medal, "None")
+        timed_out_loss = st.session_state.get("round_end_reason") == "timeout_loss"
         outcome = "Bomb hit" if st.session_state.round_bomb_hit else (
-            "All targets found" if st.session_state.round_success else "Max turns reached"
+            "Timed out" if timed_out_loss else (
+                "All targets found" if st.session_state.round_success else "Max turns reached"
+            )
         )
 
         if st.session_state.round_bomb_hit:
             st.error("Bomb hit. The round ended immediately and no medal was awarded.")
+        elif timed_out_loss:
+            st.error(
+                "Both skips were used and the final 30-second decision window ran out. "
+                "The round ended automatically and no medal was awarded."
+            )
 
         st.markdown(
             f"""
@@ -2417,6 +2501,7 @@ def screen_round_summary():
                 st.session_state.guesses = []
                 st.session_state.pending_guesses = []
                 st.session_state.round_skips = 0
+                st.session_state.final_guess_deadline_active = False
                 st.session_state.hint = ""
                 st.session_state.hint_number = 1
                 st.session_state.hint_targets = []

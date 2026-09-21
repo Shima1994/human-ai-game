@@ -40,7 +40,10 @@ class PilotParameterTests(unittest.TestCase):
         self.original_finish_round = game_logic.finish_round
         self.state = base_state()
         game_logic.st = SimpleNamespace(session_state=self.state)
-        game_logic.finish_round = lambda: self.state.__setitem__("round_finished", True)
+        game_logic.finish_round = lambda forced_loss_reason=None: (
+            self.state.__setitem__("round_finished", True),
+            self.state.__setitem__("round_end_reason", forced_loss_reason or ""),
+        )
 
     def tearDown(self):
         game_logic.st = self.original_st
@@ -131,15 +134,41 @@ class PilotParameterTests(unittest.TestCase):
             game_logic.participant_decision_timer_expired(started + timedelta(seconds=90))
         )
 
-    def test_timeout_preserves_existing_turn_without_skip_semantics(self):
+    def test_timeout_consumes_a_skip_not_a_turn(self):
+        """A timeout is treated like a skip, not a free/ordinary turn -- an
+        expired decision must not let a participant collect clues without
+        spending anything. (Once skips run out, a further timeout is a
+        forced-loss case; see record_forced_timeout_loss.)"""
         game_logic.record_timeout("expired", 1, ["Alpha"])
         item = self.state.interaction_history[-1]
-        self.assertEqual(self.state.round_interactions, 1)
-        self.assertEqual(self.state.round_skips, 0)
+        self.assertEqual(self.state.round_interactions, 0)
+        self.assertEqual(self.state.round_skips, 1)
         self.assertTrue(item["timed_out"])
         self.assertFalse(item["skipped"])
-        self.assertEqual(item["completed_turn_number"], 1)
-        self.assertEqual(item["skip_number"], "")
+        self.assertEqual(item["completed_turn_number"], 0)
+        self.assertEqual(item["skip_number"], 1)
+
+    def test_forced_timeout_loss_ends_the_round_with_no_medal(self):
+        """Once both skips are gone, a further timeout must not silently
+        keep the round open (that would let a stalling participant hold the
+        round -- and the clock -- open indefinitely)."""
+        self.state.round_skips = 2
+        game_logic.record_forced_timeout_loss("stalled", 1, ["Alpha"], ["Alpha"])
+        item = self.state.interaction_history[-1]
+        self.assertEqual(item["outcome"], "timeout_loss")
+        self.assertTrue(item["human_timed_out"])
+        self.assertTrue(self.state.round_finished)
+        self.assertEqual(self.state.round_end_reason, "timeout_loss")
+        # round_interactions/round_skips are untouched -- this isn't an
+        # ordinary turn or skip, it's the round ending outright.
+        self.assertEqual(self.state.round_skips, 2)
+
+    def test_forced_timeout_loss_is_consumed_only_once(self):
+        self.state.round_skips = 2
+        game_logic.record_forced_timeout_loss("stalled", 1, ["Alpha"], ["Alpha"])
+        history_len = len(self.state.interaction_history)
+        game_logic.record_forced_timeout_loss("stalled", 1, ["Alpha"], ["Alpha"])
+        self.assertEqual(len(self.state.interaction_history), history_len)
 
 
 if __name__ == "__main__":

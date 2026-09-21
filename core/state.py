@@ -117,6 +117,7 @@ def init_session_state():
         "ai_round_summaries": [],
         "round_interactions": 0,
         "round_skips": 0,
+        "final_guess_deadline_active": False,
         "round_finished": False,
         "start_time": None,
         "session_start_time": datetime.now(timezone.utc).isoformat(),

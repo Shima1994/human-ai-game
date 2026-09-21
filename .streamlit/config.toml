@@ -11,3 +11,20 @@ showErrorDetails = "none"
 
 [browser]
 gatherUsageStats = false
+
+[theme]
+# Without this, Streamlit follows the participant's OS/browser dark-mode
+# preference for every *native* widget it draws (multiselect, selectbox,
+# radio, checkbox...) while our custom CSS in static/app.css only ever
+# targets the light palette below. A participant (or reviewer) with dark
+# mode on saw exactly that mismatch: our light cards next to native widgets
+# rendered dark, with washed-out/invisible labels wherever a light-mode
+# text color landed on a dark-mode widget background. Forcing base="light"
+# makes every participant see the identical, tested appearance regardless
+# of their device's own theme setting.
+base = "light"
+primaryColor = "#1d5ea8"
+backgroundColor = "#f6f4ef"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1f2d3d"
+font = "sans serif"

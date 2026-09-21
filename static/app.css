@@ -143,9 +143,26 @@ h1, h2, h3, h4 {
    even in the calm state, not just a muted neutral chip, and a shadow so
    it doesn't blend into the card behind it. */
 .timer-row {
-    display: flex;
-    justify-content: flex-end;
-    margin: 0 0 0.85rem;
+    /* Fixed to the viewport. `position: sticky` was tried first and does
+       reserve space in the normal flow -- but only within its own
+       *containing block*, and Streamlit wraps each st.markdown() call in a
+       per-element container sized to exactly that element's own height
+       (confirmed by inspecting it live: parent height == row height, to
+       the pixel). With zero extra room in its container, sticky had
+       nowhere to "stick" and behaved like static -- the pill scrolled away
+       immediately, worse than before. `fixed` genuinely stays on screen at
+       every scroll position; the tradeoff is it can end up over whatever
+       content happens to scroll underneath it (reported: sitting on a blue
+       board card, hard to read against the same blue). Solved below by
+       making the pill's own background solid and light rather than a
+       translucent blue tint, so it reads clearly against literally
+       anything behind it instead of blending in. */
+    position: fixed;
+    top: 4.2rem;
+    right: 1.5rem;
+    z-index: 1000;
+    margin: 0;
+    pointer-events: none;
 }
 .timer-pill {
     display: inline-flex;
@@ -156,16 +173,38 @@ h1, h2, h3, h4 {
     font-size: 0.92rem;
     padding: 0.5rem 1rem;
     border-radius: var(--radius-pill);
-    background: var(--color-primary-soft);
-    border: 1px solid rgba(29, 94, 168, 0.35);
+    background: #fdfcfa;
+    border: 1.5px solid rgba(29, 94, 168, 0.45);
     color: var(--color-primary-strong);
-    box-shadow: 0 4px 12px rgba(29, 94, 168, 0.10);
+    box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
 }
+/* Last 15 seconds of the ordinary countdown -- red, matching the same
+   urgency color as the expired/final states, not the amber "warn" tone
+   used elsewhere in the app (requested explicitly: this should read as
+   "running out," not just "worth noting"). */
 .timer-pill.warn {
-    background: var(--color-warn-soft);
-    color: var(--color-warn);
-    border-color: rgba(200, 128, 21, 0.45);
-    box-shadow: 0 4px 14px rgba(200, 128, 21, 0.16);
+    background: #fdfcfa;
+    color: var(--color-danger);
+    border-color: rgba(180, 50, 50, 0.55);
+    box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
+}
+/* Timer hit zero -- server hasn't consumed the timeout yet (autorefresh
+   fires every few seconds, not instantly), but the participant should see
+   "time's up" immediately rather than a suspiciously frozen countdown. */
+.timer-pill.expired {
+    background: #fdfcfa;
+    color: var(--color-danger);
+    border-color: rgba(180, 50, 50, 0.6);
+    box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
+}
+/* Both skips are gone; this is the one last forced-guess window before the
+   round ends automatically. Deliberately the most urgent-looking state. */
+.timer-pill.final {
+    background: var(--color-danger);
+    color: #fff;
+    border-color: var(--color-danger);
+    box-shadow: 0 6px 18px rgba(180, 50, 50, 0.35);
+    animation: timer-final-pulse 1.4s ease-in-out infinite;
 }
 .timer-dot {
     width: 8px;
@@ -174,8 +213,21 @@ h1, h2, h3, h4 {
     background: var(--color-primary);
     flex-shrink: 0;
 }
-.timer-pill.warn .timer-dot {
-    background: var(--color-warn);
+.timer-pill.warn .timer-dot,
+.timer-pill.expired .timer-dot {
+    background: currentColor;
+}
+.timer-pill.final .timer-dot {
+    background: #fff;
+}
+@keyframes timer-final-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .timer-pill.final {
+        animation: none;
+    }
 }
 
 /* Tutorial popups (st.dialog). Streamlit's default dialog chrome is
@@ -2349,6 +2401,22 @@ div[data-testid="stAlert"] {
 @media (max-width: 640px) {
     .block-container {
         padding: 0.9rem 0.65rem 1.6rem 0.65rem;
+    }
+    /* A right-aligned pill is cramped on narrow screens; make it a
+       full-width bar instead. */
+    .timer-row {
+        top: 3.2rem;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+    }
+    .timer-pill {
+        width: 100%;
+        justify-content: center;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
     }
     .hero {
         border-radius: var(--radius-lg);

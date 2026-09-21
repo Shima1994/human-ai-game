@@ -43,6 +43,14 @@ BOMB_COUNT = 2
 MAX_INTERACTIONS_PER_ROUND = 3
 MAX_SKIPS_PER_ROUND = 2
 CLUE_TIMER_SECONDS = 90
+# Giving a clue is harder than guessing one, so it gets more time.
+CLUE_GIVER_TIMER_SECONDS = 120
+GUESSER_TIMER_SECONDS = CLUE_TIMER_SECONDS
+# Once both round skips are used up, a further timeout no longer has a skip
+# to consume -- the participant instead gets one last short window to submit
+# a guess/clue before the round ends automatically as a loss. This bounds
+# how long an indefinitely-stalling participant can be paid for.
+FINAL_GUESS_TIMER_SECONDS = 30
 AI_API_TIMEOUT_SECONDS = 20
 MEDAL_POINTS = {
     "gold": 5,

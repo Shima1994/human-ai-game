@@ -242,8 +242,11 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
         self.assertEqual(row["action_type"], "interaction")
         self.assertEqual(row["alignment_applicability"], "observed_completed_selection")
 
-    def test_existing_full_partial_and_timeout_counters_are_unchanged(self):
-        with patch.object(game_logic, "finish_round", lambda: None):
+    def test_full_partial_and_timeout_counters(self):
+        """A timeout counts as a skip (not an ordinary turn) -- see
+        test_pilot_parameters.PilotParameterTests.test_timeout_consumes_a_skip_not_a_turn
+        for why."""
+        with patch.object(game_logic, "finish_round", lambda *a, **k: None):
             game_logic.record_skip("skip", 1, ["Alpha"], skipped_by="ai")
             self.assertEqual((self.state.round_interactions, self.state.round_skips), (0, 1))
             game_logic.record_interaction(
@@ -251,7 +254,7 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
             )
             self.assertEqual((self.state.round_interactions, self.state.round_skips), (1, 2))
             game_logic.record_timeout("timeout", 1, ["Beta"])
-            self.assertEqual((self.state.round_interactions, self.state.round_skips), (2, 2))
+            self.assertEqual((self.state.round_interactions, self.state.round_skips), (1, 3))
 
     def test_round_end_reason_uses_actual_termination_state(self):
         with patch.object(game_logic, "append_ai_round_summary", lambda: None):

@@ -11,6 +11,7 @@ patching the origin module doesn't affect an already-bound `from x import y`
 reference).
 """
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
@@ -162,6 +163,65 @@ class GuesserSkipButtonGatingTests(unittest.TestCase):
         # A valid reasoning alone: now it unlocks.
         at.text_area[0].set_value("This connects to trust between two people").run()
         self.assertFalse(skip_button().disabled)
+
+
+class ClueTimerLabelingTests(unittest.TestCase):
+    """The countdown pill must say what's being timed and whether the
+    participant is giving a clue or guessing (not a bare "left to decide"),
+    and must switch to a distinct "final chance" state once both skips are
+    gone and the one last forced-guess window is running -- these are the
+    per-state labels the timer audit required."""
+
+    def _reach_guesser_with_hint(self, at):
+        at.session_state["consent_given"] = True
+        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
+        at.session_state["started"] = True
+        at.session_state["participant_id"] = "participant_test0004"
+        at.session_state["nickname"] = "Test"
+        at.session_state["tutorial_completed"] = True
+        at.session_state["game_over"] = False
+        at.session_state["condition"] = "adaptive"
+        at.session_state["condition_assigned"] = True
+        at.session_state["round"] = 1
+        at.session_state["starting_role"] = "human_clue"
+        at.session_state["board"] = None
+        at.run()
+        at.session_state["role"] = "ai_clue"
+        at.session_state["hint"] = "trust"
+        at.session_state["hint_number"] = 2
+        at.session_state["previous_hint"] = None
+        at.session_state["ai_clue_intro_seen"] = True
+        at.session_state["hint_targets"] = list(at.session_state["target_words"])[:2]
+        at.session_state["clue_timer_started_at"] = datetime.now(timezone.utc).isoformat()
+        at.session_state["clue_timer_duration_seconds"] = 90
+        at.run()
+        return at
+
+    def test_guesser_timer_shows_guessing_label(self):
+        at = self._reach_guesser_with_hint(_fresh_app())
+        self.assertIn("Guessing —", _all_markdown_text(at))
+        self.assertNotIn("Giving your clue", _all_markdown_text(at))
+
+    # There is no AppTest-based equivalent of this for the clue-giver screen:
+    # screen_human_clue renders the timer inside an st.empty() placeholder
+    # (needed so it can be cleared before the "AI is thinking" spinner), and
+    # AppTest's simulator silently drops an st.empty() placeholder's content
+    # whenever a custom component (st_autorefresh) is rendered inside it
+    # alongside other elements -- confirmed by isolating the two calls into a
+    # standalone script (markdown alone: captured; markdown + st_autorefresh
+    # in the same st.empty(): captured as an empty list, no exception raised
+    # either way). This does not reproduce in the real browser -- verified
+    # directly there instead (screenshot: the clue-giver screen shows
+    # "Giving your clue — 01:30 left" in the same fixed-position pill).
+
+    def test_final_guess_deadline_shows_final_chance_label(self):
+        at = self._reach_guesser_with_hint(_fresh_app())
+        at.session_state["final_guess_deadline_active"] = True
+        at.run()
+        text = _all_markdown_text(at)
+        self.assertIn("Final chance —", text)
+        # The ordinary phase label must not also be showing at the same time.
+        self.assertNotIn("Guessing —", text)
 
 
 class GuesserTurnStateClearedBeforeAiExplanationTests(unittest.TestCase):

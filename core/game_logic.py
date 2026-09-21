@@ -19,11 +19,13 @@ class BoardGenerationError(ValueError):
     pass
 
 
-def start_participant_decision_timer(started_at=None):
+def start_participant_decision_timer(started_at=None, duration_seconds=None):
     """Start a deadline for a new human task; ordinary reruns never call this."""
     started_at = started_at or datetime.now(timezone.utc).isoformat()
     st.session_state.clue_timer_started_at = started_at
-    st.session_state.clue_timer_duration_seconds = CLUE_TIMER_SECONDS
+    st.session_state.clue_timer_duration_seconds = (
+        duration_seconds if duration_seconds is not None else CLUE_TIMER_SECONDS
+    )
     st.session_state.clue_timer_timeout_consumed = False
     return started_at
 
@@ -271,6 +273,7 @@ def setup_new_round():
     st.session_state.interaction_history = []
     st.session_state.round_interactions = 0
     st.session_state.round_skips = 0
+    st.session_state.final_guess_deadline_active = False
     st.session_state.round_finished = False
     st.session_state.hint = ""
     st.session_state.hint_number = 1
@@ -626,19 +629,18 @@ def record_skip(
             human_decision_time_sec = None
 
     interaction_sequence = len(st.session_state.interaction_history) + 1
-    if timed_out:
-        # Preserve the established timeout behavior: an expired human task uses
-        # one completed-turn allowance, but never one of the skip allowances.
-        st.session_state.round_interactions += 1
-    else:
-        st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
+    # A timeout consumes a skip, the same as an explicit skip -- letting the
+    # clock run out is not a free pass to reroll the clue. (Once skips are
+    # exhausted, a further timeout is handled separately as a forced final
+    # guess window; see record_forced_timeout_loss.)
+    st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
     if normalized_hint and normalized_hint not in st.session_state.used_hints:
         st.session_state.used_hints.append(normalized_hint)
     st.session_state.interaction_history.append(
         {
             "turn": interaction_sequence,
             "completed_turn_number": st.session_state.round_interactions,
-            "skip_number": st.session_state.get("round_skips", 0) if not timed_out else "",
+            "skip_number": st.session_state.get("round_skips", 0),
             "clue_giver": clue_giver,
             "guesser": guesser,
             "hint": normalized_hint,
@@ -752,6 +754,54 @@ def record_skip(
         finish_round()
 
 
+def record_forced_timeout_loss(hint, hint_number, intended_targets=None, expected_guesses=None):
+    """Both skips are already used, and the one-last-chance final timer (see
+    FINAL_GUESS_TIMER_SECONDS) has now also expired with no guess/clue
+    submitted. End the round immediately as a loss rather than letting a
+    stalling participant keep the round (and the clock) open indefinitely."""
+    if st.session_state.get("clue_timer_timeout_consumed", False):
+        return None
+    st.session_state.clue_timer_timeout_consumed = True
+    timeout_timestamp = datetime.now(timezone.utc).isoformat()
+    intended_targets = intended_targets or []
+    expected_guesses = expected_guesses or []
+    interaction_sequence = len(st.session_state.interaction_history) + 1
+    clue_giver = "human" if st.session_state.role == "human_clue" else "ai"
+    guesser = "ai" if st.session_state.role == "human_clue" else "human"
+    normalized_hint = (hint or "").strip().lower()
+    st.session_state.interaction_history.append(
+        {
+            "turn": interaction_sequence,
+            "completed_turn_number": st.session_state.round_interactions,
+            "skip_number": st.session_state.get("round_skips", 0),
+            "clue_giver": clue_giver,
+            "guesser": guesser,
+            "hint": normalized_hint,
+            "hint_number": hint_number,
+            "intended_targets": intended_targets,
+            "expected_guesses": expected_guesses,
+            "guesses": [],
+            "correct": False,
+            "correct_guesses": [],
+            "neutral_guesses": [],
+            "bomb_guesses": [],
+            "bomb_hit": False,
+            "outcome": "timeout_loss",
+            "error_type": "timeout_loss",
+            "skipped": False,
+            "partial_skip": False,
+            "timed_out": True,
+            "human_timed_out": True,
+            "timeout_timestamp": timeout_timestamp,
+            "completed_guesses": 0,
+            "skipped_guesses": int(hint_number or 0),
+        }
+    )
+    st.session_state.pending_reflection_turn = None
+    finish_round(forced_loss_reason="timeout_loss")
+    return timeout_timestamp
+
+
 def record_timeout(
     hint,
     hint_number,
@@ -804,7 +854,7 @@ def record_timeout(
     return timeout_timestamp
 
 
-def finish_round():
+def finish_round(forced_loss_reason=None):
     st.session_state.round_finished = True
     bomb_words = st.session_state.get("bomb_words") or [st.session_state.bomb_word]
     st.session_state.round_bomb_hit = any(
@@ -813,7 +863,9 @@ def finish_round():
     st.session_state.round_success = (
         len(st.session_state.found_targets) == len(st.session_state.target_words)
     )
-    if st.session_state.round_bomb_hit:
+    if forced_loss_reason:
+        st.session_state.round_end_reason = forced_loss_reason
+    elif st.session_state.round_bomb_hit:
         st.session_state.round_end_reason = "bomb"
     elif st.session_state.round_success:
         st.session_state.round_end_reason = "all_targets_found"
