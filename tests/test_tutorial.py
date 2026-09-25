@@ -24,14 +24,12 @@ from core.tutorial import (
     tutorial_selection_is_correct,
     tutorial_time_remaining,
 )
-from core.words import WORD_BANKS
+from core.words import all_round_board_words
 
 
 class TutorialTests(unittest.TestCase):
     def test_board_is_fixed_disjoint_and_has_expected_roles(self):
-        experimental_words = {
-            word.lower() for pool in WORD_BANKS.values() for word in pool
-        }
+        experimental_words = all_round_board_words()
         self.assertEqual(
             TUTORIAL_BOARD, ("Cat", "Dog", "Apple", "Table", "Train", "River")
         )
@@ -68,9 +66,7 @@ class TutorialTests(unittest.TestCase):
             TUTORIAL_ROUND_2_BOARD,
             ("Cat", "Dog", "Apple", "Table", "Orange", "River"),
         )
-        experimental_words = {
-            word.lower() for pool in WORD_BANKS.values() for word in pool
-        }
+        experimental_words = all_round_board_words()
         self.assertFalse(
             {word.lower() for word in TUTORIAL_ROUND_2_BOARD} & experimental_words
         )

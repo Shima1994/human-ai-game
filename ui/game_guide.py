@@ -1,3 +1,9 @@
+from core.constants import (
+    CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND,
+    CLUE_GIVER_TIMER_SECONDS,
+    GUESSER_TIMER_SECONDS,
+)
+
 GUIDE_OVERVIEW = """
 You and the AI are on the same team.
 
@@ -82,6 +88,12 @@ Write 3–20 words in English and do not mention any words currently shown on th
 
 CLUE_GIVER_OUTRO = "After completing these steps, submit your clue and the AI will respond."
 
+_FREE_TIMEOUT_PHRASE = (
+    "your first timeout"
+    if CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND == 1
+    else f"your first {CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND} timeouts"
+)
+
 GUIDE_SECTIONS = (
     (
         "When the AI Is the Clue-Giver",
@@ -161,15 +173,15 @@ Skipping is therefore available as a safety mechanism when communication is uncl
     ),
     (
         "Time Limit",
-        """When it is your turn to make a decision, you have 90 seconds to complete the required actions shown on the screen.
+        f"""When it is your turn to make a decision, you have a limited amount of time to complete the required actions shown on the screen: {CLUE_GIVER_TIMER_SECONDS} seconds as Clue-Giver, {GUESSER_TIMER_SECONDS} seconds as Guesser.
 
-The timer applies to your decision time.
-
-Time used by the AI to generate its response does not count against your 90 seconds.
+The timer applies to your decision time. Time used by the AI to generate its response does not count against it.
 
 If the timer reaches zero before you complete your action, that interaction is used and the game continues.
 
-A timeout does not use one of your skips.
+As Guesser, a timeout uses one of your skips, the same as skipping manually.
+
+As Clue-Giver, {_FREE_TIMEOUT_PHRASE} in a round is free and costs you nothing. Every timeout after that in the same round counts as one of the round's 3 completed interactions instead of a skip.
 
 Try to answer carefully, but do not wait until the final seconds to submit your response.""",
     ),

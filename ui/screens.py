@@ -18,6 +18,7 @@ from core.ai_service import (
 )
 from core.constants import (
     AI_API_TIMEOUT_SECONDS,
+    CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
     MAX_TEAM_SCORE,
@@ -1285,7 +1286,18 @@ def _consume_human_guess_timeout():
 
 
 def _consume_human_clue_timeout():
-    """Consume an expired human clue-form task without invoking the AI."""
+    """Consume an expired human clue-form task without invoking the AI.
+
+    Independent of the shared skip budget (see CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND):
+    the clue-giver's first timeout each round costs nothing at all -- a
+    participant who doesn't yet know the timer exists shouldn't lose
+    anything for it -- and every one after that costs a completed
+    interaction from the round's MAX_INTERACTIONS_PER_ROUND budget instead
+    of a skip. That budget already ends the round automatically once it's
+    exhausted (see the tail of record_skip), so unlike the shared-skip path
+    this doesn't need its own "stalled too long" forced-final-window escape
+    hatch -- repeated clue-giver timeouts alone will end the round.
+    """
     if not participant_decision_timer_expired():
         return False
     turn_index = _current_action_index()
@@ -1304,13 +1316,6 @@ def _consume_human_clue_timeout():
             f"expected_guesses_{st.session_state.round}_{turn_index}", []
         )
     )
-    if not can_skip_current_clue():
-        return _handle_skip_exhausted_timeout(
-            hint,
-            hint_number,
-            list(st.session_state.get("hint_targets", [])),
-            expected_guesses,
-        )
     rating_before = st.session_state.get(
         f"before_ai_guess_rating_{st.session_state.round}_{turn_index}"
     )
@@ -1320,6 +1325,8 @@ def _consume_human_clue_timeout():
         )
         or ""
     ).strip()
+    clue_giver_timeouts = st.session_state.get("round_clue_giver_timeouts", 0)
+    is_free = clue_giver_timeouts < CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND
     timeout_timestamp = record_timeout(
         hint,
         hint_number,
@@ -1338,9 +1345,17 @@ def _consume_human_clue_timeout():
             "pre_ai_human_clue_form_unsubmitted" if general_link else ""
         ),
         human_explanation_collected_at="",
+        timeout_cost="none" if is_free else "interaction",
     )
+    if timeout_timestamp is None:
+        # record_timeout's own re-entrancy guard already fired (this
+        # timeout was already consumed by an earlier call this render) --
+        # don't double-count it against the free-timeout budget either.
+        _clear_current_clue()
+        return True
+    st.session_state.round_clue_giver_timeouts = clue_giver_timeouts + 1
     _log_timeout(timeout_timestamp, None)
-    st.session_state.last_timeout_notice = True
+    st.session_state.clue_giver_timeout_notice = "free" if is_free else "interaction"
     _clear_current_clue()
     return True
 
@@ -1879,8 +1894,16 @@ def screen_human_clue():
 
     render_top_status()
 
-    if st.session_state.pop("last_timeout_notice", False):
-        st.warning("Time expired. That used one of your skips.")
+    clue_giver_timeout_notice = st.session_state.pop("clue_giver_timeout_notice", "")
+    if clue_giver_timeout_notice == "free":
+        st.warning(
+            "Time expired. This is a one-time grace period, so it didn't cost "
+            "anything -- please submit your clue before the timer runs out from now on."
+        )
+    elif clue_giver_timeout_notice == "interaction":
+        st.warning(
+            "Time expired. That used one of this round's 3 interactions."
+        )
     if st.session_state.pop("final_guess_warning_notice", False):
         st.error(
             f"Both skips are used. You have {FINAL_GUESS_TIMER_SECONDS} seconds to submit "
@@ -2435,7 +2458,7 @@ def screen_human_guesser():
                     """
                     <div class="glass-card compact-card section-gap">
                         <div class="panel-title">Clue</div>
-                        <p class="subtle-text" style="margin:0;">Ask the AI for a clue when you are ready.</p>
+                        <p class="subtle-text" style="margin:0;">Please look at the cards on the board carefully before asking for a clue. Ask the AI for a clue when you are ready.</p>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -2822,6 +2845,7 @@ def screen_round_summary():
                 st.session_state.guesses = []
                 st.session_state.pending_guesses = []
                 st.session_state.round_skips = 0
+                st.session_state.round_clue_giver_timeouts = 0
                 st.session_state.final_guess_deadline_active = False
                 st.session_state.hint = ""
                 st.session_state.hint_number = 1

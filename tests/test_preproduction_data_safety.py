@@ -256,6 +256,19 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
             game_logic.record_timeout("timeout", 1, ["Beta"])
             self.assertEqual((self.state.round_interactions, self.state.round_skips), (1, 3))
 
+    def test_clue_giver_timeout_cost_is_independent_of_the_skip_budget(self):
+        """The clue-giver's own timeout no longer always costs a skip: a
+        caller can ask for timeout_cost="none" (the free first timeout each
+        round) or timeout_cost="interaction" (every one after that, costing
+        a completed interaction instead) -- see
+        ui.screens._consume_human_clue_timeout, which decides which to pass."""
+        with patch.object(game_logic, "finish_round", lambda *a, **k: None):
+            game_logic.record_timeout("clue", 1, ["Alpha"], timeout_cost="none")
+            self.assertEqual((self.state.round_interactions, self.state.round_skips), (0, 0))
+            self.state.clue_timer_timeout_consumed = False
+            game_logic.record_timeout("clue", 1, ["Alpha"], timeout_cost="interaction")
+            self.assertEqual((self.state.round_interactions, self.state.round_skips), (1, 0))
+
     def test_round_end_reason_uses_actual_termination_state(self):
         with patch.object(game_logic, "append_ai_round_summary", lambda: None):
             self.state.guesses = ["Alpha", "Beta"]

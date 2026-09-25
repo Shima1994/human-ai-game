@@ -12,7 +12,7 @@ from core.constants import (
     N_ROUNDS,
     CLUE_TIMER_SECONDS,
 )
-from core.words import BOARD_TEMPLATES, WORD_BANKS
+from core.words import ROUND_BOARDS
 
 
 class BoardGenerationError(ValueError):
@@ -65,132 +65,42 @@ def get_role_for_round(round_number, starting_role=None):
 
 
 def get_board_template_type(round_number):
-    # Template tied to round number, not to round parity/role: rounds 1-2
-    # are template A, rounds 3-4 are template B, for every participant.
-    # Combined with get_role_for_round's per-round role alternation, this
-    # means each role (human clue-giver and AI clue-giver) is exposed to
-    # both templates once within a session, instead of one role always
-    # getting template A and the other always getting template B.
-    return "A" if round_number <= 2 else "B"
-
-
-def _unique_words(words):
-    seen = set()
-    unique = []
-    for word in words:
-        key = word.strip().lower()
-        if key not in seen:
-            unique.append(word)
-            seen.add(key)
-    return unique
-
-
-def required_word_counts(round_count=N_ROUNDS):
-    counts = {"abstract": 0, "concrete": 0}
-    for round_number in range(1, round_count + 1):
-        template = BOARD_TEMPLATES[get_board_template_type(round_number)]
-        for role_counts in template.values():
-            counts["abstract"] += role_counts["abstract"]
-            counts["concrete"] += role_counts["concrete"]
-    return counts
+    # Each round has its own hand-curated, fixed board (see
+    # core.words.ROUND_BOARDS) rather than a randomly-sampled A/B template --
+    # this returns that board's id (e.g. "B01") for round 1, matched 1:1 by
+    # round number. Kept as its own function (rather than inlining the
+    # lookup) since callers elsewhere treat "which board layout is this
+    # round" as a single fact, independent of get_role_for_round.
+    board = ROUND_BOARDS.get(round_number)
+    if board is None:
+        raise BoardGenerationError(f"No fixed board is defined for round {round_number}.")
+    return board["id"]
 
 
 def validate_word_bank_capacity(round_count=N_ROUNDS):
-    required = required_word_counts(round_count)
-    available = {
-        "abstract": len(_unique_words(WORD_BANKS["abstract"])),
-        "concrete": len(_unique_words(WORD_BANKS["concrete"])),
-    }
-    shortages = [
-        f"{word_type}: need {required[word_type]}, found {available[word_type]}"
-        for word_type in ("abstract", "concrete")
-        if available[word_type] < required[word_type]
+    missing_rounds = [
+        round_number
+        for round_number in range(1, round_count + 1)
+        if round_number not in ROUND_BOARDS
     ]
-    if shortages:
+    if missing_rounds:
         raise BoardGenerationError(
-            "Not enough unique words to create 4 balanced rounds without repetition. "
-            + "; ".join(shortages)
-            + ". Add more unique words to the existing word lists before running the study."
+            "No fixed board is defined for round(s): "
+            + ", ".join(str(r) for r in missing_rounds)
+            + ". Add a board for every round in core/words.py before running the study."
         )
-
-
-def _draw_words(pool, count, used_words):
-    used_keys = {word.lower() for word in used_words}
-    available = [word for word in _unique_words(pool) if word.lower() not in used_keys]
-    if len(available) < count:
-        raise BoardGenerationError(
-            "Not enough unused unique words available for the mixed board. "
-            "A word used in an earlier round cannot be reused in this session."
-        )
-    selected = random.sample(available, count)
-    used_words.extend(selected)
-    return selected
-
-
-def _required_counts_for_template(template):
-    return {
-        "abstract": sum(role_counts["abstract"] for role_counts in template.values()),
-        "concrete": sum(role_counts["concrete"] for role_counts in template.values()),
-    }
-
-
-def _validate_round_availability(template, used_by_type):
-    required = _required_counts_for_template(template)
-    shortages = []
-    for word_type in ("abstract", "concrete"):
-        used_keys = {word.lower() for word in used_by_type.get(word_type, [])}
-        available_count = len(
-            [
-                word
-                for word in _unique_words(WORD_BANKS[word_type])
-                if word.lower() not in used_keys
-            ]
-        )
-        if available_count < required[word_type]:
-            shortages.append(
-                f"{word_type}: need {required[word_type]} unused, found {available_count}"
+    for round_number in range(1, round_count + 1):
+        board = ROUND_BOARDS[round_number]
+        words = [word for role in ("target", "neutral", "bomb") for word, _ in board[role]]
+        if len(words) != BOARD_SIZE:
+            raise BoardGenerationError(
+                f"Round {round_number}'s fixed board ({board['id']}) has {len(words)} "
+                f"words, expected {BOARD_SIZE}."
             )
-    if shortages:
-        raise BoardGenerationError(
-            "Not enough unused words remain to create this balanced round without repetition. "
-            + "; ".join(shortages)
-            + "."
-        )
-
-
-def _build_word_type_map(board_words):
-    abstract_lookup = {word.lower(): word for word in _unique_words(WORD_BANKS["abstract"])}
-    concrete_lookup = {word.lower(): word for word in _unique_words(WORD_BANKS["concrete"])}
-    word_types = {}
-    missing = []
-    duplicated_type = []
-
-    for word in board_words:
-        key = word.lower()
-        in_abstract = key in abstract_lookup
-        in_concrete = key in concrete_lookup
-        if in_abstract and in_concrete:
-            duplicated_type.append(word)
-        elif in_abstract:
-            word_types[word] = "abstract"
-        elif in_concrete:
-            word_types[word] = "concrete"
-        else:
-            missing.append(word)
-
-    if missing or duplicated_type:
-        details = []
-        if missing:
-            details.append(f"missing type for: {', '.join(missing)}")
-        if duplicated_type:
-            details.append(f"appears in both word lists: {', '.join(duplicated_type)}")
-        raise BoardGenerationError(
-            "Every board word must have exactly one word_type. " + "; ".join(details)
-        )
-
-    if len(word_types) != len(board_words):
-        raise BoardGenerationError("word_type_per_card is incomplete for this board.")
-    return word_types
+        if len(set(word.lower() for word in words)) != BOARD_SIZE:
+            raise BoardGenerationError(
+                f"Round {round_number}'s fixed board ({board['id']}) contains duplicate words."
+            )
 
 
 def build_board_id(round_number, template_type, board_words, word_roles):
@@ -201,49 +111,28 @@ def build_board_id(round_number, template_type, board_words, word_roles):
     return f"round-{round_number}-template-{template_type}-{digest}"
 
 
-def _draw_role_words(template, role_name, used_words):
-    abstract_words = _draw_words(
-        WORD_BANKS["abstract"],
-        template[role_name]["abstract"],
-        used_words["abstract"],
-    )
-    concrete_words = _draw_words(
-        WORD_BANKS["concrete"],
-        template[role_name]["concrete"],
-        used_words["concrete"],
-    )
-    return abstract_words + concrete_words
-
-
 def sample_fixed_round_words(round_number):
     validate_word_bank_capacity()
-    template_type = get_board_template_type(round_number)
-    template = BOARD_TEMPLATES[template_type]
-    used_by_type = st.session_state.setdefault(
-        "used_board_words_by_type",
-        {"abstract": [], "concrete": []},
-    )
-    used_by_type.setdefault("abstract", [])
-    used_by_type.setdefault("concrete", [])
-    _validate_round_availability(template, used_by_type)
+    board = ROUND_BOARDS[round_number]
+    template_type = board["id"]
 
-    targets = _draw_role_words(template, "target", used_by_type)
-    neutrals = _draw_role_words(template, "neutral", used_by_type)
-    bombs = _draw_role_words(template, "bomb", used_by_type)
+    targets = [word for word, _word_type in board["target"]]
+    neutrals = [word for word, _word_type in board["neutral"]]
+    bombs = [word for word, _word_type in board["bomb"]]
     board_words = targets + neutrals + bombs
-    if len(board_words) != BOARD_SIZE:
-        raise ValueError(f"Round {round_number} must contain exactly {BOARD_SIZE} words.")
-    if len(set(word.lower() for word in board_words)) != BOARD_SIZE:
-        raise ValueError(f"Round {round_number} contains duplicate board words.")
 
     word_roles = {word: "target" for word in targets}
     word_roles.update({word: "neutral" for word in neutrals})
     word_roles.update({word: "bomb" for word in bombs})
-    word_types = _build_word_type_map(board_words)
+    word_types = {
+        word: word_type
+        for role in ("target", "neutral", "bomb")
+        for word, word_type in board[role]
+    }
 
+    # The word set and every word's role are fixed above -- only the
+    # on-screen grid position is randomized, here.
     random.shuffle(board_words)
-    used_board_words = st.session_state.setdefault("used_board_words", [])
-    used_board_words.extend(board_words)
     return board_words, targets, neutrals, bombs, word_roles, word_types, template_type
 
 
@@ -279,6 +168,7 @@ def setup_new_round():
     st.session_state.interaction_history = []
     st.session_state.round_interactions = 0
     st.session_state.round_skips = 0
+    st.session_state.round_clue_giver_timeouts = 0
     st.session_state.final_guess_deadline_active = False
     st.session_state.round_finished = False
     st.session_state.hint = ""
@@ -601,6 +491,7 @@ def record_skip(
     human_explanation_blocked_reason="",
     human_explanation_source="",
     human_explanation_collected_at="",
+    timeout_cost="skip",
 ):
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
@@ -638,8 +529,15 @@ def record_skip(
     # A timeout consumes a skip, the same as an explicit skip -- letting the
     # clock run out is not a free pass to reroll the clue. (Once skips are
     # exhausted, a further timeout is handled separately as a forced final
-    # guess window; see record_forced_timeout_loss.)
-    st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
+    # guess window; see record_forced_timeout_loss.) The clue-giver's own
+    # timeout is the one exception: their first timeout each round costs
+    # nothing at all (timeout_cost="none", see CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND),
+    # and from the second one onward it costs a completed interaction instead
+    # of a skip (timeout_cost="interaction") -- see _consume_human_clue_timeout.
+    if timeout_cost == "interaction":
+        st.session_state.round_interactions = st.session_state.get("round_interactions", 0) + 1
+    elif timeout_cost == "skip":
+        st.session_state.round_skips = st.session_state.get("round_skips", 0) + 1
     if normalized_hint and normalized_hint not in st.session_state.used_hints:
         st.session_state.used_hints.append(normalized_hint)
     st.session_state.interaction_history.append(
@@ -826,6 +724,7 @@ def record_timeout(
     human_explanation_blocked_reason="",
     human_explanation_source="",
     human_explanation_collected_at="",
+    timeout_cost="skip",
 ):
     if st.session_state.get("clue_timer_timeout_consumed", False):
         return None
@@ -852,6 +751,7 @@ def record_timeout(
         human_explanation_blocked_reason=human_explanation_blocked_reason,
         human_explanation_source=human_explanation_source,
         human_explanation_collected_at=human_explanation_collected_at,
+        timeout_cost=timeout_cost,
     )
     if st.session_state.get("interaction_history"):
         st.session_state.interaction_history[-1]["ai_understanding_rating_before"] = (

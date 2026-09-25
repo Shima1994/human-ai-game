@@ -52,6 +52,12 @@ GUESSER_TIMER_SECONDS = CLUE_TIMER_SECONDS
 # how long an indefinitely-stalling participant can be paid for.
 FINAL_GUESS_TIMER_SECONDS = 30
 AI_API_TIMEOUT_SECONDS = 20
+# The clue-giver's own decision timer (unlike the guesser's) doesn't touch
+# the shared skip budget at all for their first timeout each round -- they
+# may not yet know the timer exists. From the second clue-giver timeout in
+# the same round onward, it costs a completed interaction instead (the
+# round's 3-interaction budget, same as a real guess would).
+CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND = 1
 MEDAL_POINTS = {
     "gold": 5,
     "silver": 4,
