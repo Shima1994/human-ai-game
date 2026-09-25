@@ -300,7 +300,6 @@ def screen_welcome():
             ":material/style:",
             ":material/sync:",
             ":material/skip_next:",
-            ":material/forum:",
             ":material/schedule:",
             ":material/rate_review:",
             ":material/emoji_events:",
@@ -363,6 +362,112 @@ def _tutorial_intro_dialog():
         st.rerun()
 
 
+@st.dialog("Before the AI can guess")
+def _clue_form_errors_dialog(problems):
+    for problem in problems:
+        st.warning(problem)
+    if st.button("Got it", type="primary", use_container_width=True):
+        st.rerun()
+
+
+@st.dialog("Missing information")
+def _profile_missing_fields_dialog(missing):
+    st.warning("Please complete: " + ", ".join(missing) + ".")
+    if st.button("Got it", type="primary", use_container_width=True):
+        st.rerun()
+
+
+@st.dialog("Which cards was this clue for?")
+def _skip_interpretation_dialog(remaining_guess_slots, options):
+    st.caption(
+        f"Select exactly {remaining_guess_slots} card(s) you think this clue was "
+        "meant for, even if you are not confident. These are stored separately "
+        "and do not count as guesses."
+    )
+    selected = st.multiselect(
+        "Cards this clue was meant for",
+        options=options,
+        max_selections=remaining_guess_slots,
+        placeholder=f"Select exactly {remaining_guess_slots} card(s)...",
+        label_visibility="collapsed",
+        key="guesser_skip_dialog_selection",
+    )
+    cancel_col, confirm_col = st.columns(2)
+    with cancel_col:
+        if st.button("Cancel", use_container_width=True):
+            st.session_state.guesser_skip_dialog_open = False
+            st.rerun()
+    with confirm_col:
+        if st.button("Confirm skip", type="primary", use_container_width=True):
+            if len(selected) != remaining_guess_slots:
+                st.error(f"Please select exactly {remaining_guess_slots} card(s).")
+            else:
+                st.session_state.guesser_skip_dialog_open = False
+                st.session_state.guesser_skip_confirmed = True
+                st.session_state.guesser_skip_selected_cards = selected
+                st.rerun()
+
+
+@st.dialog("The AI asked for another clue")
+def _ai_reroll_notice_dialog():
+    st.warning(
+        "Your clue was rejected. Please revise it and submit a new one — "
+        f"{st.session_state.get('ai_rerolls', 0)} AI reroll(s) remaining this game."
+    )
+    if st.button("Got it", type="primary", use_container_width=True):
+        st.rerun()
+
+
+@st.dialog("Round 1 result")
+def _tutorial_round1_result_dialog(result):
+    if result == "correct":
+        st.success("Correct — the clue referred to both target cards.")
+    elif result == "bomb":
+        st.error("Bomb selected — just as in the real game, the round ends immediately.")
+    else:
+        st.warning("The intended cards were Cat and Dog. The revealed colors show each card's role.")
+    st.markdown(f"**AI's explanation:** {TUTORIAL_AI_EXPLANATION}")
+    rating = st.radio(
+        "After the guesses, how well do you think you and the AI understood each other?",
+        options=RATING_OPTIONS,
+        index=None,
+        horizontal=True,
+        key="tutorial_guesser_rating",
+    )
+    render_rating_scale_endpoints()
+    if st.button(
+        "Continue to round 2",
+        type="primary",
+        use_container_width=True,
+        disabled=rating is None,
+    ):
+        st.session_state.tutorial_step = "human_clue_round"
+        st.session_state.tutorial_practice_started_at = _now_iso()
+        st.rerun()
+
+
+@st.dialog("Simulated AI's decision")
+def _tutorial_round2_result_dialog(ai_guesses):
+    st.success("The simulated AI has made its decision. Your submitted General Link is now locked.")
+    st.markdown("**Simulated AI guesses:** " + ", ".join(ai_guesses))
+    rating_after = st.radio(
+        "After the guesses, how well do you think you and the AI understood each other?",
+        options=RATING_OPTIONS,
+        index=None,
+        horizontal=True,
+        key="tutorial_rating_after",
+    )
+    render_rating_scale_endpoints()
+    if st.button(
+        "Complete practice",
+        type="primary",
+        use_container_width=True,
+        disabled=rating_after is None,
+    ):
+        st.session_state.tutorial_step = "complete"
+        st.rerun()
+
+
 @st.dialog("Practice complete", width="large")
 def _tutorial_complete_dialog():
     st.success("You tried both roles and all required inputs.")
@@ -402,20 +507,34 @@ def screen_tutorial():
         )
         if remaining <= 0 and not st.session_state.get("tutorial_practice_result"):
             st.session_state.tutorial_practice_result = "timeout"
-        head_col, timer_col = st.columns([3, 1], vertical_alignment="center")
+        head_col, timer_col = st.columns([1.1, 1])
         with head_col:
             st.markdown("### Round 1 of 2 · AI Clue-Giver")
         with timer_col:
-            render_clue_timer(remaining)
+            with st.container(key="timer_skip_stack"):
+                render_clue_timer(remaining, pinned=False)
+                tutorial_skip_cluster_placeholder = st.empty()
         st.caption("You are the Guesser. Interpret the clue, explain your reasoning, then guess or use a skip just as in the real game.")
+        _render_live_history_sidebar(st.session_state.get("tutorial_history", []), True)
         with st.container(border=True, key="tutorial_ai_clue_panel"):
             repair_attempt = int(st.session_state.get("tutorial_repair_attempt", 0) or 0)
             found_targets = set(st.session_state.get("tutorial_found_targets", []))
             if repair_attempt:
-                unresolved_targets = TUTORIAL_TARGETS - found_targets
-                current_clue, current_clue_number = tutorial_repair_clue(
-                    unresolved_targets, repair_attempt
-                )
+                # Computed once per attempt and cached, not recomputed on
+                # every rerun -- recomputing from found_targets meant a
+                # single card click (e.g. 1 of the 2 this clue asked for)
+                # immediately shrank the *displayed* clue number for the
+                # very same still-in-progress attempt, which in turn shrank
+                # max_clicks below and disabled every remaining card before
+                # the participant could make their second, already-expected
+                # click: a dead end with nothing left to press.
+                clue_cache_key = f"tutorial_clue_for_attempt_{repair_attempt}"
+                if clue_cache_key not in st.session_state:
+                    unresolved_targets = TUTORIAL_TARGETS - found_targets
+                    st.session_state[clue_cache_key] = tutorial_repair_clue(
+                        unresolved_targets, repair_attempt
+                    )
+                current_clue, current_clue_number = st.session_state[clue_cache_key]
                 st.caption(f"Repair attempt {repair_attempt} for the same unresolved target set.")
             else:
                 current_clue, current_clue_number = TUTORIAL_CLUE, TUTORIAL_CLUE_NUMBER
@@ -509,32 +628,69 @@ def screen_tutorial():
                             st.session_state.tutorial_practice_result = "incorrect"
                         else:
                             st.session_state.tutorial_practice_result = "incorrect"
+                    turn_result = st.session_state.get("tutorial_practice_result", "")
+                    if turn_result in {"bomb", "correct", "incorrect"}:
+                        tutorial_history = list(st.session_state.get("tutorial_history", []))
+                        tutorial_history.append(
+                            {
+                                "turn": len(tutorial_history) + 1,
+                                "clue_giver": "ai",
+                                "guesser": "human",
+                                "hint": current_clue,
+                                "hint_number": current_clue_number,
+                                "guesses": list(current_guesses),
+                                "correct_guesses": [
+                                    word for word in current_guesses if word in TUTORIAL_TARGETS
+                                ],
+                                "neutral_guesses": [
+                                    word
+                                    for word in current_guesses
+                                    if word not in TUTORIAL_TARGETS and word != TUTORIAL_BOMB
+                                ],
+                                "bomb_hit": turn_result == "bomb",
+                                "correct": turn_result == "correct",
+                                "outcome": "wrong" if turn_result == "incorrect" else turn_result,
+                                "guess_rationale": rationale if rationale_valid else "",
+                            }
+                        )
+                        st.session_state.tutorial_history = tutorial_history
                     st.rerun()
 
             result = st.session_state.get("tutorial_practice_result", "")
             if not result:
                 remaining_guess_slots = current_clue_number - len(current_guesses)
                 unavailable_cards = set(selected)
-                skip_interpretation = st.multiselect(
-                    (
-                        f"Before skipping, select exactly {remaining_guess_slots} card(s) "
-                        "you think this clue was meant for."
-                    ),
-                    options=[word for word in TUTORIAL_BOARD if word not in unavailable_cards],
-                    max_selections=remaining_guess_slots,
-                    key=f"tutorial_skip_interpretation_{repair_attempt}",
-                    help=(
-                        "These cards are stored separately as your interpretation and do not "
-                        "count as guesses."
-                    ),
-                )
                 skip_disabled = skip_count >= MAX_SKIPS_PER_ROUND
-                if st.button(
-                    "Stop guessing and use 1 skip",
-                    use_container_width=True,
-                    disabled=skip_disabled,
-                    key=f"tutorial_skip_button_{repair_attempt}",
-                ):
+                # Rendered up next to the timer, same as the real game's skip
+                # control -- only the button lives there; the interpretation
+                # picker opens as a dialog once clicked (see
+                # _skip_interpretation_dialog, shared with screen_human_guesser).
+                # Once both skips are used there's nothing left to offer, so
+                # the button disappears entirely instead of sitting there
+                # disabled -- the caption below already explains why.
+                if not skip_disabled:
+                    with tutorial_skip_cluster_placeholder:
+                        with st.container():
+                            st.markdown("<div class='skip-button-marker'></div>", unsafe_allow_html=True)
+                            if st.button(
+                                "Skip",
+                                use_container_width=True,
+                                key=f"tutorial_skip_button_{repair_attempt}",
+                            ):
+                                st.session_state.guesser_skip_dialog_open = True
+                                st.rerun()
+                if st.session_state.get("guesser_skip_dialog_open") and not skip_disabled:
+                    skip_options = [
+                        word for word in TUTORIAL_BOARD if word not in unavailable_cards
+                    ]
+                    _skip_interpretation_dialog(remaining_guess_slots, skip_options)
+                skip_confirmed = st.session_state.pop("guesser_skip_confirmed", False)
+                skip_interpretation = (
+                    st.session_state.pop("guesser_skip_selected_cards", [])
+                    if skip_confirmed
+                    else []
+                )
+                if skip_confirmed:
                     if len(skip_interpretation) != remaining_guess_slots:
                         st.error(
                             f"Please select exactly {remaining_guess_slots} card(s) before skipping."
@@ -561,6 +717,33 @@ def screen_tutorial():
                             st.session_state.tutorial_current_guesses = []
                             # A repair/new clue starts a fresh participant decision window.
                             st.session_state.tutorial_practice_started_at = _now_iso()
+                        is_partial_skip = bool(current_guesses)
+                        tutorial_history = list(st.session_state.get("tutorial_history", []))
+                        tutorial_history.append(
+                            {
+                                "turn": len(tutorial_history) + 1,
+                                "clue_giver": "ai",
+                                "guesser": "human",
+                                "hint": current_clue,
+                                "hint_number": current_clue_number,
+                                "guesses": list(current_guesses),
+                                "correct_guesses": [
+                                    word for word in current_guesses if word in TUTORIAL_TARGETS
+                                ],
+                                "neutral_guesses": [
+                                    word
+                                    for word in current_guesses
+                                    if word not in TUTORIAL_TARGETS and word != TUTORIAL_BOMB
+                                ],
+                                "outcome": "partial_skip" if is_partial_skip else "skip",
+                                "skipped": True,
+                                "skipped_by": "human",
+                                "partial_skip": is_partial_skip,
+                                "skip_interpreted_cards": list(skip_interpretation),
+                                "guess_rationale": rationale if rationale_valid else "",
+                            }
+                        )
+                        st.session_state.tutorial_history = tutorial_history
                         st.rerun()
                 if skip_disabled:
                     st.caption("Both practice skips have been used; continue by selecting cards.")
@@ -571,42 +754,27 @@ def screen_tutorial():
                     _reset_tutorial_practice()
                     st.rerun()
             elif result in {"correct", "incorrect", "bomb"}:
-                if result == "correct":
-                    st.success("Correct — the clue referred to both target cards.")
-                elif result == "bomb":
-                    st.error("Bomb selected — just as in the real game, the round ends immediately.")
-                else:
-                    st.warning("The intended cards were Cat and Dog. The revealed colors show each card's role.")
-                st.markdown(f"**AI's explanation:** {TUTORIAL_AI_EXPLANATION}")
-                rating = st.radio(
-                    "After the guesses, how well do you think you and the AI understood each other?",
-                    options=RATING_OPTIONS,
-                    index=None,
-                    horizontal=True,
-                    key="tutorial_guesser_rating",
-                )
-                render_rating_scale_endpoints()
-                if st.button(
-                    "Continue to round 2",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=rating is None,
-                ):
-                    st.session_state.tutorial_step = "human_clue_round"
-                    st.session_state.tutorial_practice_started_at = _now_iso()
-                    st.rerun()
+                _tutorial_round1_result_dialog(result)
         return
 
     if step == "human_clue_round":
         remaining = tutorial_time_remaining(
             st.session_state.get("tutorial_practice_started_at", "")
         )
-        head_col, timer_col = st.columns([3, 1], vertical_alignment="center")
+        head_col, timer_col = st.columns([1.3, 1])
         with head_col:
             st.markdown("### Round 2 of 2 · Human Clue-Giver")
         with timer_col:
-            render_clue_timer(remaining)
+            with st.container(key="timer_skip_stack"):
+                render_clue_timer(remaining, pinned=False)
         st.caption("The card roles are visible because you are the Clue-Giver. Complete every field before the simulated AI guesses.")
+        # Its own history, not round 1's -- round 2 is a single clue
+        # submission with no back-and-forth turns of its own, so this stays
+        # empty ("0 past turns"), but it must be its own panel rather than
+        # showing round 1's leftover tutorial_history.
+        _render_live_history_sidebar(
+            st.session_state.get("tutorial_history_round2", []), True
+        )
         if remaining <= 0 and not st.session_state.get("tutorial_human_clue_submitted"):
             st.warning("Practice time expired. This does not affect your study participation or score.")
             if st.button("Retry with a fresh timer", key="tutorial_round2_retry"):
@@ -629,24 +797,28 @@ def screen_tutorial():
                 """,
                 unsafe_allow_html=True,
             )
-            clue_col, number_col = st.columns([2, 1])
-            with clue_col:
-                clue = st.text_input(
-                    "One-word clue",
-                    key="tutorial_human_clue",
-                    placeholder="Example: Fruit",
-                    label_visibility="collapsed",
-                    disabled=form_locked,
-                )
-            with number_col:
-                clue_number = st.selectbox(
-                    "Clue number N",
-                    options=[1, 2],
-                    index=1,
-                    key="tutorial_human_clue_number",
-                    label_visibility="collapsed",
-                    disabled=form_locked,
-                )
+            tutorial_submit_attempted = bool(
+                st.session_state.get("tutorial_clue_submit_attempted")
+            )
+            with st.container(key="tutorial_clue_hint_container"):
+                clue_col, number_col = st.columns([2, 1])
+                with clue_col:
+                    clue = st.text_input(
+                        "One-word clue",
+                        key="tutorial_human_clue",
+                        placeholder="Example: Fruit",
+                        label_visibility="collapsed",
+                        disabled=form_locked,
+                    )
+                with number_col:
+                    clue_number = st.selectbox(
+                        "Clue number N",
+                        options=[1, 2],
+                        index=1,
+                        key="tutorial_human_clue_number",
+                        label_visibility="collapsed",
+                        disabled=form_locked,
+                    )
             tutorial_target_options = [
                 word
                 for word in TUTORIAL_ROUND_2_BOARD
@@ -660,15 +832,16 @@ def screen_tutorial():
             # Only the real target words are offered here, exactly like the
             # real game -- listing all six board words (most disabled) made
             # this look like a second, confusing board.
-            render_hint_target_selector(
-                tutorial_target_options,
-                st.session_state.tutorial_intended_targets,
-                clue_number,
-                state_key="tutorial_intended_targets",
-                key_prefix="tutorial_hint_target",
-                column_count=3,
-                disabled=form_locked,
-            )
+            with st.container(key="tutorial_clue_targets_container"):
+                render_hint_target_selector(
+                    tutorial_target_options,
+                    st.session_state.tutorial_intended_targets,
+                    clue_number,
+                    state_key="tutorial_intended_targets",
+                    key_prefix="tutorial_hint_target",
+                    column_count=3,
+                    disabled=form_locked,
+                )
             intended = st.session_state.tutorial_intended_targets
             st.markdown(
                 """
@@ -676,16 +849,16 @@ def screen_tutorial():
                 """,
                 unsafe_allow_html=True,
             )
-            expected = st.multiselect(
-                f"Which cards do you expect the AI to guess? · select exactly {clue_number}",
-                options=list(TUTORIAL_ROUND_2_BOARD),
-                max_selections=clue_number,
-                placeholder=f"Choose {clue_number} card(s)...",
-                label_visibility="collapsed",
-                key="tutorial_expected_guesses",
-                disabled=form_locked,
-            )
-            st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
+            with st.container(key="tutorial_clue_expected_container"):
+                expected = st.multiselect(
+                    f"Which cards do you expect the AI to guess? · select exactly {clue_number}",
+                    options=list(TUTORIAL_ROUND_2_BOARD),
+                    max_selections=clue_number,
+                    placeholder=f"Choose {clue_number} card(s)...",
+                    label_visibility="collapsed",
+                    key="tutorial_expected_guesses",
+                    disabled=form_locked,
+                )
             with st.container(border=True, key="before_ai_guess_panel"):
                 prompt_col, rating_col = st.columns([1.45, 1])
                 with prompt_col:
@@ -697,27 +870,57 @@ def screen_tutorial():
                         unsafe_allow_html=True,
                     )
                 with rating_col:
-                    rating_before = st.radio(
-                        "How well do you expect the AI to understand your clue?",
-                        options=RATING_OPTIONS,
-                        index=None,
-                        format_func=lambda option: f"{option}",
-                        horizontal=True,
-                        label_visibility="collapsed",
-                        key="tutorial_rating_before",
-                        disabled=form_locked,
-                    )
-                    render_rating_scale_endpoints()
-            general_link = st.text_area(
-                "General link (3–20 English words, no card names)",
-                key="tutorial_general_link",
-                placeholder="Describe the shared relationship without naming any card.",
-                disabled=form_locked,
-                max_chars=150,
+                    with st.container(key="tutorial_clue_rating_container"):
+                        rating_before = st.radio(
+                            "How well do you expect the AI to understand your clue?",
+                            options=RATING_OPTIONS,
+                            index=None,
+                            format_func=lambda option: f"{option}",
+                            horizontal=True,
+                            label_visibility="collapsed",
+                            key="tutorial_rating_before",
+                            disabled=form_locked,
+                        )
+                        render_rating_scale_endpoints()
+            with st.container(key="tutorial_clue_general_link_container"):
+                general_link = st.text_area(
+                    "General link (3–20 English words, no card names)",
+                    key="tutorial_general_link",
+                    placeholder="Describe the shared relationship without naming any card.",
+                    disabled=form_locked,
+                    max_chars=150,
+                )
+                if not form_locked:
+                    st.caption("Press Ctrl+Enter or click outside this box to save it before continuing.")
+            link_valid_live, _link_reason_live = validate_general_link(
+                general_link, list(TUTORIAL_ROUND_2_BOARD)
             )
+            clue_valid_live, _clue_error_live = validate_human_hint_with_history(
+                clue, list(TUTORIAL_ROUND_2_BOARD), [], []
+            )
+            if tutorial_submit_attempted and not form_locked:
+                tutorial_invalid_classes = " ".join(
+                    css_class
+                    for ready, css_class in [
+                        (clue_valid_live, "invalid-hint"),
+                        (len(intended) == clue_number, "invalid-targets"),
+                        (len(expected) == clue_number, "invalid-expected"),
+                        (rating_before is not None, "invalid-rating"),
+                        (link_valid_live, "invalid-link"),
+                    ]
+                    if not ready
+                )
+                if tutorial_invalid_classes:
+                    st.markdown(
+                        f"<div class='turn-invalid-marker {tutorial_invalid_classes}'></div>",
+                        unsafe_allow_html=True,
+                    )
+            if not form_locked:
+                st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
             if not form_locked and st.button(
                 "Let the simulated AI guess", type="primary", use_container_width=True
             ):
+                st.session_state.tutorial_clue_submit_attempted = True
                 link_valid, link_reason = validate_general_link(
                     general_link, list(TUTORIAL_ROUND_2_BOARD)
                 )
@@ -727,22 +930,33 @@ def screen_tutorial():
                     [],
                     [],
                 )
-                if not clue_valid:
-                    st.warning(clue_error)
-                elif len(intended) != clue_number:
-                    st.warning(f"Select exactly {clue_number} intended target card(s).")
-                elif len(expected) != clue_number:
-                    st.warning(f"Select exactly {clue_number} expected AI guess(es).")
-                elif rating_before is None:
-                    st.warning("Choose your expected-understanding rating.")
-                elif not link_valid:
-                    messages = {
-                        "too_short": "Write at least 3 English words.",
-                        "too_long": "Keep the General Link to 20 words or fewer.",
-                        "non_english": "Write the General Link in English only.",
-                        "board_word": "Do not mention any board/card names in the General Link.",
-                    }
-                    st.warning(messages.get(link_reason, "Check the General Link and try again."))
+                if not (
+                    clue_valid
+                    and len(intended) == clue_number
+                    and len(expected) == clue_number
+                    and rating_before is not None
+                    and link_valid
+                ):
+                    problems = []
+                    if not clue_valid:
+                        problems.append(clue_error)
+                    if len(intended) != clue_number:
+                        problems.append(f"Select exactly {clue_number} intended target card(s).")
+                    if len(expected) != clue_number:
+                        problems.append(f"Select exactly {clue_number} expected AI guess(es).")
+                    if rating_before is None:
+                        problems.append("Choose your expected-understanding rating.")
+                    if not link_valid:
+                        link_messages = {
+                            "too_short": "Write at least 3 English words.",
+                            "too_long": "Keep the General Link to 20 words or fewer.",
+                            "non_english": "Write the General Link in English only.",
+                            "board_word": "Do not mention any board/card names in the General Link.",
+                        }
+                        problems.append(
+                            link_messages.get(link_reason, "Check the General Link and try again.")
+                        )
+                    _clue_form_errors_dialog(problems)
                 else:
                     st.session_state.tutorial_human_clue_submitted = True
                     st.session_state.tutorial_simulated_ai_guesses = simulated_ai_guesses(clue_number)
@@ -750,24 +964,7 @@ def screen_tutorial():
 
             if form_locked:
                 ai_guesses = st.session_state.get("tutorial_simulated_ai_guesses", [])
-                st.success("The simulated AI has made its decision. Your submitted General Link is now locked.")
-                st.markdown("**Simulated AI guesses:** " + ", ".join(ai_guesses))
-                rating_after = st.radio(
-                    "After the guesses, how well do you think you and the AI understood each other?",
-                    options=RATING_OPTIONS,
-                    index=None,
-                    horizontal=True,
-                    key="tutorial_rating_after",
-                )
-                render_rating_scale_endpoints()
-                if st.button(
-                    "Complete practice",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=rating_after is None,
-                ):
-                    st.session_state.tutorial_step = "complete"
-                    st.rerun()
+                _tutorial_round2_result_dialog(ai_guesses)
         return
 
     _tutorial_complete_dialog()
@@ -952,7 +1149,7 @@ def screen_name():
                 if codenames_experience is None:
                     missing.append("Codenames experience")
                 if missing:
-                    st.error("Please complete: " + ", ".join(missing) + ".")
+                    _profile_missing_fields_dialog(missing)
                 else:
                     clean_nickname = nickname.strip()
                     # participant_id is always the anonymous, session-derived
@@ -1344,6 +1541,7 @@ def _render_guess_rationale_input():
         f"<div class='guess-rationale-status {status_class}'>{escape(status_text)}</div>",
         unsafe_allow_html=True,
     )
+    st.caption("Press Ctrl+Enter or click outside this box to save it before selecting cards.")
     return rationale.strip(), is_valid
 
 
@@ -1474,6 +1672,168 @@ def _attach_ai_wrong_guess_replacements(item):
     )
 
 
+def _guess_outcome_summary(item):
+    """Plain-language, condition-independent result of this turn's guesses.
+
+    Whether a click hit a target/neutral/bomb is basic game feedback (a
+    Codenames-style board always reveals a card's true color the instant
+    it's picked) -- it must show regardless of _share_explanations(),
+    which only gates the AI's *reasoning* text, not the factual outcome.
+    Without this, a guesser whose condition doesn't share explanations saw
+    nothing here confirming whether their guess was even right, and had to
+    go check History afterward to find out.
+    """
+    outcome = item.get("outcome")
+    guesses = item.get("guesses", [])
+    correct = item.get("correct_guesses", [])
+    neutral = item.get("neutral_guesses", [])
+    bomb = item.get("bomb_guesses", [])
+    if outcome == "bomb":
+        return "error", f"Bomb hit: {', '.join(bomb)}. The round has ended."
+    if outcome in ("skip", "partial_skip") or not guesses:
+        return "info", "Skipped -- no cards were guessed this turn."
+    if outcome == "correct" and not neutral:
+        was_were = "was" if len(correct) == 1 else "were"
+        return "success", f"Correct: {', '.join(correct)} {was_were} the target."
+    if correct and neutral:
+        return "warning", (
+            f"Partly right: {', '.join(correct)} correct, {', '.join(neutral)} not a target."
+        )
+    was_were = "was" if len(neutral or guesses) == 1 else "were"
+    return "error", f"Wrong: {', '.join(neutral or guesses)} {was_were} not a target."
+
+
+def _render_live_history_sidebar(history, share_explanations, show_ai_intended=False):
+    """Clue/guess history (with each turn's rationale/explanation already
+    part of render_interaction_history's output) as Streamlit's native
+    sidebar, so it's always reachable without scrolling the main column --
+    persistent on desktop, tap-to-open on narrow screens, both handled by
+    Streamlit itself. Every active-gameplay screen (clue-giving, guessing,
+    the between-turns reflection step, the round summary) calls this with
+    the same history so a participant never loses sight of what's happened
+    so far, regardless of which role they're in or which screen they're on."""
+    with st.sidebar:
+        st.markdown(
+            f'<div class="panel-title section-gap">History · {len(history)} past turn(s)</div>',
+            unsafe_allow_html=True,
+        )
+        render_interaction_history(
+            history,
+            show_ai_intended=show_ai_intended,
+            share_explanations=share_explanations,
+            show_title=False
+        )
+
+
+@st.dialog("Turn result")
+def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
+    outcome_kind, outcome_message = _guess_outcome_summary(item)
+    getattr(st, outcome_kind)(outcome_message)
+    ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
+    show_reflection_header = human_clue_giver or _share_explanations()
+    if show_reflection_header:
+        header_body = (
+            escape(ai_explanation)
+            if not human_clue_giver and ai_explanation
+            else "Rate the shared understanding after the AI's guesses."
+        )
+        reflection_title = (
+            "Shared-understanding rating"
+            if human_clue_giver
+            else "AI's clue explanation"
+        )
+        st.markdown(
+            f"""
+            <div class="glass-card compact-card reflection-ai-explanation reflection-compact-head">
+                <div class="panel-title">{reflection_title}</div>
+                <p class="subtle-text" style="margin:0;">{header_body}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    st.radio(
+        "After the guesses, how well do you think you understood the AI?",
+        options=list(RATING_OPTIONS.keys()),
+        index=None,
+        format_func=lambda option: f"{option}",
+        horizontal=True,
+        key=f"reflection_rating_{st.session_state.round}_{item.get('turn')}",
+    )
+    render_rating_scale_endpoints()
+    replacement_key = (
+        f"wrong_guess_replacements_{st.session_state.round}_{item.get('turn')}"
+    )
+    replacement_cards = []
+    if replacement_count:
+        replacement_cards = st.multiselect(
+            (
+                f"If you could choose {replacement_count} other card"
+                f"{'s' if replacement_count != 1 else ''}, which would you choose?"
+            ),
+            options=[
+                word
+                for word in st.session_state.board
+                if word not in st.session_state.guesses
+            ],
+            max_selections=replacement_count,
+            placeholder=f"Select exactly {replacement_count} replacement card(s)...",
+            key=replacement_key,
+            help=(
+                "Choose the cards you would have selected instead of your "
+                "wrong card(s)."
+            ),
+        )
+
+    if st.button("Continue", type="primary", use_container_width=True):
+        understood_ai_rating = st.session_state[
+            f"reflection_rating_{st.session_state.round}_{item.get('turn')}"
+        ]
+        if understood_ai_rating is None:
+            st.error("Please select a rating before continuing.")
+            return
+        if replacement_count and len(replacement_cards) != replacement_count:
+            st.error(
+                f"Please select exactly {replacement_count} replacement card(s)."
+            )
+            return
+        reflection_end_time = _now_iso()
+        reflection_start_time = item.get("reflection_start_time") or st.session_state.get(
+            "current_reflection_start_time", ""
+        )
+        item["reflection_start_time"] = reflection_start_time
+        item["reflection_end_time"] = reflection_end_time
+        item["reflection_time_sec"] = _seconds_between(
+            reflection_start_time,
+            reflection_end_time,
+        )
+        relationship_type = ""
+        explanation = ""
+
+        if replacement_count:
+            item["wrong_guess_replacements"] = list(replacement_cards)
+            item["wrong_guess_replacement_actor"] = "human"
+            item["wrong_guess_replacement_raw_response"] = ""
+            item["wrong_guess_replacement_response_time_sec"] = ""
+            item["wrong_guess_replacement_attempts"] = ""
+            log_event(
+                "wrong_guess_replacements_recorded",
+                {
+                    "actor": "human",
+                    "wrong_guesses": item.get("neutral_guesses", []),
+                    "replacement_cards": replacement_cards,
+                    "required_count": replacement_count,
+                },
+                turn_number=item.get("turn", ""),
+            )
+        _save_turn_reflection(item, understood_ai_rating, relationship_type, explanation)
+        log_event(
+            "reflection_submitted",
+            {"reflection_source": item.get("reflection_source", "")},
+            turn_number=item.get("turn", ""),
+        )
+        st.rerun()
+
+
 def render_turn_reflection():
     item = _current_pending_reflection_item()
     if not item:
@@ -1499,122 +1859,12 @@ def render_turn_reflection():
         item["reflection_shown_logged"] = True
 
     render_top_status()
-    with st.container(border=True, key="reflection_panel"):
-        ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
-        show_reflection_header = human_clue_giver or _share_explanations()
-        if show_reflection_header:
-            header_body = (
-                escape(ai_explanation)
-                if not human_clue_giver and ai_explanation
-                else "Rate the shared understanding after the AI's guesses."
-            )
-            reflection_title = (
-                "Shared-understanding rating"
-                if human_clue_giver
-                else "AI's clue explanation"
-            )
-            st.markdown(
-                f"""
-                <div class="glass-card compact-card reflection-ai-explanation reflection-compact-head">
-                    <div class="panel-title">{reflection_title}</div>
-                    <p class="subtle-text" style="margin:0;">{header_body}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        rating_col = st.container()
+    _turn_reflection_dialog(item, human_clue_giver, replacement_count)
 
-        with rating_col:
-            st.radio(
-                "After the guesses, how well do you think you understood the AI?",
-                options=list(RATING_OPTIONS.keys()),
-                index=None,
-                format_func=lambda option: f"{option}",
-                horizontal=True,
-                key=f"reflection_rating_{st.session_state.round}_{item.get('turn')}",
-            )
-            render_rating_scale_endpoints()
-        replacement_key = (
-            f"wrong_guess_replacements_{st.session_state.round}_{item.get('turn')}"
-        )
-        replacement_cards = []
-        if replacement_count:
-            replacement_cards = st.multiselect(
-                (
-                    f"If you could choose {replacement_count} other card"
-                    f"{'s' if replacement_count != 1 else ''}, which would you choose?"
-                ),
-                options=[
-                    word
-                    for word in st.session_state.board
-                    if word not in st.session_state.guesses
-                ],
-                max_selections=replacement_count,
-                placeholder=f"Select exactly {replacement_count} replacement card(s)...",
-                key=replacement_key,
-                help=(
-                    "Choose the cards you would have selected instead of your "
-                    "wrong card(s)."
-                ),
-            )
-
-        if st.button("Continue", type="primary", use_container_width=True):
-            understood_ai_rating = st.session_state[
-                f"reflection_rating_{st.session_state.round}_{item.get('turn')}"
-            ]
-            if understood_ai_rating is None:
-                st.error("Please select a rating before continuing.")
-                return True
-            if replacement_count and len(replacement_cards) != replacement_count:
-                st.error(
-                    f"Please select exactly {replacement_count} replacement card(s)."
-                )
-                return True
-            reflection_end_time = _now_iso()
-            reflection_start_time = item.get("reflection_start_time") or st.session_state.get(
-                "current_reflection_start_time", ""
-            )
-            item["reflection_start_time"] = reflection_start_time
-            item["reflection_end_time"] = reflection_end_time
-            item["reflection_time_sec"] = _seconds_between(
-                reflection_start_time,
-                reflection_end_time,
-            )
-            relationship_type = ""
-            explanation = ""
-
-            if replacement_count:
-                item["wrong_guess_replacements"] = list(replacement_cards)
-                item["wrong_guess_replacement_actor"] = "human"
-                item["wrong_guess_replacement_raw_response"] = ""
-                item["wrong_guess_replacement_response_time_sec"] = ""
-                item["wrong_guess_replacement_attempts"] = ""
-                log_event(
-                    "wrong_guess_replacements_recorded",
-                    {
-                        "actor": "human",
-                        "wrong_guesses": item.get("neutral_guesses", []),
-                        "replacement_cards": replacement_cards,
-                        "required_count": replacement_count,
-                    },
-                    turn_number=item.get("turn", ""),
-                )
-            _save_turn_reflection(item, understood_ai_rating, relationship_type, explanation)
-            log_event(
-                "reflection_submitted",
-                {"reflection_source": item.get("reflection_source", "")},
-                turn_number=item.get("turn", ""),
-            )
-            st.rerun()
-
-    with st.expander(
-        f"History · {len(st.session_state.interaction_history)} past turn(s)",
-        expanded=True,
-    ):
-        render_interaction_history(
-            st.session_state.interaction_history,
-            share_explanations=_share_explanations(),
-        )
+    _render_live_history_sidebar(
+        st.session_state.interaction_history,
+        _share_explanations(),
+    )
     return True
 
 
@@ -1637,10 +1887,26 @@ def screen_human_clue():
             "your clue or the round ends automatically."
         )
     if st.session_state.pop("ai_reroll_notice", False):
-        st.warning("The AI asked for another clue.")
+        _ai_reroll_notice_dialog()
+        return
 
     with st.container(border=True):
-        st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
+        board_title_col, board_timer_col = st.columns([1.3, 1])
+        with board_title_col:
+            st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
+        # Reserved here so the countdown ends up directly beside the board
+        # heading instead of far below it, past the whole clue-composition
+        # form -- but actually filled much further down, only once the
+        # timer's own state (start/consume-timeout) has run in its
+        # original place in the function. st.empty() keeps the *visual*
+        # slot at this position regardless of how much unrelated content
+        # renders in between; see the fill site below for why that state
+        # logic itself isn't moved up here too. Wrapped in the same keyed
+        # container as the timer+skip stack elsewhere so it sticks the same
+        # way, even though this screen has no skip button to stack with it.
+        with board_timer_col:
+            with st.container(key="timer_skip_stack"):
+                board_timer_placeholder = st.empty()
         pending_review = st.session_state.get("pending_ai_guess_review")
         review_guesses = pending_review.get("guesses", []) if pending_review else []
         render_board(
@@ -1726,11 +1992,7 @@ def screen_human_clue():
             )
             st.rerun()
         history_for_review = _history_with_pending_ai_guess(pending_review)
-        with st.expander(f"History · {len(history_for_review)} past turn(s)", expanded=True):
-            render_interaction_history(
-                history_for_review,
-                share_explanations=_share_explanations(),
-            )
+        _render_live_history_sidebar(history_for_review, _share_explanations())
         return
 
     st.markdown(
@@ -1750,11 +2012,17 @@ def screen_human_clue():
         )
     if _consume_human_clue_timeout():
         st.rerun()
-    participant_timer_placeholder = st.empty()
-    with participant_timer_placeholder:
-        render_clue_timer(participant_decision_time_remaining())
+    with board_timer_placeholder:
+        # st.empty() can only hold ONE element -- render_clue_timer writes
+        # more than one (the pill markdown, then the ticking component), so
+        # without this inner container every write but the last silently
+        # replaced the one before it and the pill never actually appeared.
+        # Nesting a plain container gives the placeholder a single child
+        # that can itself hold multiple elements.
+        with st.container():
+            render_clue_timer(participant_decision_time_remaining(), pinned=False)
 
-    with st.container(border=True):
+    with st.container(border=True, key="clue_hint_container"):
         clue_col, count_col = st.columns([4.2, 1.2])
         max_hint_count = remaining_target_count(
             st.session_state.target_words,
@@ -1784,11 +2052,12 @@ def screen_human_clue():
     st.session_state.hint_targets = [
         word for word in st.session_state.get("hint_targets", []) if word in remaining_targets
     ][:selected_count]
-    render_hint_target_selector(
-        remaining_targets,
-        st.session_state.hint_targets,
-        selected_count,
-    )
+    with st.container(key="clue_targets_container"):
+        render_hint_target_selector(
+            remaining_targets,
+            st.session_state.hint_targets,
+            selected_count,
+        )
     expected_guess_key = f"expected_guesses_{st.session_state.round}_{_current_action_index()}"
     available_guess_options = _available_guess_options()
     existing_expected_guesses = st.session_state.get(
@@ -1808,17 +2077,17 @@ def screen_human_clue():
         """,
         unsafe_allow_html=True,
     )
-    st.multiselect(
-        "Expected AI guesses",
-        options=available_guess_options,
-        max_selections=selected_count,
-        placeholder=f"Choose {selected_count} card(s)...",
-        label_visibility="collapsed",
-        key=expected_guess_key,
-    )
+    with st.container(key="clue_expected_container"):
+        st.multiselect(
+            "Expected AI guesses",
+            options=available_guess_options,
+            max_selections=selected_count,
+            placeholder=f"Choose {selected_count} card(s)...",
+            label_visibility="collapsed",
+            key=expected_guess_key,
+        )
     st.session_state.hint_expected_guesses = st.session_state.get(expected_guess_key, [])
 
-    st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
     with st.container(border=True, key="before_ai_guess_panel"):
         prompt_col, rating_col = st.columns([1.45, 1])
         with prompt_col:
@@ -1830,33 +2099,36 @@ def screen_human_clue():
                 unsafe_allow_html=True,
             )
         with rating_col:
-            rating_before = st.radio(
-                "Before AI guess rating",
-                options=list(RATING_OPTIONS.keys()),
-                index=None,
-                format_func=lambda option: f"{option}",
-                horizontal=True,
-                label_visibility="collapsed",
-                key=f"before_ai_guess_rating_{st.session_state.round}_{_current_action_index()}",
-            )
-            render_rating_scale_endpoints()
+            with st.container(key="clue_rating_container"):
+                rating_before = st.radio(
+                    "Before AI guess rating",
+                    options=list(RATING_OPTIONS.keys()),
+                    index=None,
+                    format_func=lambda option: f"{option}",
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key=f"before_ai_guess_rating_{st.session_state.round}_{_current_action_index()}",
+                )
+                render_rating_scale_endpoints()
     st.session_state.ai_understanding_rating_before = rating_before
 
     general_link_key = (
         f"pre_ai_general_link_{st.session_state.round}_"
         f"{_current_action_index()}"
     )
-    general_link = st.text_area(
-        "General link (3–20 English words, no card names)",
-        max_chars=150,
-        placeholder="Example: Both ideas connect through luck and success.",
-        key=general_link_key,
-    )
+    with st.container(key="clue_general_link_container"):
+        general_link = st.text_area(
+            "General link (3–20 English words, no card names)",
+            max_chars=150,
+            placeholder="Example: Both ideas connect through luck and success.",
+            key=general_link_key,
+        )
+        st.caption("Press Ctrl+Enter or click outside this box to save it before continuing.")
     general_link_is_valid, general_link_blocked_reason = validate_general_link(
         general_link, st.session_state.get("board", [])
     )
 
-    hint_is_valid, _hint_error_preview = validate_human_hint_with_history(
+    hint_is_valid, hint_error_message = validate_human_hint_with_history(
         hint,
         st.session_state.board,
         st.session_state.interaction_history,
@@ -1873,58 +2145,53 @@ def screen_human_clue():
         and general_link_is_valid
     )
 
-    def _checklist_item(done, label):
-        mark = "&#10003;" if done else "&#9675;"
-        state = "ok" if done else ""
-        return f"<li class='{state}'><span class='mark'>{mark}</span> {escape(label)}</li>"
-
-    st.markdown(
-        "<ul class='turn-checklist'>"
-        + _checklist_item(hint_is_valid, "Clue and count set")
-        + _checklist_item(targets_ready, "Cards you mean selected")
-        + _checklist_item(predicted_ready, "Predicted AI guesses selected")
-        + _checklist_item(rating_ready, "Confidence rated")
-        + _checklist_item(general_link_is_valid, "Connection explained")
-        + "</ul>",
-        unsafe_allow_html=True,
+    clue_submit_attempted_key = (
+        f"clue_form_submit_attempted_{st.session_state.round}_{_current_action_index()}"
     )
-
-    if not turn_ready:
-        missing = [
-            label
-            for ready, label in [
-                (hint_is_valid, "clue and count"),
-                (targets_ready, "cards you mean"),
-                (predicted_ready, "predicted AI guesses"),
-                (rating_ready, "confidence rating"),
-                (general_link_is_valid, "the General Link explanation"),
+    if st.session_state.get(clue_submit_attempted_key):
+        # A single marker, positioned wherever in the DOM, carrying one class
+        # per currently-invalid field -- :has() reaches from it to each
+        # field's own keyed container regardless of how deeply Streamlit
+        # nests either one, so this doesn't depend on the two being adjacent
+        # siblings (see the .let-ai-guess-marker fix earlier this session for
+        # why a sibling-based version of this would silently match nothing).
+        invalid_field_classes = " ".join(
+            css_class
+            for ready, css_class in [
+                (hint_is_valid, "invalid-hint"),
+                (targets_ready, "invalid-targets"),
+                (predicted_ready, "invalid-expected"),
+                (rating_ready, "invalid-rating"),
+                (general_link_is_valid, "invalid-link"),
             ]
             if not ready
-        ]
-        st.caption("Still needed before you can let the AI guess: " + ", ".join(missing) + ".")
+        )
+        if invalid_field_classes:
+            st.markdown(
+                f"<div class='turn-invalid-marker {invalid_field_classes}'></div>",
+                unsafe_allow_html=True,
+            )
 
+    st.markdown("<div class='let-ai-guess-marker'></div>", unsafe_allow_html=True)
     if st.button(
         "Let AI Guess",
         type="primary",
         use_container_width=True,
-        disabled=not turn_ready,
     ):
-        is_valid, error_message = validate_human_hint_with_history(
-            hint,
-            st.session_state.board,
-            st.session_state.interaction_history,
-            st.session_state.used_hints,
-        )
-        if not is_valid:
-            st.error(error_message)
-        elif len(st.session_state.hint_targets) != selected_count:
-            st.error(f"Please select exactly {selected_count} target card(s) for this clue.")
-        elif len(st.session_state.hint_expected_guesses) != selected_count:
-            st.error(f"Please select exactly {selected_count} card(s) you think the AI will choose.")
-        elif rating_before is None:
-            st.error("Please select how well you expect the AI understood your clue.")
-        elif not general_link_is_valid:
-            st.error(_general_link_error(general_link_blocked_reason))
+        st.session_state[clue_submit_attempted_key] = True
+        if not turn_ready:
+            problems = []
+            if not hint_is_valid:
+                problems.append(hint_error_message)
+            if not targets_ready:
+                problems.append(f"Please select exactly {selected_count} target card(s) for this clue.")
+            if not predicted_ready:
+                problems.append(f"Please select exactly {selected_count} card(s) you think the AI will choose.")
+            if not rating_ready:
+                problems.append("Please select how well you expect the AI understood your clue.")
+            if not general_link_is_valid:
+                problems.append(_general_link_error(general_link_blocked_reason))
+            _clue_form_errors_dialog(problems)
         else:
             hint_end_time = _now_iso()
             hint_time_sec = _seconds_between(
@@ -1961,7 +2228,7 @@ def screen_human_clue():
                 },
                 turn_number=_next_action_number(),
             )
-            participant_timer_placeholder.empty()
+            board_timer_placeholder.empty()
             clear_participant_decision_timer()
             log_event("ai_guess_started", {"clue": st.session_state.hint}, turn_number=_next_action_number())
             guess_start_time = _now_iso()
@@ -1971,7 +2238,7 @@ def screen_human_clue():
                     st.session_state.board,
                     st.session_state.hint,
                     st.session_state.hint_number,
-                    0,
+                    st.session_state.get("ai_rerolls", 0),
                     st.session_state.interaction_history,
                     st.session_state.guesses,
                     st.session_state.ai_round_summaries,
@@ -2010,8 +2277,55 @@ def screen_human_clue():
             if action == "reroll":
                 if st.session_state.ai_rerolls > 0:
                     st.session_state.ai_rerolls -= 1
+                    # A reroll is recorded the same way as an AI skip -- it
+                    # counts against the round's shared skip budget and
+                    # appears in the turn history, so the participant can see
+                    # it and it isn't a free, invisible retry.
+                    record_skip(
+                        st.session_state.hint,
+                        st.session_state.hint_number,
+                        intended_targets,
+                        expected_guess_cards,
+                        guess_rationale=guess_result.get("guess_rationale", ""),
+                        hint_explanation=st.session_state.get("hint_explanation", ""),
+                        hint_time_sec=hint_time_sec,
+                        skipped_by="ai",
+                        skip_interpreted_cards=guess_result.get(
+                            "skip_interpreted_cards", []
+                        ),
+                        guess_raw_response=guess_result.get("raw_response", ""),
+                        guess_time_sec=guess_time_sec,
+                        guess_response_time_sec=guess_result.get("response_time_sec"),
+                        clue_timer_started_at=clue_timer_started_at,
+                        timer_duration_seconds=timer_duration_seconds,
+                        human_decision_ended_at=hint_end_time,
+                        human_decision_time_sec=hint_time_sec,
+                        human_explanation_raw=submitted_general_link,
+                        human_explanation_is_valid=True,
+                        human_explanation_source="pre_ai_human_clue_form",
+                        human_explanation_collected_at=hint_end_time,
+                    )
+                    recorded_item = st.session_state.interaction_history[-1]
+                    log_event(
+                        "ai_reroll_used",
+                        {
+                            "skipped_by": "ai",
+                            "completed_turn_number": recorded_item.get("completed_turn_number", ""),
+                            "skip_number": recorded_item.get("skip_number", ""),
+                            "ai_rerolls_remaining": st.session_state.ai_rerolls,
+                        },
+                        turn_number=recorded_item.get("turn", ""),
+                    )
                     st.session_state.ai_reroll_notice = True
                     st.session_state.current_hint_start_time = ""
+                    # Without this, clue_timer_started_at keeps the deadline
+                    # from the clue that just got rejected -- the guard a
+                    # few lines into the next render ("start a timer only
+                    # if none is active") sees a still-active timer and
+                    # never starts a fresh one, so a reroll could hand back
+                    # only a few seconds (or an already-expired timer) to
+                    # submit a new clue instead of a full fresh window.
+                    clear_participant_decision_timer()
                 else:
                     st.warning("No AI rerolls remain. Please adjust the clue.")
                 st.rerun()
@@ -2085,14 +2399,10 @@ def screen_human_clue():
                 }
                 st.rerun()
 
-    with st.expander(
-        f"History · {len(st.session_state.interaction_history)} past turn(s)",
-        expanded=True,
-    ):
-        render_interaction_history(
-            st.session_state.interaction_history,
-            share_explanations=_share_explanations(),
-        )
+    _render_live_history_sidebar(
+        st.session_state.interaction_history,
+        _share_explanations(),
+    )
 
 
 def screen_human_guesser():
@@ -2117,6 +2427,7 @@ def screen_human_guesser():
     if _consume_human_guess_timeout():
         st.rerun()
 
+    remaining_time = None
     if not st.session_state.hint:
         if st.session_state.round == 1:
             if not st.session_state.get("ai_clue_intro_seen", False):
@@ -2142,8 +2453,6 @@ def screen_human_guesser():
             return
     else:
         remaining_time = participant_decision_time_remaining()
-        if remaining_time is not None:
-            render_clue_timer(remaining_time)
         render_hint_panel(
             st.session_state.hint,
             st.session_state.hint_number,
@@ -2153,7 +2462,21 @@ def screen_human_guesser():
         guess_gate_ready = rationale_is_valid
 
     with st.container(border=True):
-        st.markdown('<div class="panel-title">Board</div>', unsafe_allow_html=True)
+        board_title_col, board_timer_col = st.columns([1.5, 1])
+        with board_title_col:
+            st.markdown('<div class="panel-title">Board</div>', unsafe_allow_html=True)
+        # Timer and skip button stacked together in one sticky group, timer
+        # on top -- the skip placeholder is reserved here so the button ends
+        # up right under the timer instead of far below, past the whole
+        # board, but is filled later once its own state (guess_gate_ready,
+        # remaining_guess_slots) is known, same st.empty() placeholder trick
+        # as the timer itself used elsewhere. The keyed wrapper container
+        # gives app.css a stable selector to make the whole group sticky.
+        with board_timer_col:
+            with st.container(key="timer_skip_stack"):
+                if remaining_time is not None:
+                    render_clue_timer(remaining_time, pinned=False)
+                skip_cluster_placeholder = st.empty()
 
         if not st.session_state.hint:
             render_board(
@@ -2245,45 +2568,51 @@ def screen_human_guesser():
                 st.rerun()
 
     if st.session_state.hint:
-        skip_interpretation = []
         remaining_guess_slots = (
             int(st.session_state.hint_number)
             - len(st.session_state.pending_guesses)
         )
+        # Rendered into the placeholder reserved next to the timer above --
+        # only the button moves there; the click-handling logic below stays
+        # in its original place and order (st.button()'s return value is
+        # just a bool, so where it's checked doesn't matter). The card
+        # -interpretation picker used to sit inline here too, but that made
+        # this sticky cluster permanently tall -- it now opens as a dialog
+        # only once the participant has actually chosen to skip.
+        # Once both skips are used there's nothing left to offer, so the
+        # button disappears entirely instead of sitting there disabled --
+        # the "Skips used" stat in the status bar above already shows why.
+        # While a skip is still available but the rationale isn't filled in
+        # yet, the button stays visible-but-disabled, since that's a
+        # temporary, about-to-be-fixed state rather than a permanent one.
         if can_skip_current_clue():
+            with skip_cluster_placeholder:
+                with st.container():
+                    if not guess_gate_ready:
+                        st.caption("Add your reasoning above before you can skip too.")
+                    st.markdown("<div class='skip-button-marker'></div>", unsafe_allow_html=True)
+                    if st.button(
+                        "Skip",
+                        use_container_width=True,
+                        disabled=not guess_gate_ready,
+                    ):
+                        st.session_state.guesser_skip_dialog_open = True
+                        st.rerun()
+        if st.session_state.get("guesser_skip_dialog_open") and can_skip_current_clue():
             unavailable_cards = set(st.session_state.guesses).union(
                 st.session_state.pending_guesses
             )
-            skip_interpretation = st.multiselect(
-                (
-                    f"Before skipping, select exactly {remaining_guess_slots} card(s) "
-                    "you think this clue was meant for."
-                ),
-                options=[
-                    word
-                    for word in st.session_state.board
-                    if word not in unavailable_cards
-                ],
-                max_selections=remaining_guess_slots,
-                placeholder=(
-                    f"Select exactly {remaining_guess_slots} remaining card(s)..."
-                ),
-                key=(
-                    f"skip_interpretation_{st.session_state.round}_"
-        f"{_current_action_index()}"
-                ),
-                help=(
-                    f"Select exactly {remaining_guess_slots} card(s), even if you are "
-                    "not confident. These are stored separately and do not count as guesses."
-                ),
-            )
-        if not guess_gate_ready:
-            st.caption("Add your reasoning above before you can skip too.")
-        if st.button(
-            "Stop guessing and use 1 skip",
-            use_container_width=True,
-            disabled=not can_skip_current_clue() or not guess_gate_ready,
-        ):
+            skip_options = [
+                word for word in st.session_state.board if word not in unavailable_cards
+            ]
+            _skip_interpretation_dialog(remaining_guess_slots, skip_options)
+        skip_button_clicked = st.session_state.pop("guesser_skip_confirmed", False)
+        skip_interpretation = (
+            st.session_state.pop("guesser_skip_selected_cards", [])
+            if skip_button_clicked
+            else []
+        )
+        if skip_button_clicked:
             pending_meta = st.session_state.get("pending_hint_meta") or {}
             if len(skip_interpretation) != remaining_guess_slots:
                 st.error(
@@ -2365,14 +2694,10 @@ def screen_human_guesser():
                     _clear_current_clue()
                     _attach_ai_explanation_to_latest_turn()
                 st.rerun()
-    with st.expander(
-        f"History · {len(st.session_state.interaction_history)} past turn(s)",
-        expanded=True,
-    ):
-        render_interaction_history(
-            st.session_state.interaction_history,
-            share_explanations=_share_explanations(),
-        )
+    _render_live_history_sidebar(
+        st.session_state.interaction_history,
+        _share_explanations(),
+    )
 
 
 def screen_round_summary():
@@ -2416,15 +2741,11 @@ def screen_round_summary():
             """,
             unsafe_allow_html=True,
         )
-        with st.expander(
-            f"History · {len(st.session_state.interaction_history)} past turn(s)",
-            expanded=True,
-        ):
-            render_interaction_history(
-                st.session_state.interaction_history,
-                show_ai_intended=True,
-                share_explanations=_share_explanations(),
-            )
+    _render_live_history_sidebar(
+        st.session_state.interaction_history,
+        _share_explanations(),
+        show_ai_intended=True,
+    )
 
     with action_col:
         if not st.session_state.get("ai_round_reflection"):

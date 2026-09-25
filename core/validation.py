@@ -44,6 +44,11 @@ def mentions_board_word(text, board_words):
                 token.startswith(base_token) for token in explanation_token_set
             ):
                 return True
+            if len(base_token) == 3 and any(
+                token.startswith(base_token) and len(token) - len(base_token) <= 3
+                for token in explanation_token_set
+            ):
+                return True
             continue
 
         exact_phrase = " ".join(board_tokens)

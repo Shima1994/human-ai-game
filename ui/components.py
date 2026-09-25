@@ -28,9 +28,16 @@ ROLE_CLASS = {
 }
 
 ROLE_MARK = {
-    "target": "",
-    "bomb": "",
-    "neutral": "",
+    # Non-color cue for each revealed role, so target/neutral/bomb don't
+    # depend on hue alone (success-green and danger-red card backgrounds
+    # have almost identical lightness, which erases the difference for
+    # red-green color vision deficiency). Keyed by role rather than the
+    # more granular css_class, so a wrong guess on a neutral card still
+    # reads with the neutral glyph (not the bomb glyph) even though both
+    # get the same red "miss" background.
+    "target": "&#10003;",  # check mark
+    "bomb": "&#10007;",  # cross mark
+    "neutral": "&#9675;",  # open circle
 }
 
 RATING_OPTIONS = {
@@ -99,7 +106,11 @@ def render_top_status():
     is_clue_giver = st.session_state.role == "human_clue"
     role_label = "You're giving the clue" if is_clue_giver else "AI clues — you guess"
     role_variant = "human" if is_clue_giver else "ai"
-    player_name = st.session_state.get("participant_id") or "-"
+    player_name = (
+        st.session_state.get("nickname")
+        or st.session_state.get("participant_id")
+        or "-"
+    )
     initials = "".join(part[0] for part in str(player_name).replace("_", " ").split()[:2]).upper() or "P"
     found = len(st.session_state.get("found_targets", []))
     interactions = st.session_state.get("round_interactions", 0)
@@ -156,10 +167,18 @@ def render_round_chip(text):
     )
 
 
-def render_clue_timer(remaining_seconds):
+def render_clue_timer(remaining_seconds, pinned=True):
     """A small pill, sticky to the top of the viewport instead of scrolling
     away with the page -- so it stays visible during every timed decision,
     not just while the participant happens to be scrolled to the top.
+
+    pinned=False renders the identical pill in normal document flow next
+    to wherever it's called from (no position:fixed) instead -- used to
+    sit the timer directly beside the board heading rather than floating
+    far above it. Callers that use this must accept the tradeoff that the
+    timer can then scroll out of view on a long form below the board;
+    pinned=True (the default, used by the tutorial and any other caller)
+    keeps the original always-on-screen behavior unchanged.
 
     The pill itself (label, color, border) is a plain st.markdown element,
     not a custom HTML/JS component -- those render inside a sandboxed iframe
@@ -181,41 +200,38 @@ def render_clue_timer(remaining_seconds):
     everywhere a participant has a timed decision to make.
     """
     remaining = max(0, int(math.ceil(remaining_seconds or 0)))
-    # The tutorial runs its own step machine without touching st.session_state.role,
-    # so check tutorial_step first (when present) and fall back to role for the
-    # real game.
-    tutorial_step = st.session_state.get("tutorial_step")
-    if tutorial_step:
-        is_clue_giver = tutorial_step == "human_clue_round"
-    else:
-        is_clue_giver = st.session_state.get("role") == "human_clue"
-    action_label = "Giving your clue" if is_clue_giver else "Guessing"
     is_final_guess = bool(st.session_state.get("final_guess_deadline_active"))
     clock = f"{remaining // 60:02d}:{remaining % 60:02d}"
     # Absolute deadline (ms since epoch, matches JS Date.now()) so the tiny
     # ticking script below can compute "seconds left" independently on every
     # tick rather than needing a fresh value from the server each time.
     deadline_ms = int((time.time() + max(0.0, remaining_seconds or 0)) * 1000)
+    # The clue-giver/guesser role label used to prefix every state ("Guessing
+    # -- 01:13 left"), but the role is already obvious from the screen the
+    # participant is on, so it just made the pill wider without adding
+    # information -- dropped everywhere except "Final chance", which is a
+    # real state change worth calling out, not a restated role.
     if is_final_guess:
         state_class = " final"
         prefix, suffix = "Final chance — ", " left"
     elif remaining <= 0:
         state_class = " expired"
-        prefix, suffix = f"{action_label} — ", " time's up"
+        prefix, suffix = "", "Time's up"
     elif remaining <= 15:
         state_class = " warn"
-        prefix, suffix = f"{action_label} — ", " left"
+        prefix, suffix = "", " left"
     else:
         state_class = ""
-        prefix, suffix = f"{action_label} — ", " left"
+        prefix, suffix = "", " left"
     clock_html = (
         ""
         if remaining <= 0
         else f'<span class="timer-clock" data-deadline-ms="{deadline_ms}">{clock}</span>'
     )
+    row_class = "timer-row" if pinned else "timer-row-inline"
     st.markdown(
         f"""
-        <div class="timer-row">
+        <div class="{row_class}">
             <span class="timer-pill{state_class}" aria-live="polite">
                 <span class="timer-dot"></span>
                 {escape(prefix)}{clock_html}{escape(suffix)}
@@ -315,27 +331,35 @@ def render_board(
     column_count = column_count or (
         4 if len(board) == BOARD_SIZE else min(4, max(1, len(board)))
     )
-    cols = st.columns(column_count)
     guess_set = set(guesses)
     clicked_word = None
 
-    for index, word in enumerate(board):
-        role = word_roles.get(word, "neutral")
-        is_guessed = word in guess_set
-        revealed = reveal_all or is_guessed or st.session_state.round_finished
+    # Keyed so app.css can style these buttons like the static .word-card
+    # cards (light background, dark text) instead of the app's default
+    # solid-blue CTA button -- without this, the instant the board becomes
+    # clickable (e.g. once the guess-reasoning field turns valid), every
+    # still-hidden card flips all at once from the calm .word-hidden
+    # palette to a wall of vivid blue buttons, which reads as a jarring,
+    # unexplained color change rather than "these are now clickable."
+    with st.container(key="board_card_grid"):
+        cols = st.columns(column_count)
+        for index, word in enumerate(board):
+            role = word_roles.get(word, "neutral")
+            is_guessed = word in guess_set
+            revealed = reveal_all or is_guessed or st.session_state.round_finished
 
-        with cols[index % column_count]:
-            if clickable and not revealed:
-                is_disabled = len(guesses) >= max_clicks or is_guessed
-                if st.button(
-                    word,
-                    key=f"{key_prefix}_{st.session_state.round}_{word}",
-                    use_container_width=True,
-                    disabled=is_disabled,
-                ):
-                    clicked_word = word
-            else:
-                _render_static_card(word, role, revealed, guessed=is_guessed)
+            with cols[index % column_count]:
+                if clickable and not revealed:
+                    is_disabled = len(guesses) >= max_clicks or is_guessed
+                    if st.button(
+                        word,
+                        key=f"{key_prefix}_{st.session_state.round}_{word}",
+                        use_container_width=True,
+                        disabled=is_disabled,
+                    ):
+                        clicked_word = word
+                else:
+                    _render_static_card(word, role, revealed, guessed=is_guessed)
 
     return clicked_word
 
@@ -457,15 +481,20 @@ def render_hint_target_selector(
                     st.rerun()
 
 
-def render_interaction_history(history, show_ai_intended=False, share_explanations=True):
+def render_interaction_history(
+    history, show_ai_intended=False, share_explanations=True, show_title=True
+):
+    title_html = '<div class="panel-title">History</div>' if show_title else ""
     if not history:
+        # A blank (whitespace-only) line inside this block -- e.g. from an
+        # empty title_html landing on its own line -- gets read as a
+        # markdown indented code block, so the HTML after it renders as
+        # literal text instead of a page element. Keep every line non-empty.
         st.markdown(
-            """
-            <div class="history-panel">
-                <div class="panel-title">History</div>
-                <div class="history-empty">No hints or guesses yet.</div>
-            </div>
-            """,
+            "<div class='history-panel'>"
+            f"{title_html}"
+            "<div class='history-empty'>No hints or guesses yet.</div>"
+            "</div>",
             unsafe_allow_html=True,
         )
         return
@@ -584,9 +613,11 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
                 )
 
         rows.append(
-            "<div class='history-row'>"
-            f"<div class='history-index'>{index}</div>"
-            "<div class='history-body'>"
+            f"<div class='history-row {outcome_class}'>"
+            "<div class='history-row-head'>"
+            f"<span class='history-index'>Turn {index}</span>"
+            f"<span class='history-outcome-badge {outcome_class}'>{outcome}</span>"
+            "</div>"
             "<div class='history-meta'>"
             f"<span>{clue_giver} clue</span>"
             f"<span>{guesser} guesser</span>"
@@ -603,13 +634,11 @@ def render_interaction_history(history, show_ai_intended=False, share_explanatio
             f"{rationale_row}"
             f"{skip_note}"
             "</div>"
-            f"<div class='history-outcome {outcome_class}'>{outcome}</div>"
-            "</div>"
         )
 
     st.markdown(
         "<div class='history-panel'>"
-        "<div class='panel-title'>History</div>"
+        f"{title_html}"
         f"{''.join(rows)}"
         "</div>",
         unsafe_allow_html=True,

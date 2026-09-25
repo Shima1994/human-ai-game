@@ -49,6 +49,42 @@
     --color-bomb: #b43232;
     --color-hidden-from: #2b68d8;
     --color-hidden-to: #2f80ed;
+    /* Board-card palette: dark text on a light background for every state,
+       never light/white text on a saturated color. The saturated-bg +
+       white-text pattern above is exactly what kept breaking this session
+       (Streamlit nests widget/button labels in their own <p> with an
+       explicit color that a parent's inherited value can't reliably beat,
+       so any missed selector -- or a dark-mode default -- left text
+       unreadable). Dark-on-light degrades safely instead: even if a color
+       override fails to apply somewhere, the fallback is still dark text,
+       not invisible text. */
+    --card-bg-page: #f6f7f9;
+    --card-surface: #ffffff;
+    --card-text-primary: #1f2933;
+    --card-text-secondary: #52606d;
+    --card-border-idle: #cbd2d9;
+    --card-pending-bg: #fff6df;
+    --card-pending-border: #f0b429;
+    --card-pending-text: #8d5b0b;
+    --card-success-bg: #e3fcec;
+    --card-success-border: #2f855a;
+    --card-success-text: #276749;
+    --card-neutral-bg: #edf0f2;
+    --card-neutral-border: #9aa5b1;
+    --card-neutral-text: #3e4c59;
+    --card-danger-bg: #fff1f0;
+    --card-danger-border: #c53030;
+    --card-danger-text: #822727;
+    /* A wrong guess on a neutral card is a harmless miss, not a
+       round-ending one -- keeps its own color family (blue, same hue as
+       the original --color-neutral-miss) so it stays visually distinct
+       from .word-bomb, matching the "Blue wrong neutral" legend pill. */
+    --card-info-bg: #eaf4fa;
+    --card-info-border: #2f6f8f;
+    --card-info-text: #245f7c;
+    --card-accent-bg: #eef2ff;
+    --card-accent-border: #5b6ee1;
+    --card-accent-text: #3538a0;
     --radius-sm: 10px;
     --radius-md: 14px;
     --radius-lg: 18px;
@@ -82,9 +118,58 @@ html, body, [class*="css"], .stApp {
     padding-bottom: 2rem;
     padding-left: clamp(1rem, 2.5vw, 2.5rem);
 }
+/* With the history sidebar open, Streamlit centers .block-container in
+   whatever space is left over -- on a wide/ultrawide monitor that leftover
+   space is much bigger than max-width, so centering opened a large dead
+   gap between the sidebar and the actual content. Pin the content to the
+   sidebar's edge instead of centering it (only while a sidebar is
+   actually present -- other pages never populate one, so this never
+   applies there). */
+body:has([data-testid="stSidebar"]) .block-container {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: 100%;
+}
 
+/* Live history sidebar: Streamlit's native sidebar, used only during
+   active gameplay (screen_human_clue / screen_human_guesser /
+   render_turn_reflection all populate it) -- everywhere else no code
+   writes to it, so Streamlit renders no sidebar/toggle at all and no
+   override is needed there. Chosen over a hand-rolled fixed-position panel
+   because Streamlit already handles the desktop-persistent /
+   mobile-collapsed-behind-a-tap responsive behavior natively, instead of
+   another custom breakpoint to get wrong. */
 [data-testid="stSidebar"] {
+    background: var(--color-card);
+    border-right: 1px solid var(--color-border);
+    min-width: 480px !important;
+    width: 480px !important;
+}
+[data-testid="stSidebar"] > div {
+    padding-top: 1.5rem;
+}
+[data-testid="stSidebarUserContent"] {
+    padding: 0.5rem 1.1rem 1.5rem;
+}
+/* History is a core part of the task, not an optional aside -- a
+   participant who taps this by accident (or on purpose, curious what it
+   does) must not be able to lose access to it for the rest of the study
+   with no obvious way back. Hide the native collapse arrow so the sidebar
+   can't be closed at all; there's no resize handle to fight either since
+   width is pinned above. */
+[data-testid="stSidebarCollapseButton"] {
     display: none;
+}
+/* The empty-state card (render_interaction_history's own background/
+   border/padding) was designed to sit on the page's own background --
+   nested inside the sidebar's own card-colored background it read as a
+   small, oddly narrow box floating with nothing around it. Let it sit
+   flush against the sidebar instead. */
+[data-testid="stSidebar"] .history-panel {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin-top: 0.6rem;
 }
 
 h1, h2, h3, h4 {
@@ -164,6 +249,80 @@ h1, h2, h3, h4 {
     margin: 0;
     pointer-events: none;
 }
+/* The sidebar narrows the status bar's own available width, which was
+   already allowed to flex-wrap onto a second line at narrow widths (a
+   pre-existing, intentional responsive behavior) -- with the sidebar
+   present that wrapping now kicks in at much wider viewports too, and a
+   wrapped status bar is tall enough to grow into this pill's fixed y
+   position, so its own content (the medal chips) visibly poked out from
+   under the pill. Anything below the status bar's realistic wrapped
+   height (measured live: ~150px) is safe; this clears it with margin.
+   Scoped to width > 640px so it never fights the phone breakpoint below,
+   which repositions this pill its own way and remains untouched. */
+@media (min-width: 641px) {
+    body:has([data-testid="stSidebar"]) .timer-row {
+        top: 11rem;
+    }
+}
+/* Board-adjacent variant: same pill, used inside the timer_skip_stack
+   group below -- requested so the countdown and the cards a participant is
+   actually looking at aren't a long scroll apart. */
+.timer-row-inline {
+    display: flex;
+    margin: 0;
+}
+/* Timer and skip button as one stacked group, timer on top, skip pill
+   directly beneath it, same width -- both screen_human_guesser and the
+   tutorial's clue rounds render into this same keyed container (see
+   timer_skip_stack). position:fixed, not sticky: this subtree sits inside
+   Streamlit's [data-testid="stMain"] (the actual scrolling element, not
+   the window), and empirically position:sticky here never engaged --
+   getBoundingClientRect().top went negative on scroll instead of clamping
+   at `top`, with every ancestor already at overflow:visible (ruled out
+   the usual clipping-ancestor cause). position:fixed against the viewport
+   is what the original (pre-inline) timer used and is proven reliable in
+   this app, at the cost of leaving a gap in normal flow where it's
+   rendered -- acceptable since nothing else needs to sit there. */
+.st-key-timer_skip_stack {
+    position: fixed;
+    top: 5.8rem;
+    right: 1.5rem;
+    width: 320px;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+}
+/* st_autorefresh is a headless polling component -- no UI of its own --
+   but its default element-container still reserves visible height, which
+   showed up as an odd gap between the timer and skip pills once they sat
+   in a tight stack together. height:0 (not display:none) collapses the
+   layout space while leaving the iframe itself rendered, so the
+   interval timer inside it keeps running. */
+.st-key-timer_skip_stack .st-key-clue_timer_autorefresh {
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: visible;
+}
+/* Bigger than the default .timer-pill size -- scoped to this board-adjacent
+   variant only (not the tutorial's fixed pill, which still has to clear
+   "Deploy" and other top-right chrome at its current size). */
+.timer-row-inline .timer-pill {
+    font-size: 1.4rem;
+    padding: 0.85rem 1.5rem;
+    gap: 0.7rem;
+    border-width: 2px;
+    white-space: nowrap;
+    box-shadow: 0 8px 22px rgba(18, 34, 54, 0.26);
+    justify-content: center;
+    width: 100%;
+}
+.timer-row-inline .timer-dot {
+    width: 15px;
+    height: 15px;
+}
 .timer-pill {
     display: inline-flex;
     align-items: center;
@@ -176,6 +335,13 @@ h1, h2, h3, h4 {
     background: #fdfcfa;
     border: 1.5px solid rgba(29, 94, 168, 0.45);
     color: var(--color-primary-strong);
+    /* The pill's own box (padding/border-width/font-size) is identical
+       across every state -- normal/warn/expired/final only swap color and
+       shadow -- so this transition can't itself cause a layout jump. It
+       exists to make the color swap read as an intentional fade instead of
+       an instant snap on the autorefresh rerun that applies it. */
+    transition: background-color 0.35s ease, border-color 0.35s ease,
+        color 0.35s ease, box-shadow 0.35s ease;
     box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
 }
 /* Last 15 seconds of the ordinary countdown -- red, matching the same
@@ -187,6 +353,7 @@ h1, h2, h3, h4 {
     color: var(--color-danger);
     border-color: rgba(180, 50, 50, 0.55);
     box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
+    animation: timer-final-pulse 1.4s ease-in-out infinite;
 }
 /* Timer hit zero -- server hasn't consumed the timeout yet (autorefresh
    fires every few seconds, not instantly), but the participant should see
@@ -225,7 +392,8 @@ h1, h2, h3, h4 {
     50% { transform: scale(1.05); }
 }
 @media (prefers-reduced-motion: reduce) {
-    .timer-pill.final {
+    .timer-pill.final,
+    .timer-pill.warn {
         animation: none;
     }
 }
@@ -236,14 +404,23 @@ h1, h2, h3, h4 {
    app it read as a bare browser confirm() prompt rather than an
    informational panel. The header font-family is an inline style, so it
    needs !important to win over it. */
+/* Streamlit's own scrim (an unstyled inner layer, rgba(0,0,0,0.5)) wasn't
+   dark enough on its own against this app's light background -- page text
+   near the dialog's edges (it isn't full-width) stayed legible through it.
+   This outer wrapper paints behind that scrim, so darkening it too stacks
+   the two into something background text can't show through. */
+[data-testid="stDialog"] {
+    background: rgba(15, 13, 10, 0.72) !important;
+}
 [data-testid="stDialog"] [role="dialog"] {
+    width: min(92vw, 620px) !important;
     border-radius: 20px !important;
     box-shadow: 0 24px 60px rgba(18, 34, 54, 0.22) !important;
     border: 1px solid var(--color-border);
 }
 [data-testid="stDialog"] [role="dialog"] > div:first-child {
     font-family: var(--font-reading) !important;
-    font-size: 1.65rem !important;
+    font-size: 1.85rem !important;
     font-weight: 700 !important;
     color: var(--color-heading);
     border-bottom: 1px solid var(--color-border);
@@ -251,13 +428,14 @@ h1, h2, h3, h4 {
 }
 [data-testid="stDialog"] [role="dialog"] > div:first-child [data-testid="stMarkdownContainer"] p {
     font-family: var(--font-reading) !important;
-    font-size: 1.65rem !important;
+    font-size: 1.85rem !important;
     font-weight: 700 !important;
 }
 [data-testid="stDialog"] [role="dialog"] [data-testid="stMarkdownContainer"] {
     font-family: var(--font-sans);
-    font-size: 1rem;
-    line-height: 1.55;
+    font-size: 1.1rem;
+    font-weight: 500;
+    line-height: 1.6;
 }
 
 /* Cards */
@@ -273,12 +451,12 @@ h1, h2, h3, h4 {
     padding-bottom: 0.8rem;
 }
 .panel-title {
-    font-size: 0.74rem;
+    font-size: 0.82rem;
     text-transform: uppercase;
     letter-spacing: 0.14em;
     color: var(--color-text-muted);
     margin-bottom: 0.5rem;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 /* Top status bar: identity, progress stats, medals, role */
@@ -417,6 +595,16 @@ h1, h2, h3, h4 {
     color: #8a5208;
     border: 1px solid rgba(201, 128, 20, 0.35);
 }
+/* The fixed timer pill's own action label ("Giving your clue" / "Guessing")
+   already says the same thing as this badge ("You're giving the clue" /
+   "AI clues -- you guess") -- with the history sidebar narrowing the main
+   content area, the status bar's right edge (where this badge normally
+   sits) now lands close enough to the fixed pill's screen position that
+   the two visibly overlapped. Hide the redundant one instead of chasing a
+   position that stays clear of it at every viewport width. */
+body:has(.timer-row) .role-badge {
+    display: none;
+}
 .role-dot {
     width: 8px;
     height: 8px;
@@ -457,30 +645,6 @@ h1, h2, h3, h4 {
    becomes valid, which read as a one-time page "jump". */
 .board-lock-note.board-lock-note-hidden {
     visibility: hidden;
-}
-
-/* Live checklist shown above the clue-giver's submit button */
-.turn-checklist {
-    list-style: none;
-    margin: 0 0 0.75rem;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-.turn-checklist li {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-    color: var(--color-text-muted);
-}
-.turn-checklist li.ok {
-    color: var(--color-target-strong);
-}
-.turn-checklist .mark {
-    font-size: 0.85rem;
-    line-height: 1;
 }
 
 .round-chip {
@@ -531,31 +695,49 @@ h1, h2, h3, h4 {
     font-family: var(--font-sans);
 }
 .word-hidden {
-    background: linear-gradient(135deg, var(--color-hidden-from), var(--color-hidden-to));
-    color: #eff6ff;
-    border-color: rgba(255, 255, 255, 0.25);
+    /* Not yet revealed and not clickable (e.g. the guesser's board before
+       any clue exists) -- idle/neutral, not yet classified as anything. */
+    background: var(--card-neutral-bg);
+    color: var(--card-text-primary);
+    border-color: var(--card-border-idle);
 }
 .word-target {
-    background: var(--color-target);
-    color: #f7fff1;
+    background: var(--card-success-bg);
+    color: var(--card-success-text);
+    border-color: var(--card-success-border);
 }
 .word-found {
-    background: var(--color-target-strong);
-    color: #f5fff0;
-    border-color: rgba(7, 55, 10, 0.35);
-    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18), 0 10px 22px rgba(23, 95, 19, 0.18);
+    /* A target that was actually guessed correctly -- same success colors
+       as .word-target, with extra emphasis so "already found" reads as
+       more definite than "known to be a target but not guessed yet"
+       (the clue-giver's own board shows every target in the plain
+       .word-target style from the start, since they already know the
+       roles). */
+    background: var(--card-success-bg);
+    color: var(--card-success-text);
+    border-color: var(--card-success-border);
+    border-width: 2px;
+    box-shadow: inset 0 0 0 1px var(--card-success-border), 0 8px 18px rgba(47, 133, 90, 0.18);
 }
 .word-neutral {
-    background: var(--color-neutral);
-    color: #f9f8f6;
+    background: var(--card-neutral-bg);
+    color: var(--card-neutral-text);
+    border-color: var(--card-neutral-border);
 }
 .word-neutral-miss {
-    background: var(--color-neutral-miss);
-    color: #f0fbff;
+    /* A wrong guess that wasn't a bomb -- its own blue "info" family, kept
+       distinct from .word-bomb's red so a harmless miss never looks as
+       severe as hitting the bomb. */
+    background: var(--card-info-bg);
+    color: var(--card-info-text);
+    border-color: var(--card-info-border);
 }
 .word-bomb {
-    background: var(--color-bomb);
-    color: #fff5f5;
+    background: var(--card-danger-bg);
+    color: var(--card-danger-text);
+    border-color: var(--card-danger-border);
+    border-width: 2px;
+    box-shadow: inset 0 0 0 1px var(--card-danger-border), 0 8px 18px rgba(197, 48, 48, 0.2);
 }
 .card-mark {
     font-size: 0.82rem;
@@ -563,6 +745,14 @@ h1, h2, h3, h4 {
     opacity: 0.95;
 }
 .word-selected {
+    /* Added alongside a role class (.word-target, .word-bomb, ...), not
+       instead of it -- the role color already shows through immediately on
+       click in the current interaction model, so this is only a "you
+       picked this one" ring on top of it, not a separate pending state.
+       (The --card-pending-* colors above are ready for whenever the
+       click-then-confirm flow keeps a guess uncommitted with its role
+       hidden -- nothing currently produces that state, so nothing uses
+       them yet.) */
     outline: 3px solid var(--color-heading);
     outline-offset: -4px;
     box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.82);
@@ -1315,82 +1505,134 @@ div[class*="st-key-guide_clue_step_"] h4 {
     color: var(--color-heading);
 }
 .history-panel {
-    border-radius: var(--radius-lg);
-    padding: 0.95rem;
-    background: var(--color-card-soft);
-    border: 1px solid var(--color-border);
-    margin-top: 0.85rem;
-    margin-bottom: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: 0.6rem;
+    margin-bottom: 0.6rem;
 }
+/* Each past turn is its own card, always stacked (not a width-dependent
+   grid) so the same markup reads well whether it's sitting in the wide
+   round_summary panel or the much narrower live-history sidebar -- the
+   3-column grid this replaced (badge | body | outcome, plus a fixed-width
+   label column inside every detail row) had no room to work with in the
+   sidebar and collapsed into overlapping, letter-wrapped text. The left
+   accent bar is the fastest way to scan outcomes down a list of many
+   turns without reading every badge. */
 .history-row {
-    display: grid;
-    grid-template-columns: 38px minmax(0, 1fr) auto;
-    gap: 0.75rem;
-    align-items: start;
-    padding: 0.78rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.85rem 0.95rem;
     border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-border-strong);
     border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.92);
-    margin-top: 0.55rem;
+    background: var(--color-card);
+    box-shadow: 0 1px 3px rgba(18, 34, 54, 0.07);
     color: var(--color-text-soft);
-    font-size: 0.9rem;
-    line-height: 1.4;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+.history-row.history-outcome-correct {
+    border-left-color: var(--card-success-border);
+}
+.history-row.history-outcome-bomb {
+    border-left-color: var(--card-danger-border);
+}
+.history-row.history-outcome-wrong {
+    border-left-color: var(--card-info-border);
+}
+.history-row.history-outcome-skip {
+    border-left-color: var(--color-warn);
+}
+.history-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
 }
 .history-index {
-    width: 30px;
-    height: 30px;
-    border-radius: var(--radius-pill);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-heading);
-    color: #fffdf8;
-    font-weight: 800;
-}
-.history-body {
-    min-width: 0;
-}
-.history-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.38rem;
-    margin-bottom: 0.3rem;
-}
-.history-meta span,
-.history-outcome {
-    border-radius: var(--radius-pill);
-    padding: 0.22rem 0.56rem;
-    background: var(--color-primary-soft);
-    color: var(--color-primary);
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+}
+.history-outcome-badge {
+    border-radius: var(--radius-pill);
+    padding: 0.22rem 0.62rem;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+.history-outcome-badge.history-outcome-correct {
+    background: var(--card-success-bg);
+    color: var(--card-success-text);
+}
+.history-outcome-badge.history-outcome-wrong {
+    background: var(--card-info-bg);
+    color: var(--card-info-text);
+}
+.history-outcome-badge.history-outcome-bomb {
+    background: var(--card-danger-bg);
+    color: var(--card-danger-text);
+}
+.history-outcome-badge.history-outcome-skip {
+    background: var(--color-warn-soft);
+    color: var(--color-warn);
+}
+/* Role badges (who gave the clue / who guessed) are informational, not an
+   outcome -- kept visually quieter than the outcome badge above so the
+   two never compete for attention. */
+.history-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+.history-meta span {
+    border-radius: var(--radius-pill);
+    padding: 0.16rem 0.5rem;
+    background: rgba(18, 34, 54, 0.06);
+    color: var(--color-text-muted);
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 .history-hint-line {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 0.45rem;
-    margin-bottom: 0.46rem;
     flex-wrap: wrap;
 }
 .history-hint {
     color: var(--color-heading);
-    font-size: 1.05rem;
+    font-size: 1.02rem;
     font-weight: 900;
     letter-spacing: 0.02em;
 }
+.history-number {
+    border-radius: var(--radius-pill);
+    padding: 0.14rem 0.48rem;
+    background: rgba(29, 94, 168, 0.12);
+    color: var(--color-primary);
+    font-weight: 800;
+    font-size: 0.72rem;
+}
 .history-detail {
-    display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 0.45rem;
-    align-items: start;
-    margin-top: 0.28rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-top: 0.2rem;
 }
 .history-detail-label {
     color: var(--color-heading);
     font-weight: 800;
-    font-size: 0.76rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 .history-chip-row {
     display: flex;
@@ -1398,68 +1640,51 @@ div[class*="st-key-guide_clue_step_"] h4 {
     gap: 0.28rem;
     min-width: 0;
 }
-.history-number {
-    border-radius: var(--radius-pill);
-    padding: 0.18rem 0.5rem;
-    background: rgba(29, 94, 168, 0.12);
-    color: var(--color-primary);
-    font-weight: 800;
-    font-size: 0.78rem;
-}
 .history-chip {
     border-radius: var(--radius-pill);
     padding: 0.2rem 0.5rem;
     background: rgba(18, 34, 54, 0.07);
     color: #34495f;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 700;
     overflow-wrap: anywhere;
 }
 .history-chip.correct {
-    background: var(--color-success-soft);
-    color: var(--color-success-strong);
+    background: var(--card-success-bg);
+    color: var(--card-success-text);
 }
 .history-chip.neutral {
-    background: var(--color-info-soft);
-    color: #245f7c;
+    background: var(--card-info-bg);
+    color: var(--card-info-text);
 }
 .history-chip.bomb {
-    background: var(--color-danger-soft);
-    color: #a12727;
+    background: var(--card-danger-bg);
+    color: var(--card-danger-text);
 }
 .history-chip.muted {
     color: #7b8b9a;
     background: rgba(18, 34, 54, 0.05);
 }
-.history-outcome {
-    justify-self: end;
-    white-space: nowrap;
-}
-.history-outcome-correct {
-    background: var(--color-success-soft);
-    color: var(--color-success-strong);
-}
-.history-outcome-wrong {
-    background: var(--color-info-soft);
-    color: #245f7c;
-}
-.history-outcome-bomb {
-    background: var(--color-danger-soft);
-    color: #a12727;
-}
-.history-outcome-skip {
-    background: var(--color-warn-soft);
-    color: var(--color-warn);
-}
 .history-skip-note {
-    margin-top: 0.45rem;
+    margin-top: 0.15rem;
     color: var(--color-warn);
     font-weight: 700;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
 }
 .history-empty {
     color: var(--color-text-muted);
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+/* The sidebar genuinely has less width than round_summary's panel even
+   with the stacked layout above -- a touch less padding and a smaller
+   hint size keep cards feeling proportioned there instead of oversized. */
+[data-testid="stSidebar"] .history-row {
+    padding: 0.7rem 0.8rem;
+    font-size: 0.82rem;
+}
+[data-testid="stSidebar"] .history-hint {
+    font-size: 0.94rem;
 }
 
 .final-score {
@@ -1689,15 +1914,58 @@ button[data-baseweb="button"]:disabled {
     transform: none;
     filter: grayscale(0.2);
 }
-.let-ai-guess-marker + div [data-testid="stButton"] > button,
-.let-ai-guess-marker + div button {
+/* Same selector fix as .skip-button-marker below, and same root cause:
+   ".let-ai-guess-marker + div" never matched anything live (confirmed via
+   a direct query against the running app -- 0 elements), so this button
+   had silently never actually gotten its intended orange styling. The
+   marker is now placed immediately before the button call in
+   ui/screens.py (it used to sit ~90 lines earlier, before an unrelated
+   rating panel), and :has() reaches up to the real
+   [data-testid="stElementContainer"] sibling pair Streamlit creates. */
+[data-testid="stElementContainer"]:has(.let-ai-guess-marker)
+    + [data-testid="stElementContainer"]
+    [data-testid="stButton"] > button {
     background: linear-gradient(135deg, #9b4d11, var(--color-secondary));
     border-color: rgba(155, 77, 17, 0.28);
     box-shadow: 0 10px 22px rgba(155, 77, 17, 0.18);
 }
-.let-ai-guess-marker + div [data-testid="stButton"] > button:hover,
-.let-ai-guess-marker + div button:hover {
+[data-testid="stElementContainer"]:has(.let-ai-guess-marker)
+    + [data-testid="stElementContainer"]
+    [data-testid="stButton"] > button:hover {
     box-shadow: 0 12px 26px rgba(155, 77, 17, 0.22);
+}
+/* Skip is a real, always-available option, not a rarely-needed escape
+   hatch -- a participant who forgets it exists just keeps guessing blind
+   instead. Deliberately its own color (amber, matching the "Skipped"
+   outcome color used in history/legend elsewhere) and noticeably larger
+   than a normal secondary button, so it reads as a real button to
+   remember, not one more line in the form.
+
+   Selector note: a plain ".skip-button-marker + div" doesn't work -- the
+   marker div st.markdown() renders is nested inside its own small
+   stMarkdownContainer, which has no sibling of its own (nothing else was
+   put inside that same st.markdown call); the actual sibling relationship
+   Streamlit creates is one level up, between that whole element's
+   [data-testid="stElementContainer"] and the *next* one (the button's).
+   :has() reaches up to that real container first -- same fix applied
+   just above for .let-ai-guess-marker, which had the identical bug. */
+[data-testid="stElementContainer"]:has(.skip-button-marker)
+    + [data-testid="stElementContainer"]
+    [data-testid="stButton"] > button {
+    background: linear-gradient(135deg, #c9861a, #8a5208);
+    border: 2px solid rgba(138, 82, 8, 0.55);
+    box-shadow: 0 10px 24px rgba(138, 82, 8, 0.32);
+    font-size: 1.4rem;
+    padding: 0.85rem 1.5rem;
+    /* Same pill shape as .timer-pill right above it -- they're meant to
+       read as one matched two-piece control, not a pill next to a
+       rectangle. */
+    border-radius: var(--radius-pill);
+}
+[data-testid="stElementContainer"]:has(.skip-button-marker)
+    + [data-testid="stElementContainer"]
+    [data-testid="stButton"] > button:hover {
+    box-shadow: 0 12px 28px rgba(138, 82, 8, 0.38);
 }
 .st-key-before_ai_guess_panel,
 .st-key-before_ai_guess_panel [data-testid="stVerticalBlockBorderWrapper"] {
@@ -1705,6 +1973,30 @@ button[data-baseweb="button"]:disabled {
     border-color: var(--color-border) !important;
     border-radius: var(--radius-xl) !important;
     box-shadow: var(--color-shadow) !important;
+}
+/* Red highlight on whichever clue-form field failed the last submit
+   attempt, paired with a popup dialog listing the same problems (see
+   _clue_form_errors_dialog) -- a plain text caption near the button wasn't
+   reliably read. .turn-invalid-marker is a single div (position in the DOM
+   doesn't matter) carrying one class per currently-invalid field;
+   body:has() reaches from it to each field's own
+   keyed container regardless of nesting depth, so unlike a sibling selector
+   this isn't affected by how deep Streamlit nests either element. */
+body:has(.turn-invalid-marker.invalid-hint) .st-key-clue_hint_container,
+body:has(.turn-invalid-marker.invalid-targets) .st-key-clue_targets_container,
+body:has(.turn-invalid-marker.invalid-expected) .st-key-clue_expected_container,
+body:has(.turn-invalid-marker.invalid-rating) .st-key-clue_rating_container,
+body:has(.turn-invalid-marker.invalid-link) .st-key-clue_general_link_container,
+body:has(.turn-invalid-marker.invalid-hint) .st-key-tutorial_clue_hint_container,
+body:has(.turn-invalid-marker.invalid-targets) .st-key-tutorial_clue_targets_container,
+body:has(.turn-invalid-marker.invalid-expected) .st-key-tutorial_clue_expected_container,
+body:has(.turn-invalid-marker.invalid-rating) .st-key-tutorial_clue_rating_container,
+body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_container {
+    border: 3px solid var(--color-danger) !important;
+    border-radius: var(--radius-md, 10px);
+    padding: 0.6rem;
+    background: rgba(180, 50, 50, 0.07);
+    box-shadow: 0 0 0 1px rgba(180, 50, 50, 0.25);
 }
 .st-key-before_ai_guess_panel {
     margin-top: 1rem;
@@ -2047,10 +2339,16 @@ button[data-baseweb="button"]:disabled {
 .profile-aside-word-cards span:nth-child(3) {
     top: 112px; left: 22px; transform: rotate(13deg); background: #ffd0c9;
 }
-.stButton > button[kind="secondary"],
-.stButton button[kind="secondary"],
-.stButton [data-testid="stBaseButton-secondary"],
-[data-testid="stButton"] button[kind="secondary"] {
+/* Scoped to the board's word-card buttons specifically (render_board's
+   clickable cards, inside .st-key-board_card_grid) -- this used to be a
+   blanket rule on every secondary/default-kind button anywhere in the app,
+   which silently forced the same fixed 72px card height onto unrelated
+   secondary buttons elsewhere (e.g. a dialog's "Cancel" button next to a
+   normally-sized "Confirm" primary button, reading as mismatched sizes). */
+.st-key-board_card_grid .stButton > button[kind="secondary"],
+.st-key-board_card_grid .stButton button[kind="secondary"],
+.st-key-board_card_grid .stButton [data-testid="stBaseButton-secondary"],
+.st-key-board_card_grid [data-testid="stButton"] button[kind="secondary"] {
     height: 72px;
     min-height: 72px;
     max-height: 72px;
@@ -2067,10 +2365,10 @@ button[data-baseweb="button"]:disabled {
     border: 1px solid rgba(255, 255, 255, 0.24);
     box-shadow: none;
 }
-.stButton > button[kind="secondary"]:hover,
-.stButton button[kind="secondary"]:hover,
-.stButton [data-testid="stBaseButton-secondary"]:hover,
-[data-testid="stButton"] button[kind="secondary"]:hover {
+.st-key-board_card_grid .stButton > button[kind="secondary"]:hover,
+.st-key-board_card_grid .stButton button[kind="secondary"]:hover,
+.st-key-board_card_grid .stButton [data-testid="stBaseButton-secondary"]:hover,
+.st-key-board_card_grid [data-testid="stButton"] button[kind="secondary"]:hover {
     box-shadow: none;
 }
 
@@ -2120,6 +2418,45 @@ button[data-baseweb="button"]:disabled {
     color: #fff !important;
     -webkit-text-fill-color: #fff !important;
     font-size: 0.85rem !important;
+}
+
+/* Clickable board cards (the guesser's still-hidden cards, before a card
+   is clicked): kept visually continuous with the static .word-card
+   palette instead of the app's default solid-blue CTA button -- a wall of
+   vivid blue buttons appearing all at once (e.g. the instant the guess
+   reasoning field becomes valid) read as a jarring, unexplained color
+   change once .word-hidden itself became a calm light gray. */
+[class*="board_card_grid"] .stButton > button,
+[class*="board_card_grid"] .stButton button,
+[class*="board_card_grid"] [data-testid="stButton"] > button,
+[class*="board_card_grid"] [data-testid="stBaseButton-secondary"] {
+    background: var(--card-surface);
+    background-image: none;
+    border: 1px solid var(--card-border-idle);
+    box-shadow: none;
+    height: 72px;
+}
+[class*="board_card_grid"] .stButton > button [data-testid="stMarkdownContainer"] p,
+[class*="board_card_grid"] [data-testid="stBaseButton-secondary"] [data-testid="stMarkdownContainer"] p {
+    color: var(--card-text-primary) !important;
+    -webkit-text-fill-color: var(--card-text-primary) !important;
+}
+[class*="board_card_grid"] .stButton > button:hover,
+[class*="board_card_grid"] [data-testid="stBaseButton-secondary"]:hover {
+    background: var(--card-neutral-bg);
+    border-color: var(--card-accent-border);
+    box-shadow: none;
+    transform: none;
+    filter: none;
+}
+[class*="board_card_grid"] .stButton > button:hover [data-testid="stMarkdownContainer"] p,
+[class*="board_card_grid"] [data-testid="stBaseButton-secondary"]:hover [data-testid="stMarkdownContainer"] p {
+    color: var(--card-accent-text) !important;
+    -webkit-text-fill-color: var(--card-accent-text) !important;
+}
+[class*="board_card_grid"] .stButton > button:disabled,
+[class*="board_card_grid"] [data-testid="stBaseButton-secondary"]:disabled {
+    opacity: 0.55;
 }
 
 /* Radio (rating) groups */
@@ -2586,7 +2923,7 @@ div[data-testid="stAlert"] {
     div[data-testid="column"] {
         min-width: 0;
     }
-    /* Board grid: 3 columns on phones for better tap targets */
+    /* 5-column blocks (hint target selector with 5 remaining targets) get 3 columns on phones */
     div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(5)) {
         display: grid !important;
         grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -2597,7 +2934,7 @@ div[data-testid="stAlert"] {
         min-width: 0 !important;
         flex: unset !important;
     }
-    /* 4-column blocks (hint target selector etc.) get 2 columns on phone */
+    /* 4-column blocks (word board, hint target selector with 4 remaining targets) get 2 columns on phone */
     div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(4)):not(:has(> div[data-testid="column"]:nth-child(5))) {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;

@@ -14,9 +14,9 @@ from ui.game_guide import (
 
 
 class GameGuideTests(unittest.TestCase):
-    def test_all_twelve_visual_sections_are_present(self):
+    def test_all_eleven_visual_sections_are_present(self):
         self.assertEqual(len(CLUE_GIVER_STEPS), 6)
-        self.assertEqual(len(GUIDE_SECTIONS), 9)
+        self.assertEqual(len(GUIDE_SECTIONS), 8)
         titles = [title for title, _ in GUIDE_SECTIONS]
         self.assertEqual(
             titles,
@@ -26,12 +26,15 @@ class GameGuideTests(unittest.TestCase):
                 "Try to Connect More Than One Target",
                 "Interactions and Round Limit",
                 "Skipping",
-                "Communicative Repair",
                 "Time Limit",
                 "After an Interaction",
                 "Medals and Performance",
             ],
         )
+        # Communicative Repair was deliberately removed -- purely theoretical
+        # framing that shouldn't be surfaced to participants (should come
+        # naturally rather than being explained up front).
+        self.assertNotIn("Communicative Repair", titles)
 
     def test_six_clue_giver_steps_are_in_required_order(self):
         self.assertEqual(
@@ -69,7 +72,6 @@ class GameGuideTests(unittest.TestCase):
             "Try to Connect More Than One Target",
             "maximum of 3 completed interactions",
             "Skip option up to 2 times",
-            "Communicative Repair",
             "90 seconds",
             "A timeout does not use one of your skips.",
             "After an Interaction",
@@ -108,7 +110,6 @@ class GameGuideTests(unittest.TestCase):
             ":material/style:",
             ":material/sync:",
             ":material/skip_next:",
-            ":material/forum:",
             ":material/schedule:",
             ":material/rate_review:",
             ":material/emoji_events:",

@@ -265,7 +265,7 @@ ALIGNMENT_APPLICABILITY_VALUES = frozenset(
     }
 )
 ROUND_END_REASONS = frozenset(
-    {"all_targets_found", "bomb", "completed_turn_limit"}
+    {"all_targets_found", "bomb", "completed_turn_limit", "timeout_loss"}
 )
 
 

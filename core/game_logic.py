@@ -65,7 +65,13 @@ def get_role_for_round(round_number, starting_role=None):
 
 
 def get_board_template_type(round_number):
-    return "A" if round_number % 2 == 1 else "B"
+    # Template tied to round number, not to round parity/role: rounds 1-2
+    # are template A, rounds 3-4 are template B, for every participant.
+    # Combined with get_role_for_round's per-round role alternation, this
+    # means each role (human clue-giver and AI clue-giver) is exposed to
+    # both templates once within a session, instead of one role always
+    # getting template A and the other always getting template B.
+    return "A" if round_number <= 2 else "B"
 
 
 def _unique_words(words):

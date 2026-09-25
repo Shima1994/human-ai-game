@@ -295,6 +295,35 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
         row = storage._round_analysis_row("p1", "2026-01-01T00:01:00", 0)
         self.assertEqual(row["round_end_reason"], "")
 
+    def test_timeout_loss_round_end_reason_is_accepted(self):
+        """record_forced_timeout_loss (core/game_logic.py) sets
+        round_end_reason="timeout_loss" when both skips and the final
+        30-second window run out. ROUND_END_REASONS previously didn't
+        include it, so _round_analysis_row raised ValueError here -- the
+        exact path log_round takes right after a forced-loss round, which
+        crashed the app and dropped that round's data entirely instead of
+        logging it."""
+        self.state.update(
+            condition="baseline",
+            board=["Alpha", "Beta", "Neutral", "Bomb"],
+            board_id="board-1",
+            board_template_type="A",
+            word_type_per_card={
+                "Alpha": "abstract",
+                "Beta": "abstract",
+                "Neutral": "concrete",
+                "Bomb": "concrete",
+            },
+            start_time="2026-01-01T00:00:00",
+            round_start_time="2026-01-01T00:00:00",
+            round_finished=True,
+            round_end_reason="timeout_loss",
+            round_bomb_hit=False,
+            round_medal="none",
+        )
+        row = storage._round_analysis_row("p1", "2026-01-01T00:01:00", 0)
+        self.assertEqual(row["round_end_reason"], "timeout_loss")
+
 
 if __name__ == "__main__":
     unittest.main()

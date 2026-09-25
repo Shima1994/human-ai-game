@@ -22,6 +22,25 @@ class GuessRationaleValidationTests(unittest.TestCase):
             (False, "board_word"),
         )
 
+    def test_rejects_short_board_word_prefix_extension_bypass(self):
+        # "Pen" is a real 3-letter board word (see core/words.py). Mirrors the
+        # bounded prefix-extension check already applied to AI hints in
+        # core/ai_service.py::is_hint_too_close_to_board.
+        self.assertEqual(
+            validate_guess_rationale(
+                "I always use a pencil for drawing this", ["Pen", "Dog", "Apple", "Table"]
+            ),
+            (False, "board_word"),
+        )
+
+    def test_allows_unrelated_word_sharing_short_board_word_prefix(self):
+        self.assertEqual(
+            validate_guess_rationale(
+                "Both are found near a pentagon shaped building", ["Pen", "Dog", "Apple", "Table"]
+            ),
+            (True, ""),
+        )
+
     def test_rejects_word_count_and_language_violations(self):
         self.assertEqual(
             validate_guess_rationale("household pets", self.BOARD),

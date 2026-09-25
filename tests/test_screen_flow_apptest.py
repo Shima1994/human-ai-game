@@ -166,11 +166,13 @@ class GuesserSkipButtonGatingTests(unittest.TestCase):
 
 
 class ClueTimerLabelingTests(unittest.TestCase):
-    """The countdown pill must say what's being timed and whether the
-    participant is giving a clue or guessing (not a bare "left to decide"),
-    and must switch to a distinct "final chance" state once both skips are
-    gone and the one last forced-guess window is running -- these are the
-    per-state labels the timer audit required."""
+    """The countdown pill deliberately no longer restates the participant's
+    role ("Guessing"/"Giving your clue") in its ordinary states -- the role
+    is already obvious from the screen, and the label just made the pill
+    wider without adding information. It must still switch to a distinct
+    "Final chance" state once both skips are gone and the one last
+    forced-guess window is running -- that's a real state change, not a
+    restated role, and stays labeled."""
 
     def _reach_guesser_with_hint(self, at):
         at.session_state["consent_given"] = True
@@ -197,22 +199,12 @@ class ClueTimerLabelingTests(unittest.TestCase):
         at.run()
         return at
 
-    def test_guesser_timer_shows_guessing_label(self):
+    def test_guesser_timer_has_no_role_label(self):
         at = self._reach_guesser_with_hint(_fresh_app())
-        self.assertIn("Guessing —", _all_markdown_text(at))
-        self.assertNotIn("Giving your clue", _all_markdown_text(at))
-
-    # There is no AppTest-based equivalent of this for the clue-giver screen:
-    # screen_human_clue renders the timer inside an st.empty() placeholder
-    # (needed so it can be cleared before the "AI is thinking" spinner), and
-    # AppTest's simulator silently drops an st.empty() placeholder's content
-    # whenever a custom component (st_autorefresh) is rendered inside it
-    # alongside other elements -- confirmed by isolating the two calls into a
-    # standalone script (markdown alone: captured; markdown + st_autorefresh
-    # in the same st.empty(): captured as an empty list, no exception raised
-    # either way). This does not reproduce in the real browser -- verified
-    # directly there instead (screenshot: the clue-giver screen shows
-    # "Giving your clue — 01:30 left" in the same fixed-position pill).
+        text = _all_markdown_text(at)
+        self.assertNotIn("Guessing —", text)
+        self.assertNotIn("Giving your clue", text)
+        self.assertIn(" left", text)
 
     def test_final_guess_deadline_shows_final_chance_label(self):
         at = self._reach_guesser_with_hint(_fresh_app())

@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import re
 import time
 
@@ -1323,7 +1324,28 @@ def ai_guess(
         return {"action": "skip", "guesses": [], "guess_rationale": "", **meta}
     if remaining_rerolls > 0:
         return {"action": "reroll", "guesses": [], "guess_rationale": "", **meta}
-    return {"action": "guess", "guesses": [], "guess_rationale": "", **meta}
+    # No skip and no reroll left, and nothing usable could be parsed from the
+    # model's response (or the API call itself failed) -- the game rules
+    # don't have a fourth option here (guess / skip / timeout only), so an
+    # empty "guess" would record as an incoherent "wrong guess with no cards
+    # guessed" turn. Force a real guess by picking at random from the cards
+    # not yet guessed this round, same as a guesser who genuinely can't pass
+    # having to name something.
+    forced_guesses = (
+        random.sample(available_board, min(max_guesses, len(available_board)))
+        if available_board
+        else []
+    )
+    meta["raw_response"] = (
+        f"{meta['raw_response']}\n\n<forced_random_guess: no valid guess parsed, "
+        "no skip/reroll available>"
+    )
+    return {
+        "action": "guess",
+        "guesses": forced_guesses,
+        "guess_rationale": "No valid response could be parsed, so a card was picked at random.",
+        **meta,
+    }
 
 
 REFLECTION_SYSTEM_PROMPT = """You are an AI teammate writing a short reflection at the end of one round of a cooperative word game. Your reader is the human player.
@@ -1363,6 +1385,11 @@ def generate_ai_round_reflection(
         "Interaction history:\n"
         f"{format_interaction_history(history) if condition == 'adaptive' else format_baseline_history(history)}\n"
     )
+    fallback_text = (
+        "I could not generate a reflection this time. Look back at the history above: "
+        "compare each clue with its intended targets and the actual guesses, and note "
+        "what association should be clearer in the next round."
+    )
     try:
         text, _ = call_openai_chat(
             REFLECTION_SYSTEM_PROMPT,
@@ -1371,13 +1398,15 @@ def generate_ai_round_reflection(
             model=REFLECTION_MODEL_NAME,
             json_mode=False,
         )
-        return limit_words(text, 200)
+        # A successful call with blank/whitespace-only content raises nothing,
+        # so without this check an empty reflection would be stored and shown
+        # to the participant as a real (if terse) one, indistinguishable from
+        # an actual API failure -- same silent-empty-value class of bug as
+        # ai_guess's forced-random-guess fix above.
+        limited = limit_words(text, 200)
+        return limited if limited.strip() else fallback_text
     except Exception:
-        return (
-            "I could not generate a reflection this time. Look back at the history above: "
-            "compare each clue with its intended targets and the actual guesses, and note "
-            "what association should be clearer in the next round."
-        )
+        return fallback_text
 
 
 AI_POST_GAME_SYSTEM_PROMPT = """You are an AI teammate who just finished a full cooperative word-game session with one human partner across several rounds. You are now answering a private end-of-study self-assessment about the collaboration, mirroring the questions the human partner answers about you. Your answers are never shown to the human and are used only for research analysis.

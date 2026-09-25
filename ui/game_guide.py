@@ -160,18 +160,6 @@ If you have already submitted a behavioural response before using Skip, that int
 Skipping is therefore available as a safety mechanism when communication is unclear, but the number of skips is limited.""",
     ),
     (
-        "Communicative Repair",
-        """A misunderstanding does not always end the communication.
-
-After an unresolved interaction, the game may allow the communication to continue through a repair attempt.
-
-Repair gives the communicating partner another opportunity to clarify the intended relationship.
-
-When a repair occurs, it remains connected to the unresolved meaning from the previous interaction rather than starting an unrelated communication attempt.
-
-Use the new information carefully and reconsider the remaining intended cards.""",
-    ),
-    (
         "Time Limit",
         """When it is your turn to make a decision, you have 90 seconds to complete the required actions shown on the screen.
 

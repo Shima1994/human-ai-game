@@ -97,11 +97,14 @@ class TutorialTests(unittest.TestCase):
         # Only the real target words are offered, like the real game -- not
         # the whole board with non-targets shown disabled.
         self.assertIn(
-            "render_hint_target_selector(\n                tutorial_target_options,",
+            "render_hint_target_selector(\n                    tutorial_target_options,",
             source,
         )
-        self.assertIn("Stop guessing and use 1 skip", source)
-        self.assertIn("tutorial_skip_interpretation_", source)
+        # The skip button moved next to the timer (small "Skip" button); the
+        # card-interpretation picker now opens as a dialog on click instead
+        # of sitting inline, shared with screen_human_guesser's skip flow.
+        self.assertIn('key=f"tutorial_skip_button_{repair_attempt}"', source)
+        self.assertIn("_skip_interpretation_dialog(remaining_guess_slots, skip_options)", source)
         self.assertIn("MAX_SKIPS_PER_ROUND", source)
         self.assertIn("MAX_INTERACTIONS_PER_ROUND", source)
         ai_round = source[source.index('if step == "ai_clue_round"'):source.index('if step == "human_clue_round"')]
