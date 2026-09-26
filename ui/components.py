@@ -85,6 +85,84 @@ def scroll_page_to_top(should_scroll):
     )
 
 
+def close_maxed_multiselects():
+    """Every st.multiselect with max_selections in this app should close its
+    dropdown the instant a click brings it up to that cap, instead of
+    sitting open showing BaseWeb's own "You can only select up to N
+    option(s). Remove an option first." hint. Streamlit has no built-in way
+    to do this, so this reaches into the parent document (same cross-frame
+    technique as scroll_page_to_top) and blurs the focused input right after
+    an option click that leaves that hint showing -- closing it, since
+    BaseWeb's popover closes on blur.
+
+    Deliberately keyed off the option *click*, not just "is the hint
+    currently visible": a popover reopened by clicking the multiselect box
+    itself (e.g. to remove a chip) shows the exact same hint while still at
+    the cap, and must NOT be immediately closed again -- only a click that
+    just added the capping option should trigger this. Mounted once,
+    app-wide, from app.py's main() rather than once per multiselect, since
+    it isn't tied to any one widget."""
+    st_components.html(
+        """
+        <script>
+          (function () {
+            const doc = window.parent.document;
+            if (doc.__closeMaxedMultiselectsInstalled) return;
+            doc.__closeMaxedMultiselectsInstalled = true;
+            doc.addEventListener(
+              "click",
+              (event) => {
+                doc.body.setAttribute("data-debug-option-click-seen", "yes");
+                if (!event.target.closest('[role="option"]')) return;
+                doc.body.setAttribute("data-debug-option-click-matched", "yes");
+                // The selection has to round-trip to the Streamlit server and
+                // back (a script rerun) before the "you can only select up
+                // to N" hint actually renders -- that can easily take longer
+                // than a single short delay, so poll for a couple of seconds
+                // instead of checking once.
+                let attempts = 0;
+                const poll = setInterval(() => {
+                  attempts += 1;
+                  const popovers = doc.querySelectorAll('[data-baseweb="popover"]');
+                  doc.body.setAttribute("data-debug-popover-count", String(popovers.length));
+                  doc.body.setAttribute(
+                    "data-debug-popover-texts",
+                    Array.from(popovers).map((p) => p.textContent.slice(0, 40)).join(" || ")
+                  );
+                  for (const popover of popovers) {
+                    if (
+                      popover.getClientRects().length > 0 &&
+                      popover.textContent.includes("You can only select up to")
+                    ) {
+                      doc.body.setAttribute("data-debug-close-attempted", "yes");
+                      clearInterval(poll);
+                      // Neither .blur() nor an Escape keydown closes a BaseWeb
+                      // Select popover -- it tracks its own open/closed React
+                      // state via a document-level "click outside" listener,
+                      // not native focus or key handling. Simulating that
+                      // click (on <body>, away from the popover/input) is
+                      // what its own close logic actually listens for.
+                      const away = doc.body;
+                      const opts = { bubbles: true, cancelable: true, view: doc.defaultView };
+                      away.dispatchEvent(new MouseEvent("mousedown", opts));
+                      away.dispatchEvent(new MouseEvent("mouseup", opts));
+                      away.dispatchEvent(new MouseEvent("click", opts));
+                      return;
+                    }
+                  }
+                  if (attempts >= 20) clearInterval(poll);
+                }, 100);
+              },
+              true
+            );
+          })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
 def render_app_header():
     st.markdown(
         """
@@ -294,10 +372,28 @@ def render_clue_timer(remaining_seconds, pinned=True):
     # so a shorter interval means more chances for a real click's rerun to
     # get interrupted and silently dropped, which is exactly what showed up
     # as "the board card I clicked didn't register" and "the screen randomly
-    # refreshes itself." 5s keeps timeout detection close enough (a 90s
-    # decision timer noticing a few seconds late is harmless) while meaningfully
-    # cutting how often this collides with an actual participant click.
-    st_autorefresh(interval=5000, key="clue_timer_autorefresh")
+    # refreshes itself," and (further downstream) the AI-guess response
+    # itself getting silently discarded if a real OpenAI call -- often
+    # 3-10+ seconds -- is still in flight when a tick lands. 10s keeps
+    # timeout detection close enough (a 90-120s decision timer noticing a
+    # few seconds late is harmless) while meaningfully cutting how often
+    # this collides with either a participant click or a slow AI response.
+    st_autorefresh(interval=10000, key="clue_timer_autorefresh")
+
+
+def render_idle_watchdog_ticker():
+    """Headless polling tick for the global idle-detection watchdog (see
+    ui.screens.render_idle_watchdog) -- same technique as the clue timer's
+    own autorefresh above, just on a screen that has no visible countdown.
+
+    Returns the autorefresh's own fire count, which only increments when
+    ITS OWN interval elapses -- a rerun caused by anything else (a real
+    click, a text commit) re-renders this component with that count
+    unchanged. The caller compares counts across reruns to tell "nothing
+    happened for 5s" apart from "the participant just did something,"
+    without which typing a long answer for over a minute got flagged as
+    idle and repeatedly interrupted by the watchdog's own popup."""
+    return st_autorefresh(interval=10000, key="idle_watchdog_autorefresh")
 
 
 def _render_static_card(word, role, revealed, guessed=False):
@@ -412,17 +508,16 @@ def render_board_lock_note(message, visible=True):
 
 
 def render_hint_panel(current_hint, hint_number, previous_hint=None):
-    chips_html = f"<div class='hint-chip'>{hint_number} guesses</div>"
-    chips_section = f"<div class=\"hint-chip-row\">{chips_html}</div>"
-
     st.markdown(
         f"""
         <div class="hint-card">
             <div class="hint-copy">
                 <div class="hint-label">AI clue</div>
-                <div class="hint-main">{escape(current_hint.upper())}</div>
+                <div class="hint-main">
+                    <span class="hint-word">{escape(current_hint.upper())}</span>
+                    <span class="hint-chip">{hint_number} guesses</span>
+                </div>
             </div>
-            {chips_section}
         </div>
         """,
         unsafe_allow_html=True,

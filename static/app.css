@@ -47,8 +47,6 @@
     --color-neutral: #6d6a63;
     --color-neutral-miss: #2f6f8f;
     --color-bomb: #b43232;
-    --color-hidden-from: #2b68d8;
-    --color-hidden-to: #2f80ed;
     /* Board-card palette: dark text on a light background for every state,
        never light/white text on a saturated color. The saturated-bg +
        white-text pattern above is exactly what kept breaking this session
@@ -139,11 +137,17 @@ body:has([data-testid="stSidebar"]) .block-container {
    because Streamlit already handles the desktop-persistent /
    mobile-collapsed-behind-a-tap responsive behavior natively, instead of
    another custom breakpoint to get wrong. */
+/* A flat pixel width made the sidebar a shrinking fraction of the screen
+   on a wide desktop monitor (480px was ~3/8 of a narrow laptop window but
+   barely a quarter of a wide one) -- clamp() keeps it at roughly 3/8 of the
+   viewport on anything wide enough for that to matter, while never
+   dropping below the 480px floor that was tuned for readability, or
+   growing past a sensible cap on an ultra-wide monitor. */
 [data-testid="stSidebar"] {
     background: var(--color-card);
     border-right: 1px solid var(--color-border);
-    min-width: 480px !important;
-    width: 480px !important;
+    min-width: clamp(480px, 37.5vw, 680px) !important;
+    width: clamp(480px, 37.5vw, 680px) !important;
 }
 [data-testid="stSidebar"] > div {
     padding-top: 1.5rem;
@@ -301,6 +305,15 @@ h1, h2, h3, h4 {
    layout space while leaving the iframe itself rendered, so the
    interval timer inside it keeps running. */
 .st-key-timer_skip_stack .st-key-clue_timer_autorefresh {
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: visible;
+}
+/* Same headless-component height collapse as above, for the global
+   idle-detection watchdog's own autorefresh (see render_idle_watchdog) --
+   this one isn't nested in the timer/skip stack, so it needs its own rule. */
+.st-key-idle_watchdog_ticker {
     height: 0 !important;
     min-height: 0 !important;
     margin: 0 !important;
@@ -796,10 +809,6 @@ body:has(.timer-row) .role-badge {
 
 /* Hint card (no explanation shown) */
 .hint-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 0.75rem;
     background: linear-gradient(135deg, #f3f8ff, #dcecff);
     border: 1px solid rgba(29, 94, 168, 0.22);
     border-radius: var(--radius-xl);
@@ -814,20 +823,25 @@ body:has(.timer-row) .role-badge {
     color: #315f91;
     font-weight: 800;
 }
+/* The guess-count chip sits right beside the clue word itself now, not
+   right-aligned across the card -- this screen's timer+skip cluster is
+   position:fixed at the same top-right corner (see .st-key-timer_skip_stack
+   below) and was landing directly on top of a right-aligned chip, hiding
+   it behind the Skip pill. */
 .hint-main {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0.2rem 0 0 0;
+}
+.hint-word {
     font-size: clamp(1.45rem, 2vw + 0.35rem, 2.05rem);
     line-height: 1.05;
-    margin: 0.2rem 0 0 0;
     font-weight: 900;
     color: #0b4a8b;
     letter-spacing: 0.03em;
     word-break: break-word;
-}
-.hint-chip-row {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
 }
 .hint-chip {
     border-radius: var(--radius-pill);
@@ -2344,7 +2358,14 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
    blanket rule on every secondary/default-kind button anywhere in the app,
    which silently forced the same fixed 72px card height onto unrelated
    secondary buttons elsewhere (e.g. a dialog's "Cancel" button next to a
-   normally-sized "Confirm" primary button, reading as mismatched sizes). */
+   normally-sized "Confirm" primary button, reading as mismatched sizes).
+   Only shape/typography here now -- background/color/border used to be set
+   here too (a vivid blue gradient, --color-hidden-from/-to), but the newer
+   [class*="board_card_grid"] rule further down replaced that with the calm
+   light-gray look. Both rules matched the same buttons and this one won on
+   specificity ([kind="secondary"] + .stButton beats a bare class-contains
+   selector), so the "new" light styling silently lost and the board
+   occasionally rendered with the old vivid blue cards instead. */
 .st-key-board_card_grid .stButton > button[kind="secondary"],
 .st-key-board_card_grid .stButton button[kind="secondary"],
 .st-key-board_card_grid .stButton [data-testid="stBaseButton-secondary"],
@@ -2360,9 +2381,6 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     font-weight: 700;
     letter-spacing: 0.01em;
     margin-bottom: 0.7rem;
-    background: linear-gradient(135deg, var(--color-hidden-from), var(--color-hidden-to));
-    color: #eff6ff;
-    border: 1px solid rgba(255, 255, 255, 0.24);
     box-shadow: none;
 }
 .st-key-board_card_grid .stButton > button[kind="secondary"]:hover,
@@ -2691,7 +2709,7 @@ div[data-testid="stAlert"] {
     .status-stats {
         gap: 1rem;
     }
-    .hint-main {
+    .hint-word {
         font-size: 1.65rem;
     }
     .stat-block {
@@ -2958,16 +2976,12 @@ div[data-testid="stAlert"] {
         line-height: 1.1;
     }
     .hint-card {
-        grid-template-columns: 1fr;
         gap: 0.55rem;
         border-radius: var(--radius-md);
         padding: 0.78rem;
     }
-    .hint-main {
+    .hint-word {
         font-size: 1.35rem;
-    }
-    .hint-chip-row {
-        justify-content: flex-start;
     }
     .guess-rationale-head {
         align-items: flex-start;

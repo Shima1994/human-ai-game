@@ -28,6 +28,7 @@ from core.constants import (
     CLUE_GIVER_TIMER_SECONDS,
     GUESSER_TIMER_SECONDS,
     FINAL_GUESS_TIMER_SECONDS,
+    GLOBAL_IDLE_TIMEOUT_SECONDS,
     DEFAULT_CONDITION,
 )
 from core.game_logic import (
@@ -73,6 +74,7 @@ from ui.components import (
     render_clue_timer,
     render_hint_panel,
     render_hint_target_selector,
+    render_idle_watchdog_ticker,
     render_interaction_history,
     render_rating_scale_endpoints,
     render_round_chip,
@@ -447,7 +449,7 @@ def _tutorial_round1_result_dialog(result):
         st.rerun()
 
 
-@st.dialog("Simulated AI's decision")
+@st.dialog("Simulated AI's decision", width="large")
 def _tutorial_round2_result_dialog(ai_guesses):
     st.success("The simulated AI has made its decision. Your submitted General Link is now locked.")
     st.markdown("**Simulated AI guesses:** " + ", ".join(ai_guesses))
@@ -459,21 +461,16 @@ def _tutorial_round2_result_dialog(ai_guesses):
         key="tutorial_rating_after",
     )
     render_rating_scale_endpoints()
+    st.divider()
+    st.success("You tried both roles and all required inputs.")
+    st.caption("Your practice answers are not scored and are not stored in the experimental datasets.")
     if st.button(
-        "Complete practice",
+        "Begin the real game",
         type="primary",
         use_container_width=True,
         disabled=rating_after is None,
     ):
         st.session_state.tutorial_step = "complete"
-        st.rerun()
-
-
-@st.dialog("Practice complete", width="large")
-def _tutorial_complete_dialog():
-    st.success("You tried both roles and all required inputs.")
-    st.caption("Your practice answers are not scored and are not stored in the experimental datasets.")
-    if st.button("Begin the real game", type="primary", use_container_width=True):
         st.session_state.tutorial_completed = True
         mark_session_progress("tutorial")
         st.rerun()
@@ -745,7 +742,18 @@ def screen_tutorial():
                             }
                         )
                         st.session_state.tutorial_history = tutorial_history
-                        st.rerun()
+                        new_result = st.session_state.get("tutorial_practice_result", "")
+                        if new_result:
+                            # Show the round-1 result dialog directly in this
+                            # same rerun, right after the skip-interpretation
+                            # dialog closed above -- a plain st.rerun() here
+                            # left one rerun with no dialog open at all in
+                            # between, which read as two separate popups
+                            # flashing one after another (same fix as the
+                            # real game's skip flow).
+                            _tutorial_round1_result_dialog(new_result)
+                        else:
+                            st.rerun()
                 if skip_disabled:
                     st.caption("Both practice skips have been used; continue by selecting cards.")
 
@@ -967,8 +975,6 @@ def screen_tutorial():
                 ai_guesses = st.session_state.get("tutorial_simulated_ai_guesses", [])
                 _tutorial_round2_result_dialog(ai_guesses)
         return
-
-    _tutorial_complete_dialog()
 
 
 def _anonymous_participant_id():
@@ -1232,6 +1238,72 @@ def _log_timeout(timeout_timestamp, repair_context):
             else ""
         ),
     )
+
+
+@st.dialog("Still there?")
+def _idle_watchdog_dialog():
+    st.markdown(
+        f"There's been no activity for more than {GLOBAL_IDLE_TIMEOUT_SECONDS} "
+        "seconds. Click below to continue."
+    )
+    if st.button("OK, Continue", type="primary", use_container_width=True):
+        st.session_state.idle_watchdog_reset_at = _now_iso()
+        st.session_state.idle_watchdog_popup_logged = False
+        st.rerun()
+
+
+def render_idle_watchdog(view_key):
+    """A soft, dismissible "are you still there?" check for every screen
+    that has no countdown of its own (consent, tutorial dialogs, the
+    between-turn reflection step, round summary, questionnaire/debriefing --
+    app.py skips calling this during an active timed clue/guess turn, which
+    already has its own timer). Purely for later bot/disengagement filtering
+    on Prolific: dismissing just resets the clock, it never blocks progress.
+
+    Returns True while its own "still there?" dialog is showing -- app.py
+    stops rendering the rest of the page for that one rerun, the same as
+    every other dialog in this file, instead of leaving the real screen
+    underneath (and its own buttons) fighting the modal for the next click."""
+    with st.container(key="idle_watchdog_ticker"):
+        tick_count = render_idle_watchdog_ticker()
+
+    # The ticker's own count only advances when ITS 5s interval elapses --
+    # any OTHER trigger (typing in a field, clicking a real button) reruns
+    # the script with that count unchanged. Treating that as activity is
+    # what lets composing a long answer for well over 60s not get flagged:
+    # only genuine silence -- no interaction at all between autorefresh
+    # ticks -- ever lets elapsed time below actually accumulate.
+    last_tick_count = st.session_state.get("idle_watchdog_last_tick_count")
+    st.session_state.idle_watchdog_last_tick_count = tick_count
+    if last_tick_count is not None and tick_count == last_tick_count:
+        st.session_state.idle_watchdog_reset_at = _now_iso()
+        st.session_state.idle_watchdog_popup_logged = False
+        return False
+
+    reset_at = st.session_state.get("idle_watchdog_reset_at", "")
+    if not reset_at:
+        st.session_state.idle_watchdog_reset_at = _now_iso()
+        return False
+
+    elapsed = _seconds_between(reset_at, _now_iso())
+    if elapsed is None or elapsed < GLOBAL_IDLE_TIMEOUT_SECONDS:
+        return False
+
+    if not st.session_state.get("idle_watchdog_popup_logged"):
+        trigger_count = st.session_state.get("idle_watchdog_trigger_count", 0) + 1
+        st.session_state.idle_watchdog_trigger_count = trigger_count
+        log_event(
+            "participant_idle_detected",
+            {
+                "idle_seconds": GLOBAL_IDLE_TIMEOUT_SECONDS,
+                "trigger_count": trigger_count,
+                "view": view_key,
+            },
+        )
+        st.session_state.idle_watchdog_popup_logged = True
+
+    _idle_watchdog_dialog()
+    return True
 
 
 def _handle_skip_exhausted_timeout(hint, hint_number, intended_targets, expected_guesses):
@@ -1745,13 +1817,17 @@ def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
     outcome_kind, outcome_message = _guess_outcome_summary(item)
     getattr(st, outcome_kind)(outcome_message)
     ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
+    had_guesses = bool(item.get("guesses"))
     show_reflection_header = human_clue_giver or _share_explanations()
     if show_reflection_header:
-        header_body = (
-            escape(ai_explanation)
-            if not human_clue_giver and ai_explanation
-            else "Rate the shared understanding after the AI's guesses."
-        )
+        if not human_clue_giver and ai_explanation:
+            header_body = escape(ai_explanation)
+        elif had_guesses:
+            header_body = "Rate the shared understanding after the AI's guesses."
+        elif human_clue_giver:
+            header_body = "The AI didn't guess this turn -- rate how well you think it understood your clue."
+        else:
+            header_body = "You didn't guess this turn -- rate how well you understood the AI's clue."
         reflection_title = (
             "Shared-understanding rating"
             if human_clue_giver
@@ -1766,8 +1842,21 @@ def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
             """,
             unsafe_allow_html=True,
         )
+    # A no-guess turn (full skip) has no completed exchange to judge *mutual*
+    # understanding by -- asking "how well did you and the AI understand
+    # EACH OTHER" here has no honest answer. Each role instead rates the one
+    # thing it actually has a basis to judge: the clue-giver rates their own
+    # guess at whether their clue landed (informed by the AI declining to
+    # guess rather than guessing wrong); the guesser rates their own
+    # comprehension of the clue they chose not to act on.
+    if had_guesses:
+        rating_question = "After the guesses, how well do you think you understood the AI?"
+    elif human_clue_giver:
+        rating_question = "How well do you think the AI understood your clue?"
+    else:
+        rating_question = "How well do you think you understood the AI's clue?"
     st.radio(
-        "After the guesses, how well do you think you understood the AI?",
+        rating_question,
         options=list(RATING_OPTIONS.keys()),
         index=None,
         format_func=lambda option: f"{option}",
@@ -1849,10 +1938,14 @@ def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
         st.rerun()
 
 
-def render_turn_reflection():
-    item = _current_pending_reflection_item()
-    if not item:
-        return False
+def _show_pending_turn_reflection_dialog(item):
+    """The actual "Turn result" popup for a resolved turn -- factored out of
+    render_turn_reflection() so a skip's own confirmation dialog (see the
+    skip-processing blocks in screen_human_guesser/screen_tutorial) can show
+    this SAME dialog immediately in the same rerun that recorded the skip,
+    instead of closing its own dialog and waiting for the *next* rerun's
+    top-of-function check to open a second, separate-looking popup right
+    after it."""
     human_clue_giver = item.get("clue_giver") == "human"
     round_ended_by_bomb = bool(
         item.get("bomb_hit") or st.session_state.get("round_bomb_hit", False)
@@ -1872,9 +1965,15 @@ def render_turn_reflection():
             turn_number=item.get("turn", ""),
         )
         item["reflection_shown_logged"] = True
-
-    render_top_status()
     _turn_reflection_dialog(item, human_clue_giver, replacement_count)
+
+
+def render_turn_reflection():
+    item = _current_pending_reflection_item()
+    if not item:
+        return False
+    render_top_status()
+    _show_pending_turn_reflection_dialog(item)
 
     _render_live_history_sidebar(
         st.session_state.interaction_history,
@@ -2458,7 +2557,7 @@ def screen_human_guesser():
                     """
                     <div class="glass-card compact-card section-gap">
                         <div class="panel-title">Clue</div>
-                        <p class="subtle-text" style="margin:0;">Please look at the cards on the board carefully before asking for a clue. Ask the AI for a clue when you are ready.</p>
+                        <p class="subtle-text" style="margin:0;"><strong>Please look at the cards on the board carefully before asking for a clue.</strong> Ask the AI for a clue when you are ready.</p>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -2716,7 +2815,17 @@ def screen_human_guesser():
                     )
                     _clear_current_clue()
                     _attach_ai_explanation_to_latest_turn()
-                st.rerun()
+                # Show the "Turn result" dialog directly in this same rerun,
+                # right after the skip-interpretation dialog closed above --
+                # a plain st.rerun() here left one rerun with no dialog open
+                # at all in between (the interpretation dialog already
+                # closed; pending_reflection_turn only gets picked up at the
+                # top of this function on the *next* rerun), which read as
+                # two separate popups flashing one after another.
+                if st.session_state.get("pending_reflection_turn"):
+                    _show_pending_turn_reflection_dialog(
+                        st.session_state.interaction_history[-1]
+                    )
     _render_live_history_sidebar(
         st.session_state.interaction_history,
         _share_explanations(),
@@ -3027,4 +3136,19 @@ def screen_game_over():
     else:
         st.success(f"Thank you, {player_name}. Your answers and game data have been saved.")
 
+    # The debriefing page (shown just before this one) is the only other
+    # place the completion code appears -- a participant who clicks through
+    # without copying it down there had no way to recover it once they
+    # reached this final screen, which is the one they're actually looking
+    # at when they go to paste the code into Prolific/MTurk.
+    st.markdown(
+        f"""
+        <div class="glass-card compact-card section-gap">
+            <div class="panel-title">Your completion code</div>
+            <p class="subtle-text" style="margin:0 0 0.4rem 0;">Enter this code on the platform where you found this study to confirm your participation:</p>
+            <p style="font-size:1.4rem; font-weight:800; letter-spacing:0.08em; margin:0;">{escape(st.session_state.get("completion_code", ""))}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.caption("You may now close this browser tab.")

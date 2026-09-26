@@ -691,7 +691,12 @@ def initialize_session_log(participant_id):
         return False
 
     st.session_state.participant_id = participant_id
-    st.session_state.nickname = st.session_state.get("nickname", participant_id) or participant_id
+    # nickname is optional and display-only (screen_name already set it, blank
+    # or not) -- it must NOT be overwritten with participant_id here, or every
+    # participant who skips the optional field gets their anonymous ID silently
+    # stored as their "nickname," polluting that column for analysis. Anywhere
+    # that needs to *display* a name already falls back to participant_id on
+    # its own (see render_top_status).
     st.session_state.consent_given = True
     st.session_state.last_activity_at = _iso_now()
     st.session_state.last_completed_stage = "participant_profile"
