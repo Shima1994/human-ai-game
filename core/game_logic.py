@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from core.constants import (
+    BOARD_MATERIAL_VERSION,
     BOARD_SIZE,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
@@ -64,14 +65,26 @@ def get_role_for_round(round_number, starting_role=None):
     return "ai_clue" if starting_role == "human_clue" else "human_clue"
 
 
-def get_board_template_type(round_number):
-    # Each round has its own hand-curated, fixed board (see
-    # core.words.ROUND_BOARDS) rather than a randomly-sampled A/B template --
-    # this returns that board's id (e.g. "B01") for round 1, matched 1:1 by
-    # round number. Kept as its own function (rather than inlining the
-    # lookup) since callers elsewhere treat "which board layout is this
-    # round" as a single fact, independent of get_role_for_round.
-    board = ROUND_BOARDS.get(round_number)
+def _board_number_for_round(round_number):
+    """Which entry in core.words.ROUND_BOARDS plays as this game round --
+    shuffled once per session (see core.state._new_round_board_order) so
+    the four boards appear in a random order instead of always B01..B04 in
+    round 1..4. Falls back to a direct 1:1 mapping if the shuffled order is
+    ever missing (e.g. an older session_state), rather than crashing."""
+    order = st.session_state.get("round_board_order") or list(ROUND_BOARDS.keys())
+    index = round_number - 1
+    return order[index] if 0 <= index < len(order) else round_number
+
+
+def get_board_template_id(round_number):
+    # Each round plays one of the hand-curated, fixed boards (see
+    # core.words.ROUND_BOARDS), assigned via the session's shuffled
+    # round-to-board order rather than a fixed 1:1 mapping. This returns
+    # that board's id (e.g. "B01"). Kept as its own function (rather than
+    # inlining the lookup) since callers elsewhere treat "which board
+    # layout is this round" as a single fact, independent of
+    # get_role_for_round.
+    board = ROUND_BOARDS.get(_board_number_for_round(round_number))
     if board is None:
         raise BoardGenerationError(f"No fixed board is defined for round {round_number}.")
     return board["id"]
@@ -103,7 +116,7 @@ def validate_word_bank_capacity(round_count=N_ROUNDS):
             )
 
 
-def build_board_id(round_number, template_type, board_words, word_roles):
+def build_board_instance_id(round_number, template_type, board_words, word_roles):
     board_signature = "|".join(
         f"{word}:{word_roles.get(word, '')}" for word in sorted(board_words)
     )
@@ -113,7 +126,7 @@ def build_board_id(round_number, template_type, board_words, word_roles):
 
 def sample_fixed_round_words(round_number):
     validate_word_bank_capacity()
-    board = ROUND_BOARDS[round_number]
+    board = ROUND_BOARDS[_board_number_for_round(round_number)]
     template_type = board["id"]
 
     targets = [word for word, _word_type in board["target"]]
@@ -148,8 +161,9 @@ def setup_new_round():
         st.session_state.get("starting_role", "human_clue"),
     )
     st.session_state.board = board
-    st.session_state.board_template_type = template_type
-    st.session_state.board_id = build_board_id(
+    st.session_state.board_template_id = template_type
+    st.session_state.board_material_version = BOARD_MATERIAL_VERSION
+    st.session_state.board_instance_id = build_board_instance_id(
         st.session_state.round,
         template_type,
         board,
@@ -179,7 +193,7 @@ def setup_new_round():
     st.session_state.last_ai_guesses = []
     st.session_state.last_ai_hint = ""
     st.session_state.perception_rating = None
-    st.session_state.ai_understanding_rating_before = None
+    st.session_state.human_expected_ai_understanding_rating = None
     st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.now(timezone.utc)
@@ -230,7 +244,7 @@ def record_interaction(
     expected_guesses=None,
     guess_rationale="",
     hint_explanation="",
-    ai_understanding_rating_before=None,
+    human_expected_ai_understanding_rating=None,
     hint_raw_response="",
     hint_time_sec=None,
     hint_response_time_sec=None,
@@ -244,8 +258,6 @@ def record_interaction(
     repair_context=None,
     clue_timer_started_at=None,
     timer_duration_seconds=None,
-    human_decision_ended_at=None,
-    human_decision_time_sec=None,
     human_explanation_raw="",
     human_explanation_is_valid=None,
     human_explanation_blocked_reason="",
@@ -293,6 +305,17 @@ def record_interaction(
         outcome = "bomb"
     elif partial_skip:
         outcome = "partial_skip"
+    elif correct_guesses and neutral_guesses:
+        # A turn with both a correct guess and a neutral (wrong) one used to
+        # collapse into plain "correct" here (any correct guess at all was
+        # enough) -- masking a real, analyzable distinction between a fully
+        # clean turn and a partly-right one. ui.screens._guess_outcome_summary
+        # already computes this exact split live for the "Partly right: ..."
+        # message; this makes it a first-class STORED value instead of only
+        # ever existing on screen. Independent of alignment_status (which
+        # measures guessed-vs-INTENDED overlap, a communication question) --
+        # this is the game-outcome axis (guessed-vs-actual board roles).
+        outcome = "partial_correct"
     elif correct_guesses:
         outcome = "correct"
     else:
@@ -317,20 +340,6 @@ def record_interaction(
     )
     hit_rate = len(correct_guesses) / len(guesses) if guesses else 0.0
     target_yield = len(new_targets)
-    human_decision_started_at = (
-        clue_timer_started_at
-        if clue_timer_started_at is not None
-        else st.session_state.get("clue_timer_started_at", "")
-    )
-    human_decision_ended_at = human_decision_ended_at or turn_end.isoformat()
-    if human_decision_time_sec is None and human_decision_started_at:
-        try:
-            human_decision_time_sec = (
-                datetime.fromisoformat(human_decision_ended_at)
-                - datetime.fromisoformat(human_decision_started_at)
-            ).total_seconds()
-        except (TypeError, ValueError):
-            human_decision_time_sec = None
 
     interaction_sequence = len(st.session_state.interaction_history) + 1
     st.session_state.round_interactions += 1
@@ -388,9 +397,6 @@ def record_interaction(
             ),
             "timer_duration_seconds": timer_duration_seconds if timer_duration_seconds is not None else st.session_state.get("clue_timer_duration_seconds", CLUE_TIMER_SECONDS),
             "clue_timer_started_at": clue_timer_started_at if clue_timer_started_at is not None else st.session_state.get("clue_timer_started_at", ""),
-            "human_decision_started_at": human_decision_started_at,
-            "human_decision_ended_at": human_decision_ended_at,
-            "human_decision_time_sec": human_decision_time_sec,
             "human_timed_out": False,
             "timeout_timestamp": "",
             "timed_out": False,
@@ -405,7 +411,7 @@ def record_interaction(
             "skipped_guesses": max(0, int(hint_number or 0) - len(guesses)) if partial_skip else 0,
             "alignment_status": alignment_status,
             "error_type": error_type,
-            "ai_understanding_rating_before": ai_understanding_rating_before,
+            "human_expected_ai_understanding_rating": human_expected_ai_understanding_rating,
             "hint_raw_response": hint_raw_response,
             "hint_time_sec": hint_time_sec,
             "hint_response_time_sec": hint_response_time_sec,
@@ -431,7 +437,7 @@ def record_interaction(
             "reflection_explanation_raw": human_explanation_raw,
             "reflection_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
             "reflection_blocked_reason": "",
-            "human_understanding_rating": "",
+            "human_perceived_understanding_rating": "",
             "human_relationship_type": "",
             "human_explanation_raw": human_explanation_raw,
             "human_explanation_sanitized": human_explanation_raw if human_explanation_is_valid else "",
@@ -484,8 +490,6 @@ def record_skip(
     timeout_selected_cards=None,
     clue_timer_started_at=None,
     timer_duration_seconds=None,
-    human_decision_ended_at=None,
-    human_decision_time_sec=None,
     human_explanation_raw="",
     human_explanation_is_valid=None,
     human_explanation_blocked_reason="",
@@ -510,20 +514,6 @@ def record_skip(
     clue_giver = "human" if st.session_state.role == "human_clue" else "ai"
     guesser = "ai" if st.session_state.role == "human_clue" else "human"
     skipped_by = skipped_by or guesser
-    human_decision_started_at = (
-        clue_timer_started_at
-        if clue_timer_started_at is not None
-        else st.session_state.get("clue_timer_started_at", "")
-    )
-    human_decision_ended_at = human_decision_ended_at or turn_end.isoformat()
-    if human_decision_time_sec is None and human_decision_started_at:
-        try:
-            human_decision_time_sec = (
-                datetime.fromisoformat(human_decision_ended_at)
-                - datetime.fromisoformat(human_decision_started_at)
-            ).total_seconds()
-        except (TypeError, ValueError):
-            human_decision_time_sec = None
 
     interaction_sequence = len(st.session_state.interaction_history) + 1
     # A timeout consumes a skip, the same as an explicit skip -- letting the
@@ -586,9 +576,6 @@ def record_skip(
             "repair_success": False,
             "timer_duration_seconds": timer_duration_seconds if timer_duration_seconds is not None else st.session_state.get("clue_timer_duration_seconds", CLUE_TIMER_SECONDS),
             "clue_timer_started_at": clue_timer_started_at if clue_timer_started_at is not None else st.session_state.get("clue_timer_started_at", ""),
-            "human_decision_started_at": human_decision_started_at,
-            "human_decision_ended_at": human_decision_ended_at,
-            "human_decision_time_sec": human_decision_time_sec,
             "human_timed_out": bool(timed_out),
             "timeout_timestamp": timeout_timestamp if timed_out else "",
             "timed_out": bool(timed_out),
@@ -601,7 +588,7 @@ def record_skip(
             "wrong_guess_replacement_attempts": "",
             "completed_guesses": 0,
             "skipped_guesses": int(hint_number or 0),
-            "ai_understanding_rating_before": None,
+            "human_expected_ai_understanding_rating": None,
             "hint_raw_response": hint_raw_response,
             "hint_time_sec": hint_time_sec,
             "hint_response_time_sec": hint_response_time_sec,
@@ -635,7 +622,7 @@ def record_skip(
             "reflection_explanation_raw": human_explanation_raw,
             "reflection_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
             "reflection_blocked_reason": "",
-            "human_understanding_rating": "",
+            "human_perceived_understanding_rating": "",
             "human_relationship_type": "",
             "human_explanation_raw": human_explanation_raw,
             "human_explanation_sanitized": human_explanation_raw if human_explanation_is_valid else "",
@@ -718,7 +705,7 @@ def record_timeout(
     repair_context=None,
     hint_raw_response="",
     hint_time_sec=None,
-    ai_understanding_rating_before=None,
+    human_expected_ai_understanding_rating=None,
     human_explanation_raw="",
     human_explanation_is_valid=None,
     human_explanation_blocked_reason="",
@@ -745,7 +732,6 @@ def record_timeout(
         timed_out=True,
         timeout_timestamp=timeout_timestamp,
         timeout_selected_cards=timeout_selected_cards,
-        human_decision_ended_at=timeout_timestamp,
         human_explanation_raw=human_explanation_raw,
         human_explanation_is_valid=human_explanation_is_valid,
         human_explanation_blocked_reason=human_explanation_blocked_reason,
@@ -754,8 +740,8 @@ def record_timeout(
         timeout_cost=timeout_cost,
     )
     if st.session_state.get("interaction_history"):
-        st.session_state.interaction_history[-1]["ai_understanding_rating_before"] = (
-            ai_understanding_rating_before
+        st.session_state.interaction_history[-1]["human_expected_ai_understanding_rating"] = (
+            human_expected_ai_understanding_rating
         )
     return timeout_timestamp
 
@@ -810,8 +796,9 @@ def append_ai_round_summary():
             "round": st.session_state.round,
             "role": st.session_state.role,
             "word_type": st.session_state.word_type,
-            "board_template_type": st.session_state.get("board_template_type", ""),
-            "board_id": st.session_state.get("board_id", ""),
+            "board_template_id": st.session_state.get("board_template_id", ""),
+            "board_material_version": st.session_state.get("board_material_version", ""),
+            "board_instance_id": st.session_state.get("board_instance_id", ""),
             "word_type_per_card": dict(word_type_per_card),
             "targets": list(st.session_state.target_words),
             "target_word_types": word_types_for(st.session_state.target_words),
@@ -870,13 +857,13 @@ def append_ai_round_summary():
                     ),
                     "completed_guesses": item.get("completed_guesses", len(item.get("guesses", []))),
                     "skipped_guesses": item.get("skipped_guesses", 0),
-                    "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
+                    "human_expected_ai_understanding_rating": item.get("human_expected_ai_understanding_rating"),
                     "reflection_rating": item.get("reflection_rating", ""),
                     "reflection_relationship_type": item.get("reflection_relationship_type", ""),
                     "reflection_explanation_raw": item.get("reflection_explanation_raw", ""),
                     "reflection_explanation_is_valid": item.get("reflection_explanation_is_valid", ""),
                     "reflection_blocked_reason": item.get("reflection_blocked_reason", ""),
-                    "human_understanding_rating": item.get("human_understanding_rating", ""),
+                    "human_perceived_understanding_rating": item.get("human_perceived_understanding_rating", ""),
                     "human_relationship_type": item.get("human_relationship_type", ""),
                     "human_explanation_raw": item.get("human_explanation_raw", ""),
                     "human_explanation_sanitized": item.get("human_explanation_sanitized", ""),

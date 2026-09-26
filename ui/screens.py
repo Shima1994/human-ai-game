@@ -411,16 +411,6 @@ def _skip_interpretation_dialog(remaining_guess_slots, options):
                 st.rerun()
 
 
-@st.dialog("The AI asked for another clue")
-def _ai_reroll_notice_dialog():
-    st.warning(
-        "Your clue was rejected. Please revise it and submit a new one — "
-        f"{st.session_state.get('ai_rerolls', 0)} AI reroll(s) remaining this game."
-    )
-    if st.button("Got it", type="primary", use_container_width=True):
-        st.rerun()
-
-
 @st.dialog("Round 1 result")
 def _tutorial_round1_result_dialog(result):
     if result == "correct":
@@ -983,6 +973,24 @@ def _anonymous_participant_id():
     return f"participant_{suffix}"
 
 
+def render_debug_skip_to_round_one():
+    """DEBUG_MODE-only shortcut for repeated local testing: one click past
+    consent, the profile form, and both tutorial rounds, straight into
+    round 1 of the real game. DEBUG_MODE is False for the actual study, so
+    this is never reachable by a real participant regardless of whether
+    this function is still in the file -- remove it once testing is done,
+    or just leave DEBUG_MODE off."""
+    if st.button("Skip to Round 1 (debug)", key="debug_skip_to_round_one"):
+        st.session_state.consent_given = True
+        st.session_state.consent_timestamp = _now_iso()
+        st.session_state.started = True
+        if not st.session_state.get("participant_id"):
+            if not initialize_session_log(_anonymous_participant_id()):
+                return
+        st.session_state.tutorial_completed = True
+        st.rerun()
+
+
 def _display_player_name():
     return st.session_state.get("nickname") or "Participant"
 
@@ -1025,7 +1033,11 @@ def _history_with_pending_ai_guess(pending_review):
                 else (
                     "partial_skip"
                     if pending_review.get("partial_skip")
-                    else ("correct" if correct_guesses else "wrong")
+                    else (
+                        "partial_correct"
+                        if correct_guesses and neutral_guesses
+                        else ("correct" if correct_guesses else "wrong")
+                    )
                 )
             ),
             "skipped": bool(pending_review.get("partial_skip")),
@@ -1218,11 +1230,6 @@ def _log_timeout(timeout_timestamp, repair_context):
                 "clue_timer_duration_seconds", CLUE_TIMER_SECONDS
             ),
             "clue_start_timestamp": st.session_state.get("clue_timer_started_at", ""),
-            "human_decision_started_at": st.session_state.get("clue_timer_started_at", ""),
-            "human_decision_ended_at": timeout_timestamp,
-            "human_decision_time_sec": _seconds_between(
-                st.session_state.get("clue_timer_started_at", ""), timeout_timestamp
-            ),
             "human_timed_out": True,
             "timeout_timestamp": timeout_timestamp,
             "timed_out": True,
@@ -1407,7 +1414,7 @@ def _consume_human_clue_timeout():
         hint_time_sec=_seconds_between(
             st.session_state.get("current_hint_start_time", "")
         ),
-        ai_understanding_rating_before=rating_before,
+        human_expected_ai_understanding_rating=rating_before,
         human_explanation_raw=general_link,
         human_explanation_is_valid=False if general_link else None,
         human_explanation_blocked_reason=(
@@ -1676,7 +1683,7 @@ def _sync_reflection_to_round_summary(item):
                     "reflection_start_time",
                     "reflection_end_time",
                     "reflection_time_sec",
-                    "human_understanding_rating",
+                    "human_perceived_understanding_rating",
                     "human_relationship_type",
                     "human_explanation_raw",
                     "human_explanation_is_valid",
@@ -1703,7 +1710,7 @@ def _save_turn_reflection(item, understood_ai_rating, relationship_type, explana
     explanation = (explanation or "").strip()
     understood_ai_rating = int(understood_ai_rating)
     item["reflection_rating"] = understood_ai_rating
-    item["human_understanding_rating"] = understood_ai_rating
+    item["human_perceived_understanding_rating"] = understood_ai_rating
     st.session_state.perception_rating = understood_ai_rating
     if item.get("clue_giver") == "human":
         item["reflection_relationship_type"] = relationship_type or ""
@@ -1798,7 +1805,11 @@ def _render_live_history_sidebar(history, share_explanations, show_ai_intended=F
     Streamlit itself. Every active-gameplay screen (clue-giving, guessing,
     the between-turns reflection step, the round summary) calls this with
     the same history so a participant never loses sight of what's happened
-    so far, regardless of which role they're in or which screen they're on."""
+    so far, regardless of which role they're in or which screen they're on.
+
+    Always visible, even before the first turn (showing "No hints or
+    guesses yet."), so a participant sees it in the same place from the
+    very start of a round instead of it appearing partway through."""
     with st.sidebar:
         st.markdown(
             f'<div class="panel-title section-gap">History · {len(history)} past turn(s)</div>',
@@ -1813,9 +1824,49 @@ def _render_live_history_sidebar(history, share_explanations, show_ai_intended=F
 
 
 @st.dialog("Turn result")
+def _render_skip_interpretation_and_rationale(item):
+    """Same "Guesser thought" / "Why" chips render_interaction_history shows
+    in the History sidebar for a skip, repeated here inline in the "Turn
+    result" popup itself -- so a participant doesn't have to glance away
+    from the dialog to see why the other side skipped. Gated identically
+    (share_explanations, and skip_interpreted_cards only on an actual skip)
+    so visibility stays symmetric between roles/conditions with the sidebar."""
+    if not _share_explanations():
+        return
+    is_skip = item.get("outcome") in ("skip", "partial_skip") or item.get("skipped")
+    skip_interpreted_cards = item.get("skip_interpreted_cards", [])
+    guess_rationale = item.get("guess_rationale", "")
+    if not (is_skip and skip_interpreted_cards) and not guess_rationale:
+        return
+    rows = []
+    if is_skip and skip_interpreted_cards:
+        chips = "".join(
+            f"<span class='history-chip'>{escape(word)}</span>"
+            for word in skip_interpreted_cards
+        )
+        rows.append(
+            "<div class='history-detail'>"
+            "<span class='history-detail-label'>Guesser thought</span>"
+            f"<span class='history-chip-row'>{chips}</span>"
+            "</div>"
+        )
+    if guess_rationale:
+        rows.append(
+            "<div class='history-detail'>"
+            "<span class='history-detail-label'>Why</span>"
+            f"<span class='history-chip-row'><span class='history-chip muted'>{escape(guess_rationale)}</span></span>"
+            "</div>"
+        )
+    st.markdown(
+        f"<div class='history-panel' style='margin-bottom:0.75rem;'>{''.join(rows)}</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
     outcome_kind, outcome_message = _guess_outcome_summary(item)
     getattr(st, outcome_kind)(outcome_message)
+    _render_skip_interpretation_and_rationale(item)
     ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
     had_guesses = bool(item.get("guesses"))
     show_reflection_header = human_clue_giver or _share_explanations()
@@ -1849,6 +1900,16 @@ def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
     # guess at whether their clue landed (informed by the AI declining to
     # guess rather than guessing wrong); the guesser rates their own
     # comprehension of the clue they chose not to act on.
+    # All three branches feed the SAME stored field
+    # (human_perceived_understanding_rating) -- it is one column holding
+    # answers to three different questions, disambiguated only by
+    # reflection_source (human_clue_giver/ai_clue_giver) plus whether this
+    # turn had any guesses at all. Analysis code must join on those two
+    # fields to know which question a given value actually answers:
+    #   had_guesses=True            -> perceived SHARED understanding after a
+    #                                   completed exchange (either role)
+    #   had_guesses=False, clue-giver -> did the AI understand MY clue
+    #   had_guesses=False, guesser    -> did I understand the AI's clue
     if had_guesses:
         rating_question = "After the guesses, how well do you think you understood the AI?"
     elif human_clue_giver:
@@ -2008,36 +2069,34 @@ def screen_human_clue():
             f"Both skips are used. You have {FINAL_GUESS_TIMER_SECONDS} seconds to submit "
             "your clue or the round ends automatically."
         )
-    if st.session_state.pop("ai_reroll_notice", False):
-        _ai_reroll_notice_dialog()
-        return
 
     with st.container(border=True):
-        board_title_col, board_timer_col = st.columns([1.3, 1])
-        with board_title_col:
-            st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
+        board_col, board_timer_col = st.columns([1.7, 1])
         # Reserved here so the countdown ends up directly beside the board
-        # heading instead of far below it, past the whole clue-composition
-        # form -- but actually filled much further down, only once the
-        # timer's own state (start/consume-timeout) has run in its
-        # original place in the function. st.empty() keeps the *visual*
-        # slot at this position regardless of how much unrelated content
-        # renders in between; see the fill site below for why that state
-        # logic itself isn't moved up here too. Wrapped in the same keyed
-        # container as the timer+skip stack elsewhere so it sticks the same
-        # way, even though this screen has no skip button to stack with it.
+        # instead of far below it, past the whole clue-composition form --
+        # but actually filled much further down, only once the timer's own
+        # state (start/consume-timeout) has run in its original place in the
+        # function. st.empty() keeps the *visual* slot at this position
+        # regardless of how much unrelated content renders in between; see
+        # the fill site below for why that state logic itself isn't moved up
+        # here too. A dedicated key (not the shared timer_skip_stack used on
+        # the guesser/tutorial screens) since this one sits in normal flow
+        # beside the narrower board rather than fixed to the viewport.
         with board_timer_col:
-            with st.container(key="timer_skip_stack"):
+            with st.container(key="board_adjacent_timer"):
                 board_timer_placeholder = st.empty()
-        pending_review = st.session_state.get("pending_ai_guess_review")
-        review_guesses = pending_review.get("guesses", []) if pending_review else []
-        render_board(
-            st.session_state.board,
-            st.session_state.word_roles,
-            guesses=st.session_state.guesses + review_guesses,
-            reveal_all=True,
-        )
-        render_board_legend()
+        with board_col:
+            with st.container(key="human_clue_board_wrap"):
+                pending_review = st.session_state.get("pending_ai_guess_review")
+                review_guesses = pending_review.get("guesses", []) if pending_review else []
+                render_board(
+                    st.session_state.board,
+                    st.session_state.word_roles,
+                    guesses=st.session_state.guesses + review_guesses,
+                    reveal_all=True,
+                )
+                render_board_legend()
 
     if st.session_state.get("pending_ai_guess_review"):
         pending_review = st.session_state.pending_ai_guess_review
@@ -2051,7 +2110,7 @@ def screen_human_clue():
                 expected_guesses=pending_review.get("expected_guesses", []),
                 guess_rationale=pending_review.get("guess_rationale", ""),
                 hint_explanation=pending_review.get("hint_explanation", ""),
-                ai_understanding_rating_before=pending_review.get("rating_before"),
+                human_expected_ai_understanding_rating=pending_review.get("rating_before"),
                 hint_time_sec=pending_review.get("hint_time_sec"),
                 guess_raw_response=pending_review.get("guess_raw_response", ""),
                 guess_time_sec=pending_review.get("guess_time_sec"),
@@ -2063,8 +2122,6 @@ def screen_human_clue():
                 ),
                 clue_timer_started_at=pending_review.get("clue_timer_started_at"),
                 timer_duration_seconds=pending_review.get("timer_duration_seconds"),
-                human_decision_ended_at=pending_review.get("human_decision_ended_at"),
-                human_decision_time_sec=pending_review.get("human_decision_time_sec"),
                 human_explanation_raw=pending_review.get("human_explanation_raw", ""),
                 human_explanation_is_valid=pending_review.get("human_explanation_is_valid"),
                 human_explanation_source=pending_review.get("human_explanation_source", ""),
@@ -2232,7 +2289,7 @@ def screen_human_clue():
                     key=f"before_ai_guess_rating_{st.session_state.round}_{_current_action_index()}",
                 )
                 render_rating_scale_endpoints()
-    st.session_state.ai_understanding_rating_before = rating_before
+    st.session_state.human_expected_ai_understanding_rating = rating_before
 
     general_link_key = (
         f"pre_ai_general_link_{st.session_state.round}_"
@@ -2339,14 +2396,11 @@ def screen_human_clue():
                     "clue_number": st.session_state.hint_number,
                     "intended_cards": intended_targets,
                     "expected_guess_cards": expected_guess_cards,
-                    "ai_understanding_rating_before": rating_before,
+                    "human_expected_ai_understanding_rating": rating_before,
                     "human_explanation_raw": submitted_general_link,
                     "human_explanation_is_valid": True,
                     "human_explanation_source": "pre_ai_human_clue_form",
                     "human_explanation_collected_at": hint_end_time,
-                    "human_decision_started_at": clue_timer_started_at,
-                    "human_decision_ended_at": hint_end_time,
-                    "human_decision_time_sec": hint_time_sec,
                 },
                 turn_number=_next_action_number(),
             )
@@ -2360,7 +2414,6 @@ def screen_human_clue():
                     st.session_state.board,
                     st.session_state.hint,
                     st.session_state.hint_number,
-                    st.session_state.get("ai_rerolls", 0),
                     st.session_state.interaction_history,
                     st.session_state.guesses,
                     st.session_state.ai_round_summaries,
@@ -2396,62 +2449,7 @@ def screen_human_clue():
                 },
                 turn_number=_next_action_number(),
             )
-            if action == "reroll":
-                if st.session_state.ai_rerolls > 0:
-                    st.session_state.ai_rerolls -= 1
-                    # A reroll is recorded the same way as an AI skip -- it
-                    # counts against the round's shared skip budget and
-                    # appears in the turn history, so the participant can see
-                    # it and it isn't a free, invisible retry.
-                    record_skip(
-                        st.session_state.hint,
-                        st.session_state.hint_number,
-                        intended_targets,
-                        expected_guess_cards,
-                        guess_rationale=guess_result.get("guess_rationale", ""),
-                        hint_explanation=st.session_state.get("hint_explanation", ""),
-                        hint_time_sec=hint_time_sec,
-                        skipped_by="ai",
-                        skip_interpreted_cards=guess_result.get(
-                            "skip_interpreted_cards", []
-                        ),
-                        guess_raw_response=guess_result.get("raw_response", ""),
-                        guess_time_sec=guess_time_sec,
-                        guess_response_time_sec=guess_result.get("response_time_sec"),
-                        clue_timer_started_at=clue_timer_started_at,
-                        timer_duration_seconds=timer_duration_seconds,
-                        human_decision_ended_at=hint_end_time,
-                        human_decision_time_sec=hint_time_sec,
-                        human_explanation_raw=submitted_general_link,
-                        human_explanation_is_valid=True,
-                        human_explanation_source="pre_ai_human_clue_form",
-                        human_explanation_collected_at=hint_end_time,
-                    )
-                    recorded_item = st.session_state.interaction_history[-1]
-                    log_event(
-                        "ai_reroll_used",
-                        {
-                            "skipped_by": "ai",
-                            "completed_turn_number": recorded_item.get("completed_turn_number", ""),
-                            "skip_number": recorded_item.get("skip_number", ""),
-                            "ai_rerolls_remaining": st.session_state.ai_rerolls,
-                        },
-                        turn_number=recorded_item.get("turn", ""),
-                    )
-                    st.session_state.ai_reroll_notice = True
-                    st.session_state.current_hint_start_time = ""
-                    # Without this, clue_timer_started_at keeps the deadline
-                    # from the clue that just got rejected -- the guard a
-                    # few lines into the next render ("start a timer only
-                    # if none is active") sees a still-active timer and
-                    # never starts a fresh one, so a reroll could hand back
-                    # only a few seconds (or an already-expired timer) to
-                    # submit a new clue instead of a full fresh window.
-                    clear_participant_decision_timer()
-                else:
-                    st.warning("No AI rerolls remain. Please adjust the clue.")
-                st.rerun()
-            elif action == "skip":
+            if action == "skip":
                 record_skip(
                     st.session_state.hint,
                     st.session_state.hint_number,
@@ -2469,8 +2467,6 @@ def screen_human_clue():
                     guess_response_time_sec=guess_result.get("response_time_sec"),
                     clue_timer_started_at=clue_timer_started_at,
                     timer_duration_seconds=timer_duration_seconds,
-                    human_decision_ended_at=hint_end_time,
-                    human_decision_time_sec=hint_time_sec,
                     human_explanation_raw=submitted_general_link,
                     human_explanation_is_valid=True,
                     human_explanation_source="pre_ai_human_clue_form",
@@ -2512,8 +2508,6 @@ def screen_human_clue():
                     ),
                     "clue_timer_started_at": clue_timer_started_at,
                     "timer_duration_seconds": timer_duration_seconds,
-                    "human_decision_ended_at": hint_end_time,
-                    "human_decision_time_sec": hint_time_sec,
                     "human_explanation_raw": submitted_general_link,
                     "human_explanation_is_valid": True,
                     "human_explanation_source": "pre_ai_human_clue_form",

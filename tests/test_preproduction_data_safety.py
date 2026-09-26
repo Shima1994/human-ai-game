@@ -242,6 +242,45 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
         self.assertEqual(row["action_type"], "interaction")
         self.assertEqual(row["alignment_applicability"], "observed_completed_selection")
 
+    def test_llm_response_parsed_action_is_not_the_outcome(self):
+        """llm_response_parsed["action"] must describe what the guesser DID
+        (interaction/full_skip/partial_skip/timeout, same vocabulary as the
+        row's own action_type) -- it must never leak the RESULT of that
+        decision (correct/wrong/bomb, already its own separate "outcome"
+        column). A prior bug built this from item["outcome"] directly, so a
+        correct guess was logged with llm_response_parsed.action == "correct"
+        instead of "interaction", silently conflating the two concepts."""
+        item = {
+            "turn": 1,
+            "outcome": "correct",
+            "guesses": ["Alpha"],
+            "correct_guesses": ["Alpha"],
+            "clue_giver": "human",
+            "guess_raw_response": '{"action": "guess", "guesses": ["Alpha"]}',
+        }
+        row = storage._turn_analysis_row(
+            "p1", item, {"Alpha": "abstract"}
+        )
+        parsed = json.loads(row["llm_response_parsed"])
+        self.assertEqual(parsed["action"], row["action_type"])
+        self.assertNotEqual(parsed["action"], "correct")
+
+    def test_mixed_correct_and_neutral_guess_is_not_flattened_to_plain_correct(self):
+        """A turn with one correct guess and one wrong (neutral) guess used
+        to be stored as outcome="correct" -- any correct guess at all was
+        enough, so a genuinely partly-right turn was indistinguishable from
+        a fully clean one in the stored data (the UI already showed "Partly
+        right: ..." for this exact case via its own live correct+neutral
+        check, but that nuance never made it into what got saved)."""
+        with patch.object(game_logic, "finish_round", lambda *a, **k: None):
+            game_logic.record_interaction("clue", 2, ["Alpha", "Neutral"], ["Alpha", "Beta"])
+        self.assertEqual(self.state.interaction_history[-1]["outcome"], "partial_correct")
+
+    def test_all_correct_guesses_still_report_plain_correct(self):
+        with patch.object(game_logic, "finish_round", lambda *a, **k: None):
+            game_logic.record_interaction("clue", 1, ["Alpha"], ["Alpha"])
+        self.assertEqual(self.state.interaction_history[-1]["outcome"], "correct")
+
     def test_full_partial_and_timeout_counters(self):
         """A timeout counts as a skip (not an ordinary turn) -- see
         test_pilot_parameters.PilotParameterTests.test_timeout_consumes_a_skip_not_a_turn
@@ -290,8 +329,8 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
         self.state.update(
             condition="baseline",
             board=["Alpha", "Beta", "Neutral", "Bomb"],
-            board_id="board-1",
-            board_template_type="A",
+            board_instance_id="board-1",
+            board_template_id="A",
             word_type_per_card={
                 "Alpha": "abstract",
                 "Beta": "abstract",
@@ -319,8 +358,8 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
         self.state.update(
             condition="baseline",
             board=["Alpha", "Beta", "Neutral", "Bomb"],
-            board_id="board-1",
-            board_template_type="A",
+            board_instance_id="board-1",
+            board_template_id="A",
             word_type_per_card={
                 "Alpha": "abstract",
                 "Beta": "abstract",

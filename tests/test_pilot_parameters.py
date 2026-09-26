@@ -171,5 +171,53 @@ class PilotParameterTests(unittest.TestCase):
         self.assertEqual(len(self.state.interaction_history), history_len)
 
 
+class RoundBoardOrderTests(unittest.TestCase):
+    """The 4 fixed boards (core.words.ROUND_BOARDS) must play in a shuffled
+    order per session, not always B01 in round 1, B02 in round 2, etc. --
+    see core.state._new_round_board_order and
+    core.game_logic._board_number_for_round."""
+
+    def setUp(self):
+        self.original_st = game_logic.st
+        self.state = base_state()
+        game_logic.st = SimpleNamespace(session_state=self.state)
+
+    def tearDown(self):
+        game_logic.st = self.original_st
+
+    def test_new_round_board_order_is_a_shuffled_permutation(self):
+        from core.state import _new_round_board_order
+        from core.words import ROUND_BOARDS
+
+        order = _new_round_board_order()
+        self.assertEqual(sorted(order), sorted(ROUND_BOARDS.keys()))
+
+    def test_get_board_template_id_follows_the_shuffled_order(self):
+        from core.words import ROUND_BOARDS
+
+        self.state.round_board_order = [3, 1, 4, 2]
+        self.assertEqual(game_logic.get_board_template_id(1), ROUND_BOARDS[3]["id"])
+        self.assertEqual(game_logic.get_board_template_id(2), ROUND_BOARDS[1]["id"])
+        self.assertEqual(game_logic.get_board_template_id(3), ROUND_BOARDS[4]["id"])
+        self.assertEqual(game_logic.get_board_template_id(4), ROUND_BOARDS[2]["id"])
+
+    def test_sample_fixed_round_words_follows_the_shuffled_order(self):
+        from core.words import ROUND_BOARDS
+
+        self.state.round_board_order = [3, 1, 4, 2]
+        _board, _targets, _neutrals, _bombs, _roles, _types, template_type = (
+            game_logic.sample_fixed_round_words(1)
+        )
+        self.assertEqual(template_type, ROUND_BOARDS[3]["id"])
+
+    def test_falls_back_to_direct_mapping_without_a_shuffled_order(self):
+        """An older/incomplete session_state with no round_board_order set
+        must not crash -- it degrades to the original fixed 1:1 mapping."""
+        from core.words import ROUND_BOARDS
+
+        self.state.pop("round_board_order", None)
+        self.assertEqual(game_logic.get_board_template_id(2), ROUND_BOARDS[2]["id"])
+
+
 if __name__ == "__main__":
     unittest.main()

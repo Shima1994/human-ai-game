@@ -5,11 +5,10 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from core.constants import (
-    AI_REROLLS_PER_GAME,
     DEFAULT_CONDITION,
-    HUMAN_REROLLS_PER_GAME,
     VALID_CONDITIONS,
 )
+from core.words import ROUND_BOARDS
 
 
 def _new_session_id():
@@ -29,6 +28,15 @@ def _condition_from_query_params():
 
 def _new_starting_role():
     return random.choice(["human_clue", "ai_clue"])
+
+
+def _new_round_board_order():
+    """Which fixed board (see core.words.ROUND_BOARDS) plays in which game
+    round, shuffled once per session -- every board is still used exactly
+    once across the study, only the order participants see them in varies."""
+    board_numbers = list(ROUND_BOARDS.keys())
+    random.shuffle(board_numbers)
+    return board_numbers
 
 
 def _device_type_from_user_agent(user_agent):
@@ -75,6 +83,7 @@ def init_session_state():
         "condition": _condition_from_query_params(),
         "condition_assigned": False,
         "starting_role": _new_starting_role(),
+        "round_board_order": _new_round_board_order(),
         "started": False,
         "participant_id": None,
         "nickname": "",
@@ -93,8 +102,9 @@ def init_session_state():
         "board": None,
         "role": None,
         "word_type": None,
-        "board_template_type": "",
-        "board_id": "",
+        "board_template_id": "",
+        "board_material_version": "",
+        "board_instance_id": "",
         "word_type_per_card": {},
         "target_words": [],
         "bomb_words": [],
@@ -150,15 +160,13 @@ def init_session_state():
         "post_game_questionnaire_submitted": False,
         "post_game_questionnaire": {},
         "perception_rating": None,
-        "ai_understanding_rating_before": None,
+        "human_expected_ai_understanding_rating": None,
         "pending_ai_guess_review": None,
         "previous_hint": None,
         "last_ai_guesses": [],
         "last_ai_hint": "",
         "ai_round_reflection": "",
         "human_round_feedback": "",
-        "ai_rerolls": AI_REROLLS_PER_GAME,
-        "human_rerolls": HUMAN_REROLLS_PER_GAME,
         "game_over": False,
         "last_score_change": 0,
         "round_medal": "none",

@@ -139,6 +139,70 @@ class ParticipantIdAnonymityTests(unittest.TestCase):
         self.assertRegex(at.session_state["participant_id"], r"^participant_[0-9a-f]{8}$")
 
 
+class TurnResultPopupSkipInfoTests(unittest.TestCase):
+    """The "Turn result" dialog itself (not just the adjacent History
+    sidebar) must show what the skipping guesser thought the clue meant and
+    why, gated the same way the sidebar already gates it (share_explanations,
+    i.e. the adaptive condition) -- added on request so a participant isn't
+    forced to look away from the popup to see this."""
+
+    def _reach_pending_reflection_for_skip(self, at, condition):
+        at.session_state["consent_given"] = True
+        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
+        at.session_state["started"] = True
+        at.session_state["participant_id"] = "participant_test0003"
+        at.session_state["nickname"] = "Test"
+        at.session_state["tutorial_completed"] = True
+        at.session_state["game_over"] = False
+        at.session_state["condition"] = condition
+        at.session_state["condition_assigned"] = True
+        at.session_state["round"] = 1
+        at.session_state["starting_role"] = "human_clue"
+        at.session_state["board"] = None
+        at.run()
+        board_words = list(at.session_state["board"])
+        at.session_state["role"] = "human_guesser"
+        at.session_state["pending_reflection_turn"] = 1
+        at.session_state["interaction_history"] = [
+            {
+                "turn": 1,
+                "clue_giver": "ai",
+                "guesser": "human",
+                "hint": "test",
+                "hint_number": 2,
+                "outcome": "skip",
+                "skipped": True,
+                "skipped_by": "human",
+                "guesses": [],
+                "neutral_guesses": [],
+                "correct_guesses": [],
+                "bomb_guesses": [],
+                "bomb_hit": False,
+                "timed_out": False,
+                "skip_interpreted_cards": board_words[:2],
+                "guess_rationale": "I thought it meant something else entirely.",
+            }
+        ]
+        with patch("ui.screens.log_event"):
+            at.run()
+        return at, board_words
+
+    def test_skip_info_shown_in_popup_when_condition_shares_explanations(self):
+        at, board_words = self._reach_pending_reflection_for_skip(
+            _fresh_app(), "adaptive"
+        )
+        text = _all_markdown_text(at)
+        self.assertIn("Guesser thought", text)
+        self.assertIn(board_words[0], text)
+        self.assertIn("I thought it meant something else entirely.", text)
+
+    def test_skip_info_hidden_in_popup_when_condition_does_not_share_explanations(self):
+        at, _ = self._reach_pending_reflection_for_skip(_fresh_app(), "baseline")
+        text = _all_markdown_text(at)
+        self.assertNotIn("Guesser thought", text)
+        self.assertNotIn("I thought it meant something else entirely.", text)
+
+
 class GuesserSkipButtonGatingTests(unittest.TestCase):
     """The "Stop guessing and use 1 skip" button intentionally requires the
     same reasoning text as clicking a board card (the study needs that
@@ -243,6 +307,47 @@ class ClueTimerLabelingTests(unittest.TestCase):
         self.assertIn("Final chance —", text)
         # The ordinary phase label must not also be showing at the same time.
         self.assertNotIn("Guessing —", text)
+
+
+class HistorySidebarAlwaysVisibleTests(unittest.TestCase):
+    """The live history sidebar must be visible from the very start of a
+    round (showing "No hints or guesses yet."), not only once the first
+    turn completes -- a participant should see it in the same place the
+    whole time, not have it appear partway through."""
+
+    def _reach_guesser(self, at, interaction_history):
+        at.session_state["consent_given"] = True
+        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
+        at.session_state["started"] = True
+        at.session_state["participant_id"] = "participant_test_history"
+        at.session_state["nickname"] = "Test"
+        at.session_state["tutorial_completed"] = True
+        at.session_state["game_over"] = False
+        at.session_state["condition"] = "adaptive"
+        at.session_state["condition_assigned"] = True
+        at.session_state["round"] = 1
+        at.session_state["starting_role"] = "ai_clue"
+        at.session_state["board"] = None
+        at.run()
+        at.session_state["interaction_history"] = interaction_history
+        at.run()
+        return at
+
+    def test_sidebar_visible_with_no_turns_yet(self):
+        at = self._reach_guesser(_fresh_app(), [])
+        self.assertFalse(at.exception)
+        sidebar_text = "\n".join(el.value for el in at.sidebar.markdown)
+        self.assertIn("History", sidebar_text)
+        self.assertIn("No hints or guesses yet", sidebar_text)
+
+    def test_sidebar_shows_turn_once_one_exists(self):
+        at = self._reach_guesser(
+            _fresh_app(),
+            [{"turn": 1, "clue_giver": "ai", "guesser": "human", "hint": "trust", "hint_number": 1, "guesses": []}],
+        )
+        self.assertFalse(at.exception)
+        sidebar_text = "\n".join(el.value for el in at.sidebar.markdown)
+        self.assertIn("History", sidebar_text)
 
 
 class GuesserTurnStateClearedBeforeAiExplanationTests(unittest.TestCase):

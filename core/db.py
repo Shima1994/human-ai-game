@@ -51,12 +51,27 @@ CREATE TABLE IF NOT EXISTS turns (
 CREATE TABLE IF NOT EXISTS board_cards (
     session_id TEXT NOT NULL,
     round_number INTEGER NOT NULL,
-    board_id TEXT NOT NULL,
+    board_instance_id TEXT NOT NULL,
     card_word TEXT NOT NULL,
     card_role TEXT NOT NULL,
     word_type TEXT NOT NULL,
     PRIMARY KEY (session_id, round_number, card_word)
 );
+
+-- One-time, idempotent migration for any table created before board_cards'
+-- board_id column was renamed to board_instance_id (CREATE TABLE IF NOT
+-- EXISTS above is a no-op against an already-existing table, so it can't
+-- fix this on its own). Safe to run on every start: does nothing once the
+-- rename has already happened.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'board_cards' AND column_name = 'board_id'
+    ) THEN
+        ALTER TABLE board_cards RENAME COLUMN board_id TO board_instance_id;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS events (
     id BIGSERIAL PRIMARY KEY,

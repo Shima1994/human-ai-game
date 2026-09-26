@@ -85,8 +85,9 @@ ROUNDS_LOG_FIELDS = [
     "round_role",
     "clue_giver",
     "guesser",
-    "board_template_type",
-    "board_id",
+    "board_template_id",
+    "board_material_version",
+    "board_instance_id",
     "all_board_words",
     "word_type_per_card",
     "target_words",
@@ -129,7 +130,9 @@ TURNS_LOG_FIELDS = [
     "clue_number",
     "hint_explanation",
     "hint_attempts",
-    "board_id",
+    "board_template_id",
+    "board_material_version",
+    "board_instance_id",
     "outcome",
     "bomb_hit",
     "intended_cards",
@@ -183,8 +186,8 @@ TURNS_LOG_FIELDS = [
     "reflection_end_time",
     "reflection_time_sec",
     "reflection_source",
-    "ai_understanding_rating_before",
-    "human_understanding_rating",
+    "human_expected_ai_understanding_rating",
+    "human_perceived_understanding_rating",
     "human_relationship_type",
     "human_explanation_raw",
     "human_explanation_sanitized",
@@ -210,9 +213,6 @@ TURNS_LOG_FIELDS = [
     "repair_success",
     "timer_duration_seconds",
     "clue_timer_started_at",
-    "human_decision_started_at",
-    "human_decision_ended_at",
-    "human_decision_time_sec",
     "human_timed_out",
     "timeout_timestamp",
     "timed_out",
@@ -388,9 +388,6 @@ def clean_interaction_history(history):
                 "repair_success": bool(item.get("repair_success", False)),
                 "timer_duration_seconds": item.get("timer_duration_seconds", ""),
                 "clue_timer_started_at": item.get("clue_timer_started_at", ""),
-                "human_decision_started_at": item.get("human_decision_started_at", ""),
-                "human_decision_ended_at": item.get("human_decision_ended_at", ""),
-                "human_decision_time_sec": item.get("human_decision_time_sec", ""),
                 "human_timed_out": bool(item.get("human_timed_out", item.get("timed_out", False))),
                 "timeout_timestamp": item.get("timeout_timestamp", ""),
                 "timed_out": bool(item.get("timed_out", False)),
@@ -414,7 +411,7 @@ def clean_interaction_history(history):
                 "completed_guesses": item.get("completed_guesses", len(guesses)),
                 "skipped_guesses": item.get("skipped_guesses", 0),
                 "bomb_hit": bool(item.get("bomb_hit", False)),
-                "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
+                "human_expected_ai_understanding_rating": item.get("human_expected_ai_understanding_rating"),
                 "hint_raw_response": item.get("hint_raw_response", ""),
                 "hint_response_time_sec": item.get("hint_response_time_sec"),
                 "hint_attempts": item.get("hint_attempts"),
@@ -439,7 +436,7 @@ def clean_interaction_history(history):
                 "reflection_explanation_raw": item.get("reflection_explanation_raw", ""),
                 "reflection_explanation_is_valid": item.get("reflection_explanation_is_valid", ""),
                 "reflection_blocked_reason": item.get("reflection_blocked_reason", ""),
-                "human_understanding_rating": item.get("human_understanding_rating", ""),
+                "human_perceived_understanding_rating": item.get("human_perceived_understanding_rating", ""),
                 "human_relationship_type": item.get("human_relationship_type", ""),
                 "human_explanation_raw": item.get("human_explanation_raw", ""),
                 "human_explanation_sanitized": item.get("human_explanation_sanitized", ""),
@@ -759,8 +756,9 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "round_role": st.session_state.role,
         "clue_giver": clue_giver,
         "guesser": guesser,
-        "board_template_type": st.session_state.get("board_template_type", ""),
-        "board_id": st.session_state.get("board_id", ""),
+        "board_template_id": st.session_state.get("board_template_id", ""),
+        "board_material_version": st.session_state.get("board_material_version", ""),
+        "board_instance_id": st.session_state.get("board_instance_id", ""),
         "all_board_words": _json(st.session_state.board),
         "word_type_per_card": _format_word_type_per_card(st.session_state.board, word_type_per_card),
         "target_words": _json(st.session_state.target_words),
@@ -836,7 +834,13 @@ def _llm_fields_for_turn(item):
         raw = item.get("guess_raw_response", "")
         latency = item.get("guess_response_time_sec")
         parsed = {
-            "action": item.get("outcome", "guess"),
+            # The actor's decision (interaction/full_skip/partial_skip/timeout
+            # -- see ACTION_TYPES), never the RESULT of that decision. Reusing
+            # item["outcome"] here used to leak "correct"/"wrong"/"bomb" into
+            # this field -- outcome already has its own dedicated column in
+            # the turn row (see _turn_analysis_row); this one mirrors what the
+            # guesser actually did, matching the row's own action_type.
+            "action": _action_classification(item),
             "guesses": item.get("guesses", []),
             "reasoning": item.get("guess_rationale", ""),
             "partial_skip": bool(item.get("partial_skip", False)),
@@ -892,7 +896,9 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "clue_number": item.get("hint_number", ""),
         "hint_explanation": item.get("hint_explanation", ""),
         "hint_attempts": item.get("hint_attempts"),
-        "board_id": st.session_state.get("board_id", ""),
+        "board_template_id": st.session_state.get("board_template_id", ""),
+        "board_material_version": st.session_state.get("board_material_version", ""),
+        "board_instance_id": st.session_state.get("board_instance_id", ""),
         "outcome": item.get("outcome", "correct" if correct else "wrong"),
         "bomb_hit": bool(item.get("bomb_hit", False)),
         "intended_cards": _json(item.get("intended_targets", [])),
@@ -971,8 +977,8 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "reflection_end_time": item.get("reflection_end_time", ""),
         "reflection_time_sec": _format_optional_float(item.get("reflection_time_sec")),
         "reflection_source": item.get("reflection_source", ""),
-        "ai_understanding_rating_before": item.get("ai_understanding_rating_before"),
-        "human_understanding_rating": item.get("human_understanding_rating", ""),
+        "human_expected_ai_understanding_rating": item.get("human_expected_ai_understanding_rating"),
+        "human_perceived_understanding_rating": item.get("human_perceived_understanding_rating", ""),
         "human_relationship_type": item.get("human_relationship_type", ""),
         "human_explanation_raw": human_raw,
         "human_explanation_sanitized": human_sanitized if human_valid else "",
@@ -1008,9 +1014,6 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "repair_success": bool(item.get("repair_success", False)),
         "timer_duration_seconds": item.get("timer_duration_seconds", ""),
         "clue_timer_started_at": item.get("clue_timer_started_at", ""),
-        "human_decision_started_at": item.get("human_decision_started_at", ""),
-        "human_decision_ended_at": item.get("human_decision_ended_at", ""),
-        "human_decision_time_sec": _format_optional_float(item.get("human_decision_time_sec")),
         "human_timed_out": bool(item.get("human_timed_out", False)),
         "timeout_timestamp": item.get("timeout_timestamp", ""),
         "timed_out": bool(item.get("timed_out", False)),
@@ -1027,14 +1030,14 @@ def _board_card_rows():
     word_type_per_card = st.session_state.get("word_type_per_card", {})
     session_id = st.session_state.get("session_id", "")
     round_number = st.session_state.round
-    board_id = st.session_state.get("board_id", "")
+    board_instance_id = st.session_state.get("board_instance_id", "")
     rows = []
     for word in st.session_state.get("board", []) or []:
         rows.append(
             (
                 session_id,
                 round_number,
-                board_id,
+                board_instance_id,
                 word,
                 word_roles.get(word, ""),
                 word_type_per_card.get(word, ""),
@@ -1079,7 +1082,7 @@ def append_analysis_logs(participant_id, timestamp, score_change, clean_history)
     if board_card_rows:
         db.insert_rows(
             "board_cards",
-            columns=["session_id", "round_number", "board_id", "card_word", "card_role", "word_type"],
+            columns=["session_id", "round_number", "board_instance_id", "card_word", "card_role", "word_type"],
             rows=board_card_rows,
             # Re-running the same round (e.g. a Streamlit rerun interrupting
             # this save before the round actually advances) must not raise

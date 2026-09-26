@@ -29,6 +29,13 @@ MODEL_IDENTIFIER = json.dumps(
 )
 CONDITION_ASSIGNMENT_VERSION = "alternating-registered-sessions-v1"
 
+# Bump this by hand whenever core/words.py's ROUND_BOARDS word content
+# changes (a swapped word, an abstract/concrete correction, a typo fix,
+# etc.). A board's template id (e.g. "B01") stays the same across such an
+# edit, so without this a session played before a correction and one played
+# after are otherwise indistinguishable in the logged data.
+BOARD_MATERIAL_VERSION = "v2026-09-26"
+
 VALID_CONDITIONS = frozenset({"baseline", "adaptive"})
 DEFAULT_CONDITION = "adaptive"
 DEBUG_MODE = False
@@ -68,5 +75,3 @@ MEDAL_POINTS = {
     "silver": 4,
     "none": 0,
 }
-AI_REROLLS_PER_GAME = 2
-HUMAN_REROLLS_PER_GAME = 2

@@ -15,12 +15,17 @@
 }
 :root {
     --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --font-reading: "Source Serif 4", Georgia, "Times New Roman", serif;
+    /* Was a separate serif ("Source Serif 4") for hero/dialog headings --
+       requested to be the same single typeface as the rest of the app. */
+    --font-reading: var(--font-sans);
     --color-bg: #f6f4ef;
     --color-bg-alt: #efece5;
     --color-text: #1f2d3d;
-    --color-text-soft: #5e6e80;
-    --color-text-muted: #7f8a99;
+    /* Requested: no gray text anywhere -- these two used to be lighter
+       gray-blue "secondary" shades; both now match the main dark text
+       color instead of reading as a lower-contrast gray tier. */
+    --color-text-soft: #111827;
+    --color-text-muted: #111827;
     --color-heading: #122236;
     --color-card: rgba(255, 255, 255, 0.92);
     --color-card-soft: rgba(247, 250, 253, 0.95);
@@ -59,7 +64,7 @@
     --card-bg-page: #f6f7f9;
     --card-surface: #ffffff;
     --card-text-primary: #1f2933;
-    --card-text-secondary: #52606d;
+    --card-text-secondary: #1f2933;
     --card-border-idle: #cbd2d9;
     --card-pending-bg: #fff6df;
     --card-pending-border: #f0b429;
@@ -108,6 +113,15 @@ html, body, [class*="css"], .stApp {
     color: var(--color-text);
 }
 
+/* Streamlit's own st.caption() ships a semi-transparent gray by default
+   (its built-in theme, not this app's CSS) -- requested: no gray text
+   anywhere, applied globally rather than only where already overridden
+   per-panel. */
+[data-testid="stCaptionContainer"] {
+    color: #111827 !important;
+    opacity: 1 !important;
+}
+
 .block-container {
     width: 100%;
     max-width: 1600px;
@@ -137,17 +151,18 @@ body:has([data-testid="stSidebar"]) .block-container {
    because Streamlit already handles the desktop-persistent /
    mobile-collapsed-behind-a-tap responsive behavior natively, instead of
    another custom breakpoint to get wrong. */
-/* A flat pixel width made the sidebar a shrinking fraction of the screen
-   on a wide desktop monitor (480px was ~3/8 of a narrow laptop window but
-   barely a quarter of a wide one) -- clamp() keeps it at roughly 3/8 of the
-   viewport on anything wide enough for that to matter, while never
-   dropping below the 480px floor that was tuned for readability, or
-   growing past a sensible cap on an ultra-wide monitor. */
+/* History should be a fixed proportion of the page (5 parts out of a
+   12-part layout, ~41.7%) rather than a flat pixel width -- a flat width
+   like the old 380px floor ate a much bigger share of the screen than
+   intended on anything narrower than ~1460px wide, which is most laptop
+   windows, so it kept looking too big even after several size passes. A
+   pure vw width only floors on genuinely narrow windows (below ~625px),
+   where 260px keeps it readable instead of collapsing further. */
 [data-testid="stSidebar"] {
     background: var(--color-card);
     border-right: 1px solid var(--color-border);
-    min-width: clamp(480px, 37.5vw, 680px) !important;
-    width: clamp(480px, 37.5vw, 680px) !important;
+    min-width: 260px !important;
+    width: 41.67vw !important;
 }
 [data-testid="stSidebar"] > div {
     padding-top: 1.5rem;
@@ -297,6 +312,32 @@ h1, h2, h3, h4 {
     flex-direction: column;
     align-items: stretch;
     gap: 0.6rem;
+}
+/* The human clue-giver's own board-adjacent timer (screen_human_clue) --
+   unlike timer_skip_stack above, this one sits in normal flow in the
+   column next to the (now narrower, centered) board grid rather than
+   fixed to the viewport, so it visibly reads as "next to the cards"
+   instead of floating at the page's top-right corner. */
+.st-key-board_adjacent_timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 220px;
+}
+.st-key-board_adjacent_timer .timer-pill {
+    font-size: 1.3rem;
+    padding: 0.8rem 1.4rem;
+    white-space: nowrap;
+}
+/* The human clue-giver's board grid specifically (scoped to this wrapper,
+   not every screen that reuses render_board/.st-key-board_card_grid) --
+   narrower and centered in its column instead of stretching edge to edge,
+   the freed space to its side being where board_adjacent_timer sits. */
+.st-key-human_clue_board_wrap .st-key-board_card_grid {
+    max-width: 94%;
+    margin: 0 auto;
 }
 /* st_autorefresh is a headless polling component -- no UI of its own --
    but its default element-container still reserves visible height, which
@@ -792,7 +833,7 @@ body:has(.timer-row) .role-badge {
     background: var(--color-success-soft);
 }
 .legend-neutral {
-    color: #5c5a55;
+    color: #111827;
     border-color: rgba(109, 106, 99, 0.22);
     background: rgba(109, 106, 99, 0.08);
 }
@@ -1676,7 +1717,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
     color: var(--card-danger-text);
 }
 .history-chip.muted {
-    color: #7b8b9a;
+    color: #111827;
     background: rgba(18, 34, 54, 0.05);
 }
 .history-skip-note {
@@ -1813,7 +1854,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
     box-shadow: none !important;
 }
 .st-key-reflection_panel .stTextArea textarea::placeholder {
-    color: #6B7280 !important;
+    color: #111827 !important;
 }
 .st-key-reflection_panel .stTextArea textarea:focus {
     border-color: rgba(29, 94, 168, 0.42) !important;
@@ -1859,7 +1900,7 @@ div[data-baseweb="popover"] [role="option"]:hover {
 }
 .stTextInput input::placeholder,
 .stTextArea textarea::placeholder {
-    color: #6B7280;
+    color: #111827;
 }
 .stTextInput input:focus,
 .stTextArea textarea:focus {

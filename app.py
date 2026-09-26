@@ -2,11 +2,13 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
+from core.constants import DEBUG_MODE
 from core.game_logic import BoardGenerationError, setup_new_round
 from core.state import init_session_state
 from core.storage import log_event
 from ui.components import close_maxed_multiselects, render_app_header, scroll_page_to_top
 from ui.screens import (
+    render_debug_skip_to_round_one,
     render_idle_watchdog,
     screen_consent,
     screen_game_over,
@@ -90,6 +92,9 @@ def main():
         if render_idle_watchdog(_current_view_key()):
             return
 
+    if DEBUG_MODE and not st.session_state.tutorial_completed:
+        render_debug_skip_to_round_one()
+
     if not st.session_state.consent_given:
         screen_consent()
         return
@@ -123,10 +128,9 @@ def main():
                 "round_started",
                 {
                     "round_role": st.session_state.role,
-                    "board_template_type": st.session_state.get("board_template_type", ""),
-
-                    "board_id": st.session_state.get("board_id", ""),
-
+                    "board_template_id": st.session_state.get("board_template_id", ""),
+                    "board_material_version": st.session_state.get("board_material_version", ""),
+                    "board_instance_id": st.session_state.get("board_instance_id", ""),
                 },
                 round_number=st.session_state.round,
                 turn_number="",

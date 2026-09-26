@@ -231,13 +231,13 @@ def format_participant_feedback(history):
         if clue_giver == "human":
             if not item.get("human_explanation_is_valid"):
                 continue
-            rating = item.get("human_understanding_rating")
+            rating = item.get("human_perceived_understanding_rating")
             relationship_type = item.get("human_relationship_type", "")
             explanation = str(item.get("human_explanation_sanitized", "") or "").strip()
             if not rating and not relationship_type and not explanation:
                 continue
         elif clue_giver == "ai":
-            rating = item.get("human_understanding_rating")
+            rating = item.get("human_perceived_understanding_rating")
             if not rating:
                 continue
             relationship_type = ""
@@ -267,13 +267,13 @@ def format_round_participant_feedback(round_summaries):
             if clue_giver == "human":
                 if not item.get("human_explanation_is_valid"):
                     continue
-                rating = item.get("human_understanding_rating")
+                rating = item.get("human_perceived_understanding_rating")
                 relationship_type = item.get("human_relationship_type", "")
                 explanation = str(item.get("human_explanation_sanitized", "") or "").strip()
                 if not rating and not relationship_type and not explanation:
                     continue
             elif clue_giver == "ai":
-                rating = item.get("human_understanding_rating")
+                rating = item.get("human_perceived_understanding_rating")
                 if not rating:
                     continue
                 relationship_type = ""
@@ -376,7 +376,7 @@ def _memory_interaction_lines(interactions, round_label="current"):
             ", ".join(item.get("wrong_guess_replacements", [])) or "none"
         )
         rationale = str(item.get("guess_rationale", "") or "").strip()
-        human_rating = item.get("human_understanding_rating")
+        human_rating = item.get("human_perceived_understanding_rating")
         human_relationship = str(item.get("human_relationship_type", "") or "").strip()
         human_explanation = str(
             item.get("human_explanation_sanitized", "")
@@ -898,8 +898,7 @@ PERSISTENT TEAMMATE MEMORY
 - Guess like a teammate who has been paying attention from the first turn, not like an isolated one-shot model.
 
 WHEN TO REFUSE
-- Output exactly REROLL_HINT only if the clue is genuinely meaningless or unrelated to every available board word. Last resort.
-- Use action="skip" only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort.
+- Use action="skip" only if skipping is allowed AND no available word has at least a plausible score of 3. Last resort. Even a full skip is not a free pass: you must still name which cards you think the clue was actually meant for in "interpreted_cards", with your reasoning in "reasoning" — the same as your human teammate has to when they skip. There is no way to reject a clue without saying why and what you thought it meant.
 - If one or more guesses are strong but the remaining guesses would be unsafe, return action="partial_skip" with only the strong guesses. This consumes one full skip, but is better than risking a bomb.
 - For action="skip", include up to N unselected cards in "interpreted_cards".
 - For action="partial_skip", include only cards you have NOT already guessed, with at most N minus the number of completed guesses. These are the remaining cards you think the clue-giver most likely meant.
@@ -911,9 +910,6 @@ OUTPUT FORMAT — strict JSON only, no markdown, no commentary outside the JSON.
   "guesses": ["<exact board word>", "..."],
   "interpreted_cards": ["<exact board word you think the clue was meant for>", "..."]
 }
-
-OR, instead of JSON, exactly this literal token on a single line:
-REROLL_HINT
 """
 
 BASELINE_GUESS_SYSTEM_PROMPT = GUESS_SYSTEM_PROMPT.replace(
@@ -935,7 +931,6 @@ def build_guess_user_prompt(
     board,
     hint,
     max_guesses,
-    remaining_rerolls,
     history,
     previous_guesses,
     round_summaries,
@@ -976,8 +971,7 @@ def build_guess_user_prompt(
         "Before answering, internally rank every available board word by direct semantic association to the clue. "
         "Your final guesses must be the top N exact board words, not random filler.\n\n"
         f"Skipping allowed right now: {'yes' if can_skip else 'no'}\n"
-        f"Remaining skips this round: {remaining_skips}\n"
-        f"Remaining clue rerolls: {remaining_rerolls}\n\n"
+        f"Remaining skips this round: {remaining_skips}\n\n"
         "You may make fewer than N strong guesses and set action=partial_skip when the remaining choices are dangerously uncertain. "
         "A partial skip preserves the guesses already made but consumes one full skip. Prefer it over a serious bomb risk.\n\n"
         "Interaction history so far this round:\n"
@@ -986,8 +980,8 @@ def build_guess_user_prompt(
         f"{round_memory}"
         f"{teammate_memory}\n\n"
         f"{feedback_block}\n\n"
-        "Default to guessing. REROLL_HINT and action=skip are last resorts. "
-        "Respond with the JSON object or the REROLL_HINT literal."
+        "Default to guessing. action=\"skip\" is a last resort, and even then you must name which "
+        "cards you thought the clue meant. Respond with the JSON object only."
     )
 
 
@@ -1149,7 +1143,6 @@ def ai_guess(
     board,
     hint,
     max_guesses,
-    remaining_rerolls,
     history=None,
     previous_guesses=None,
     round_summaries=None,
@@ -1170,7 +1163,6 @@ def ai_guess(
                 board,
                 hint,
                 max_guesses,
-                remaining_rerolls,
                 history,
                 previous_guesses,
                 round_summaries,
@@ -1192,12 +1184,6 @@ def ai_guess(
         raw = ""
 
     if raw:
-        upper = raw.strip().upper()
-        if upper == "REROLL_HINT" and remaining_rerolls > 0:
-            return {"action": "reroll", "guesses": [], "guess_rationale": "", **meta}
-        if upper == "SKIP_CLUE" and can_skip and remaining_skips > 0:
-            return {"action": "skip", "guesses": [], "guess_rationale": "", **meta}
-
         valid_guesses, guess_rationale = parse_guess_json(raw, available_board, max_guesses)
         interpreted_cards = parse_interpreted_cards(raw, available_board, max_guesses)
         requested_action = parse_guess_action(raw)
@@ -1321,13 +1307,22 @@ def ai_guess(
             }
 
     if can_skip and remaining_skips > 0:
-        return {"action": "skip", "guesses": [], "guess_rationale": "", **meta}
-    if remaining_rerolls > 0:
-        return {"action": "reroll", "guesses": [], "guess_rationale": "", **meta}
-    # No skip and no reroll left, and nothing usable could be parsed from the
-    # model's response (or the API call itself failed) -- the game rules
-    # don't have a fourth option here (guess / skip / timeout only), so an
-    # empty "guess" would record as an incoherent "wrong guess with no cards
+        # Nothing at all could be parsed from the model's response (or the
+        # API call itself failed) -- this is the one skip path with no real
+        # interpreted_cards/reasoning to report, since there's genuinely
+        # nothing parseable to base them on. It's a fallback of last resort,
+        # not a way to skip without justification: every other skip path
+        # requires both (see GUESS_SYSTEM_PROMPT's WHEN TO REFUSE).
+        return {
+            "action": "skip",
+            "guesses": [],
+            "guess_rationale": "No valid response could be parsed, so the clue was skipped.",
+            **meta,
+        }
+    # No skip left, and nothing usable could be parsed from the model's
+    # response (or the API call itself failed) -- the game rules don't have
+    # a fourth option here (guess / skip / timeout only), so an empty
+    # "guess" would record as an incoherent "wrong guess with no cards
     # guessed" turn. Force a real guess by picking at random from the cards
     # not yet guessed this round, same as a guesser who genuinely can't pass
     # having to name something.
@@ -1338,7 +1333,7 @@ def ai_guess(
     )
     meta["raw_response"] = (
         f"{meta['raw_response']}\n\n<forced_random_guess: no valid guess parsed, "
-        "no skip/reroll available>"
+        "no skip available>"
     )
     return {
         "action": "guess",
