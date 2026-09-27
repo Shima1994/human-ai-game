@@ -1280,6 +1280,31 @@ def ai_guess(
                 f"{meta['raw_response']}\n\n<normalized_action: partial_skip; "
                 "incomplete normal guess after repair>"
             )
+        elif (
+            valid_guesses
+            and not partial_skip_is_valid
+            and len(valid_guesses) < required_guess_count
+            and not (can_skip and remaining_skips > 0)
+        ):
+            # Undersized guess with no skip available to fall back on -- a
+            # partial guess is never valid here (the only legitimate way to
+            # submit fewer than N is partial_skip, which costs a skip the AI
+            # doesn't have). Padding with the model's own ranked
+            # interpreted_cards (falling back to whatever's left in
+            # available_board if even those run short) forces a genuine
+            # full-count commitment instead of quietly recording a shorter
+            # guess as though it satisfied the clue.
+            selected = set(valid_guesses)
+            fill_pool = [card for card in interpreted_cards if card not in selected]
+            fill_pool += [
+                card for card in available_board
+                if card not in selected and card not in fill_pool
+            ]
+            valid_guesses = valid_guesses + fill_pool[: required_guess_count - len(valid_guesses)]
+            meta["raw_response"] = (
+                f"{meta['raw_response']}\n\n<normalized_action: guess padded to "
+                f"required_guess_count={required_guess_count}; no skip available>"
+            )
 
         if valid_guesses:
             if partial_skip_is_valid:

@@ -11,7 +11,7 @@ patching the origin module doesn't affect an already-bound `from x import y`
 reference).
 """
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
@@ -304,7 +304,7 @@ class ClueTimerLabelingTests(unittest.TestCase):
         at.session_state["final_guess_deadline_active"] = True
         at.run()
         text = _all_markdown_text(at)
-        self.assertIn("Final chance —", text)
+        self.assertIn("Final chance", text)
         # The ordinary phase label must not also be showing at the same time.
         self.assertNotIn("Guessing —", text)
 
@@ -473,114 +473,6 @@ class DebriefingGateOrderingTests(unittest.TestCase):
         self.assertFalse(at.exception)
         rendered = _all_markdown_text(at)
         self.assertIn("TESTCODE1", rendered)
-
-
-class IdleWatchdogTests(unittest.TestCase):
-    """A soft, dismissible "still there?" popup on any screen without its
-    own countdown -- purely to log disengaged/bot-like participants for
-    later Prolific filtering, never to block them.
-
-    render_idle_watchdog_ticker (streamlit_autorefresh under the hood) has
-    no real client-side timer in AppTest's bare-script mode, so every test
-    here patches it directly: a strictly-increasing side_effect simulates
-    "nothing else happened between real 5s ticks" (genuine idle), while a
-    constant return value simulates "something else triggered this rerun"
-    (real activity -- typing, a click) -- see render_idle_watchdog's own
-    comparison of this count across reruns for why that distinction is what
-    makes composing a long answer for over 60s not itself count as idle."""
-
-    def _stale_reset_at(self, seconds=65):
-        return (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
-
-    @patch("ui.screens.render_idle_watchdog_ticker")
-    @patch("ui.screens.log_event")
-    def test_idle_popup_appears_and_logs_after_60s_on_an_untimed_screen(self, mock_log, mock_ticker):
-        mock_ticker.side_effect = range(100)
-        at = _fresh_app()  # consent screen: no countdown of its own
-        at.session_state["idle_watchdog_reset_at"] = self._stale_reset_at()
-        at.run()
-
-        self.assertFalse(at.exception)
-        self.assertTrue(any(b.label == "OK, Continue" for b in at.button))
-        mock_log.assert_any_call(
-            "participant_idle_detected",
-            {"idle_seconds": 60, "trigger_count": 1, "view": "consent"},
-        )
-
-    @patch("ui.screens.render_idle_watchdog_ticker")
-    @patch("ui.screens.log_event")
-    def test_dismissing_resets_and_a_later_idle_window_logs_again(self, mock_log, mock_ticker):
-        mock_ticker.side_effect = range(100)
-        at = _fresh_app()
-        at.session_state["idle_watchdog_reset_at"] = self._stale_reset_at()
-        at.run()
-        next(b for b in at.button if b.label == "OK, Continue").click().run()
-        at.run()  # AppTest's .run() returns the frame at the click's own
-        # internal st.rerun() point, not the fully-settled next render (the
-        # same behavior seen while diagnosing the clue-form staleness report
-        # earlier this session) -- one more clean, uninterrupted .run() is
-        # needed to observe the actually-settled, dialog-closed state.
-
-        self.assertFalse(at.session_state["idle_watchdog_popup_logged"])
-        self.assertFalse(any(b.label == "OK, Continue" for b in at.button))
-
-        at.session_state["idle_watchdog_reset_at"] = self._stale_reset_at()
-        at.run()
-        self.assertTrue(any(b.label == "OK, Continue" for b in at.button))
-        mock_log.assert_any_call(
-            "participant_idle_detected",
-            {"idle_seconds": 60, "trigger_count": 2, "view": "consent"},
-        )
-
-    @patch("ui.screens.render_idle_watchdog_ticker")
-    @patch("ui.screens.log_event")
-    def test_ongoing_activity_within_the_same_screen_prevents_the_popup(self, mock_log, mock_ticker):
-        """The exact production bug this guards against: a participant
-        composing a long round-summary message for well over 60s must not
-        get interrupted, since the ticker's own count stays put across each
-        rerun their typing causes (nothing else -- no real 5s tick -- has
-        elapsed in between)."""
-        mock_ticker.return_value = 7
-        at = _fresh_app()
-        at.session_state["idle_watchdog_reset_at"] = self._stale_reset_at()
-        at.run()  # establishes last_tick_count == 7
-
-        at.session_state["idle_watchdog_reset_at"] = self._stale_reset_at()
-        at.run()  # ticker still 7 -> looks like activity, not a real 60s gap
-
-        self.assertFalse(any(b.label == "OK, Continue" for b in at.button))
-        self.assertNotIn(
-            "participant_idle_detected",
-            [call.args[0] for call in mock_log.call_args_list],
-        )
-
-    @patch("ui.screens.render_idle_watchdog_ticker")
-    @patch("ui.screens.log_event")
-    def test_watchdog_does_not_fire_during_an_active_timed_clue_giver_turn(self, mock_log, mock_ticker):
-        mock_ticker.side_effect = range(100)
-        at = _fresh_app()
-        at.session_state["consent_given"] = True
-        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
-        at.session_state["started"] = True
-        at.session_state["participant_id"] = "participant_test_idle"
-        at.session_state["nickname"] = "Test"
-        at.session_state["tutorial_completed"] = True
-        at.session_state["game_over"] = False
-        at.session_state["condition"] = "adaptive"
-        at.session_state["condition_assigned"] = True
-        at.session_state["round"] = 1
-        at.session_state["starting_role"] = "human_clue"
-        at.session_state["board"] = None
-        at.run()
-
-        at.session_state["idle_watchdog_reset_at"] = self._stale_reset_at(seconds=120)
-        at.run()
-
-        self.assertFalse(any(b.label == "OK, Continue" for b in at.button))
-        self.assertNotIn(
-            "participant_idle_detected",
-            [call.args[0] for call in mock_log.call_args_list],
-        )
 
 
 if __name__ == "__main__":

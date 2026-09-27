@@ -49,6 +49,38 @@ class AiGuessForcedFallbackTests(unittest.TestCase):
         self.assertTrue(result["guesses"])
 
     @patch("core.ai_service.call_openai_chat")
+    def test_undersized_guess_with_no_skip_is_padded_to_the_full_clue_count(
+        self, mock_call
+    ):
+        """The one legitimate way to submit fewer than N guesses is
+        partial_skip, which costs a skip -- if no skip is available, a
+        genuinely undersized "guess" response must never be recorded as a
+        complete, satisfied answer to the clue. It must be padded up to the
+        full required count instead (from the model's own interpreted_cards,
+        or whatever's left on the board), never silently accepted short."""
+        mock_call.return_value = (
+            '{"guesses": ["Cat", "Dog"], "reasoning": "Two safe picks.", '
+            '"interpreted_cards": ["Table", "Train"]}',
+            0.05,
+        )
+        result = ai_guess(
+            self.board,
+            "animal",
+            5,
+            history=[],
+            previous_guesses=[],
+            round_summaries=[],
+            remaining_skips=0,
+            can_skip=False,
+        )
+        self.assertEqual(result["action"], "guess")
+        self.assertEqual(len(result["guesses"]), 5)
+        self.assertIn("Cat", result["guesses"])
+        self.assertIn("Dog", result["guesses"])
+        self.assertTrue(all(word in self.board for word in result["guesses"]))
+        self.assertEqual(len(set(result["guesses"])), 5)
+
+    @patch("core.ai_service.call_openai_chat")
     def test_unparseable_response_still_skips_when_a_skip_is_available(
         self, mock_call
     ):

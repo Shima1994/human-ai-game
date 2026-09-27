@@ -37,14 +37,12 @@ def _debug_visuals():
     debug_condition = (
         condition if assigned and condition in {"baseline", "adaptive"} else "unassigned"
     )
-    baseline_background = """
-        .stApp {
-            background:
-                radial-gradient(circle at top left, rgba(184, 219, 248, 0.48), transparent 24%),
-                linear-gradient(180deg, #F1F8FF 0%, #E7F2FC 100%) !important;
-        }
-    """ if debug_condition == "baseline" else ""
-    debug_css = baseline_background + """
+    # Used to repaint the whole .stApp background blue for "baseline" so a
+    # developer could tell conditions apart at a glance -- dropped because
+    # it visually competed with (and got mistaken for) the app's own
+    # background, which must stay one single color everywhere. The small
+    # label below is enough to identify the condition during debugging.
+    debug_css = """
         .debug-condition-label {
             position: fixed;
             top: 0.65rem;

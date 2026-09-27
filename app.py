@@ -9,7 +9,6 @@ from core.storage import log_event
 from ui.components import close_maxed_multiselects, render_app_header, scroll_page_to_top
 from ui.screens import (
     render_debug_skip_to_round_one,
-    render_idle_watchdog,
     screen_consent,
     screen_game_over,
     screen_human_clue,
@@ -56,30 +55,10 @@ def _scroll_after_view_change():
     previous_view = st.session_state.get("_rendered_view_key")
     should_scroll = previous_view is not None and previous_view != current_view
     st.session_state._rendered_view_key = current_view
-    if should_scroll:
-        # A real screen/step transition is itself proof of activity -- give
-        # the idle watchdog (see render_idle_watchdog) a fresh window rather
-        # than counting time spent on the *previous* screen against this one.
-        st.session_state.idle_watchdog_reset_at = datetime.now(timezone.utc).isoformat()
-        st.session_state.idle_watchdog_popup_logged = False
     # Called every rerun (not just on a transition) so this component's DOM
     # node is never added/removed between reruns -- see scroll_page_to_top's
     # docstring for why that mattered.
     scroll_page_to_top(should_scroll)
-
-
-def _active_timed_turn_in_progress():
-    """True only while a screen with its own visible countdown is showing
-    (an in-progress clue/guess turn, or one of the two timed tutorial
-    rounds) -- render_idle_watchdog is skipped there since it would just be
-    a second, redundant "are you idle" check layered on top of the timer
-    that already handles this."""
-    state = st.session_state
-    if not state.tutorial_completed:
-        return state.get("tutorial_step") in ("ai_clue_round", "human_clue_round")
-    if state.game_over or state.board is None:
-        return False
-    return not state.get("pending_reflection_turn") and not state.get("round_finished")
 
 
 def main():
@@ -87,10 +66,6 @@ def main():
     inject_css()
     _scroll_after_view_change()
     close_maxed_multiselects()
-
-    if not _active_timed_turn_in_progress():
-        if render_idle_watchdog(_current_view_key()):
-            return
 
     if DEBUG_MODE and not st.session_state.tutorial_completed:
         render_debug_skip_to_round_one()

@@ -18,40 +18,55 @@
     /* Was a separate serif ("Source Serif 4") for hero/dialog headings --
        requested to be the same single typeface as the rest of the app. */
     --font-reading: var(--font-sans);
-    --color-bg: #f6f4ef;
-    --color-bg-alt: #efece5;
-    --color-text: #1f2d3d;
+    /* Cluecraft palette (2026-09-26 redesign): a warm "card-table" neutral
+       instead of the previous cool cream, plus two ROLE accents -- amber
+       for the clue-giver, teal for the guesser -- so the whole page
+       (buttons, timer, headings) re-tints depending on which hat the
+       participant is wearing that round. See the body:has() block below
+       for how a screen opts into a role accent; --color-primary itself
+       stays the fallback for screens that don't (consent, tutorial, etc). */
+    --color-bg: #f5f5f2;
+    --color-bg-alt: #ece2ce;
+    --color-text: #211c17;
     /* Requested: no gray text anywhere -- these two used to be lighter
        gray-blue "secondary" shades; both now match the main dark text
        color instead of reading as a lower-contrast gray tier. */
     --color-text-soft: #111827;
     --color-text-muted: #111827;
-    --color-heading: #122236;
-    --color-card: rgba(255, 255, 255, 0.92);
-    --color-card-soft: rgba(247, 250, 253, 0.95);
-    --color-border: rgba(18, 34, 54, 0.08);
-    --color-border-strong: rgba(18, 34, 54, 0.14);
-    --color-shadow: 0 8px 24px rgba(18, 34, 54, 0.07);
-    --color-shadow-strong: 0 14px 32px rgba(18, 34, 54, 0.12);
-    --color-primary: #1d5ea8;
-    --color-primary-strong: #154884;
-    --color-primary-soft: rgba(29, 94, 168, 0.10);
-    --color-secondary: #c98014;
-    --color-secondary-soft: rgba(201, 128, 20, 0.14);
-    --color-success: #3f7b11;
-    --color-success-strong: #175f13;
-    --color-success-soft: rgba(63, 123, 17, 0.12);
+    --color-heading: #1c1712;
+    --color-card: rgba(255, 253, 248, 0.94);
+    --color-card-soft: rgba(255, 253, 248, 0.97);
+    --color-border: rgba(33, 28, 23, 0.12);
+    --color-border-strong: rgba(33, 28, 23, 0.22);
+    --color-shadow: 0 8px 24px rgba(60, 45, 20, 0.08);
+    --color-shadow-strong: 0 14px 32px rgba(60, 45, 20, 0.13);
+
+    --role-clue: #b5711a;
+    --role-clue-strong: #8a5513;
+    --role-clue-soft: rgba(181, 113, 26, 0.13);
+    --role-guess: #1c6e77;
+    --role-guess-strong: #145159;
+    --role-guess-soft: rgba(28, 110, 119, 0.13);
+
+    --color-primary: #8a5513;
+    --color-primary-strong: #6e4310;
+    --color-primary-soft: rgba(181, 113, 26, 0.10);
+    --color-secondary: #1c6e77;
+    --color-secondary-soft: rgba(28, 110, 119, 0.14);
+    --color-success: #3c5e28;
+    --color-success-strong: #2c4a1c;
+    --color-success-soft: rgba(127, 164, 101, 0.16);
     --color-warn: #8a5208;
     --color-warn-soft: rgba(200, 128, 21, 0.16);
-    --color-danger: #b43232;
-    --color-danger-soft: rgba(180, 50, 50, 0.12);
-    --color-info: #2f6f8f;
-    --color-info-soft: rgba(47, 111, 143, 0.12);
-    --color-target: #5b8e1f;
-    --color-target-strong: #145e0f;
-    --color-neutral: #6d6a63;
-    --color-neutral-miss: #2f6f8f;
-    --color-bomb: #b43232;
+    --color-danger: #a3352b;
+    --color-danger-soft: rgba(163, 53, 43, 0.12);
+    --color-info: #295269;
+    --color-info-soft: rgba(41, 82, 105, 0.12);
+    --color-target: #3c5e28;
+    --color-target-strong: #2c4a1c;
+    --color-neutral: #5c5342;
+    --color-neutral-miss: #295269;
+    --color-bomb: #a3352b;
     /* Board-card palette: dark text on a light background for every state,
        never light/white text on a saturated color. The saturated-bg +
        white-text pattern above is exactly what kept breaking this session
@@ -61,30 +76,30 @@
        unreadable). Dark-on-light degrades safely instead: even if a color
        override fails to apply somewhere, the fallback is still dark text,
        not invisible text. */
-    --card-bg-page: #f6f7f9;
-    --card-surface: #ffffff;
-    --card-text-primary: #1f2933;
-    --card-text-secondary: #1f2933;
-    --card-border-idle: #cbd2d9;
+    --card-bg-page: #f6f2e9;
+    --card-surface: #fffdf8;
+    --card-text-primary: #211c17;
+    --card-text-secondary: #211c17;
+    --card-border-idle: #d6cbb4;
     --card-pending-bg: #fff6df;
     --card-pending-border: #f0b429;
     --card-pending-text: #8d5b0b;
-    --card-success-bg: #e3fcec;
-    --card-success-border: #2f855a;
-    --card-success-text: #276749;
-    --card-neutral-bg: #edf0f2;
-    --card-neutral-border: #9aa5b1;
-    --card-neutral-text: #3e4c59;
-    --card-danger-bg: #fff1f0;
-    --card-danger-border: #c53030;
-    --card-danger-text: #822727;
+    --card-success-bg: #e4efd9;
+    --card-success-border: #7fa465;
+    --card-success-text: #3c5e28;
+    --card-neutral-bg: #efeae0;
+    --card-neutral-border: #b4a992;
+    --card-neutral-text: #5c5342;
+    --card-danger-bg: #f6dfda;
+    --card-danger-border: #c56656;
+    --card-danger-text: #7c2c1e;
     /* A wrong guess on a neutral card is a harmless miss, not a
        round-ending one -- keeps its own color family (blue, same hue as
        the original --color-neutral-miss) so it stays visually distinct
        from .word-bomb, matching the "Blue wrong neutral" legend pill. */
-    --card-info-bg: #eaf4fa;
-    --card-info-border: #2f6f8f;
-    --card-info-text: #245f7c;
+    --card-info-bg: #dde8ee;
+    --card-info-border: #6f9cb0;
+    --card-info-text: #295269;
     --card-accent-bg: #eef2ff;
     --card-accent-border: #5b6ee1;
     --card-accent-text: #3538a0;
@@ -106,10 +121,24 @@ html, body, [class*="css"], .stApp {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Role accent switch: screen_human_clue()/screen_human_guesser() each drop
+   one invisible marker div near the top of their render. Every existing
+   rule that reads --color-primary/-strong/-soft (buttons, the timer ring,
+   panel-title underlines, ...) re-tints automatically -- no rule below
+   needs to know about roles itself. */
+body:has(.role-marker-clue) {
+    --color-primary: var(--role-clue);
+    --color-primary-strong: var(--role-clue-strong);
+    --color-primary-soft: var(--role-clue-soft);
+}
+body:has(.role-marker-guess) {
+    --color-primary: var(--role-guess);
+    --color-primary-strong: var(--role-guess-strong);
+    --color-primary-soft: var(--role-guess-soft);
+}
+
 .stApp {
-    background:
-        radial-gradient(circle at top left, rgba(208, 223, 255, 0.42), transparent 23%),
-        linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-alt) 100%);
+    background: var(--color-bg);
     color: var(--color-text);
 }
 
@@ -125,7 +154,7 @@ html, body, [class*="css"], .stApp {
 .block-container {
     width: 100%;
     max-width: 1600px;
-    padding-top: 2rem;
+    padding-top: 0.75rem;
     padding-right: clamp(1rem, 2.5vw, 2.5rem);
     padding-bottom: 2rem;
     padding-left: clamp(1rem, 2.5vw, 2.5rem);
@@ -151,21 +180,24 @@ body:has([data-testid="stSidebar"]) .block-container {
    because Streamlit already handles the desktop-persistent /
    mobile-collapsed-behind-a-tap responsive behavior natively, instead of
    another custom breakpoint to get wrong. */
-/* History should be a fixed proportion of the page (5 parts out of a
-   12-part layout, ~41.7%) rather than a flat pixel width -- a flat width
-   like the old 380px floor ate a much bigger share of the screen than
-   intended on anything narrower than ~1460px wide, which is most laptop
-   windows, so it kept looking too big even after several size passes. A
-   pure vw width only floors on genuinely narrow windows (below ~625px),
-   where 260px keeps it readable instead of collapsing further. */
+/* A vw-proportional sidebar (previously ~41.7% of the page) read as far
+   too large on real gameplay screens -- 25vw keeps it proportional across
+   different monitors/window sizes (a fixed px width would look cramped on
+   a narrow laptop and tiny on an ultrawide) while staying a secondary
+   panel instead of competing with the board for attention. min/max-width
+   floor and ceiling it so it never collapses unreadably narrow nor grows
+   as large as the old 41.7vw on very wide screens. Same background token
+   as .stApp (not a separate --color-bg-alt) so the sidebar reads as part
+   of one continuous page, not a boxed-off panel of its own. */
 [data-testid="stSidebar"] {
-    background: var(--color-card);
-    border-right: 1px solid var(--color-border);
-    min-width: 260px !important;
-    width: 41.67vw !important;
+    background: var(--color-bg);
+    border-right: none;
+    width: 25vw !important;
+    min-width: 280px !important;
+    max-width: 460px !important;
 }
 [data-testid="stSidebar"] > div {
-    padding-top: 1.5rem;
+    padding-top: 0.75rem;
 }
 [data-testid="stSidebarUserContent"] {
     padding: 0.5rem 1.1rem 1.5rem;
@@ -282,6 +314,13 @@ h1, h2, h3, h4 {
     body:has([data-testid="stSidebar"]) .timer-row {
         top: 11rem;
     }
+    /* Same fix, same reason, for the guesser/tutorial timer+skip stack --
+       it was never given this sidebar-aware bump before, which the old
+       smaller pill mostly hid; the bigger ring made the status bar
+       collision plainly visible. */
+    body:has([data-testid="stSidebar"]) .st-key-timer_skip_stack {
+        top: 11rem;
+    }
 }
 /* Board-adjacent variant: same pill, used inside the timer_skip_stack
    group below -- requested so the countdown and the cards a participant is
@@ -318,6 +357,15 @@ h1, h2, h3, h4 {
    column next to the (now narrower, centered) board grid rather than
    fixed to the viewport, so it visibly reads as "next to the cards"
    instead of floating at the page's top-right corner. */
+.st-key-board_adjacent_timer,
+.st-key-guesser_timer_skip_stack,
+.st-key-tutorial_timer_stack {
+    background: var(--card-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--color-shadow);
+    padding: 1.1rem 0.9rem;
+}
 .st-key-board_adjacent_timer {
     display: flex;
     flex-direction: column;
@@ -326,18 +374,77 @@ h1, h2, h3, h4 {
     height: 100%;
     min-height: 220px;
 }
-.st-key-board_adjacent_timer .timer-pill {
-    font-size: 1.3rem;
-    padding: 0.8rem 1.4rem;
-    white-space: nowrap;
+.st-key-board_adjacent_timer .timer-row-inline .timer-pill {
+    width: 148px;
+    height: 148px;
+}
+.st-key-board_adjacent_timer .timer-row-inline .timer-pill .timer-ring-label {
+    font-size: 1.7rem;
 }
 /* The human clue-giver's board grid specifically (scoped to this wrapper,
    not every screen that reuses render_board/.st-key-board_card_grid) --
    narrower and centered in its column instead of stretching edge to edge,
    the freed space to its side being where board_adjacent_timer sits. */
-.st-key-human_clue_board_wrap .st-key-board_card_grid {
+/* The board reads as a tactile "play surface" the cards sit on -- a
+   recessed felt panel visually distinct from the page behind it and the
+   bordered panel around it, not tiles floating directly on the same
+   background as everything else. */
+.st-key-human_clue_board_wrap .st-key-board_card_grid,
+.st-key-human_guesser_board_wrap .st-key-board_card_grid,
+.st-key-tutorial_board_wrap .st-key-board_card_grid {
     max-width: 94%;
     margin: 0 auto;
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 0.9rem;
+    box-shadow: inset 0 2px 6px rgba(33, 28, 23, 0.08);
+}
+/* Guesser screen's own timer+skip stack -- same normal-flow pattern as
+   board_adjacent_timer above (not the tutorial's, which still uses the
+   fixed-to-viewport timer_skip_stack). Ring sized a bit smaller than the
+   clue-giver's standalone one since the Skip button shares this column. */
+.st-key-guesser_timer_skip_stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+}
+.st-key-guesser_timer_skip_stack .timer-row-inline .timer-pill {
+    width: 136px;
+    height: 136px;
+}
+.st-key-guesser_timer_skip_stack .timer-row-inline .timer-pill .timer-ring-label {
+    font-size: 1.3rem;
+}
+/* Tutorial's two practice rounds reuse this normal-flow timer card instead
+   of the fixed-to-viewport timer_skip_stack -- the tutorial's layout (round
+   header, then a separate bordered panel below) never had the vertical
+   space the real screens reserve for a fixed top-right pill, so it used to
+   float on top of the intro copy and the panel underneath it. */
+.st-key-tutorial_timer_stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+}
+.st-key-tutorial_timer_stack .timer-row-inline .timer-pill {
+    width: 136px;
+    height: 136px;
+}
+.st-key-tutorial_timer_stack .timer-row-inline .timer-pill .timer-ring-label {
+    font-size: 1.3rem;
+}
+/* Round 2 (human_clue_round) plays the clue-giver role -- same larger ring
+   size as the real clue-giver's own board_adjacent_timer, so the two don't
+   quietly disagree on how big the timer is for the same role. */
+body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .timer-pill {
+    width: 148px;
+    height: 148px;
+}
+body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .timer-pill .timer-ring-label {
+    font-size: 1.7rem;
 }
 /* st_autorefresh is a headless polling component -- no UI of its own --
    but its default element-container still reserves visible height, which
@@ -351,96 +458,96 @@ h1, h2, h3, h4 {
     margin: 0 !important;
     overflow: visible;
 }
-/* Same headless-component height collapse as above, for the global
-   idle-detection watchdog's own autorefresh (see render_idle_watchdog) --
-   this one isn't nested in the timer/skip stack, so it needs its own rule. */
-.st-key-idle_watchdog_ticker {
-    height: 0 !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    overflow: visible;
-}
-/* Bigger than the default .timer-pill size -- scoped to this board-adjacent
-   variant only (not the tutorial's fixed pill, which still has to clear
-   "Deploy" and other top-right chrome at its current size). */
-.timer-row-inline .timer-pill {
-    font-size: 1.4rem;
-    padding: 0.85rem 1.5rem;
-    gap: 0.7rem;
-    border-width: 2px;
-    white-space: nowrap;
-    box-shadow: 0 8px 22px rgba(18, 34, 54, 0.26);
-    justify-content: center;
-    width: 100%;
-}
-.timer-row-inline .timer-dot {
-    width: 15px;
-    height: 15px;
-}
-.timer-pill {
-    display: inline-flex;
+.timer-row-inline {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    margin: 0;
+    gap: 0.4rem;
+}
+/* Ring countdown: a conic-gradient arc (its filled angle set inline, per
+   render, from remaining/total -- see render_clue_timer) with a hollow
+   punched-out center showing the clock, replacing the old horizontal
+   pill. --ring-progress defaults to 0 so a caller that forgets to set the
+   inline custom property still renders a plain ring rather than breaking. */
+.timer-pill {
+    --ring-progress: 0deg;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 108px;
+    height: 108px;
+    border-radius: 50%;
+    background: conic-gradient(
+        var(--color-primary-strong) 0deg var(--ring-progress),
+        var(--color-border-strong) var(--ring-progress) 360deg
+    );
+    box-shadow: var(--color-shadow);
+    /* Only the arc's own color/angle transitions -- the label beneath it
+       (::before + .timer-ring-label) never moves, so this can't cause a
+       layout jump on the autorefresh rerun that updates it. */
+    transition: background 0.35s ease;
+}
+.timer-pill::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: var(--card-surface);
+    transition: background-color 0.35s ease;
+}
+.timer-ring-label {
+    position: relative;
+    z-index: 1;
     font-variant-numeric: tabular-nums;
     font-weight: 800;
-    font-size: 0.92rem;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-pill);
-    background: #fdfcfa;
-    border: 1.5px solid rgba(29, 94, 168, 0.45);
+    font-size: 1.05rem;
+    line-height: 1.15;
     color: var(--color-primary-strong);
-    /* The pill's own box (padding/border-width/font-size) is identical
-       across every state -- normal/warn/expired/final only swap color and
-       shadow -- so this transition can't itself cause a layout jump. It
-       exists to make the color swap read as an intentional fade instead of
-       an instant snap on the autorefresh rerun that applies it. */
-    transition: background-color 0.35s ease, border-color 0.35s ease,
-        color 0.35s ease, box-shadow 0.35s ease;
-    box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
+    text-align: center;
+    padding: 0 0.3rem;
+}
+.timer-caption {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-danger);
+    text-align: center;
 }
 /* Last 15 seconds of the ordinary countdown -- red, matching the same
    urgency color as the expired/final states, not the amber "warn" tone
    used elsewhere in the app (requested explicitly: this should read as
    "running out," not just "worth noting"). */
 .timer-pill.warn {
-    background: #fdfcfa;
-    color: var(--color-danger);
-    border-color: rgba(180, 50, 50, 0.55);
-    box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
+    background: conic-gradient(
+        var(--color-danger) 0deg var(--ring-progress),
+        var(--color-border-strong) var(--ring-progress) 360deg
+    );
     animation: timer-final-pulse 1.4s ease-in-out infinite;
 }
+.timer-pill.warn .timer-ring-label { color: var(--color-danger); }
 /* Timer hit zero -- server hasn't consumed the timeout yet (autorefresh
    fires every few seconds, not instantly), but the participant should see
    "time's up" immediately rather than a suspiciously frozen countdown. */
 .timer-pill.expired {
-    background: #fdfcfa;
-    color: var(--color-danger);
-    border-color: rgba(180, 50, 50, 0.6);
-    box-shadow: 0 6px 18px rgba(18, 34, 54, 0.22);
+    background: var(--color-danger);
 }
+.timer-pill.expired::before { background: rgba(255, 255, 255, 0.9); }
+.timer-pill.expired .timer-ring-label { color: var(--color-danger); }
 /* Both skips are gone; this is the one last forced-guess window before the
-   round ends automatically. Deliberately the most urgent-looking state. */
+   round ends automatically. Deliberately the most urgent-looking state --
+   solid filled red (no hollow center), unlike every other state's ring. */
 .timer-pill.final {
     background: var(--color-danger);
-    color: #fff;
-    border-color: var(--color-danger);
-    box-shadow: 0 6px 18px rgba(180, 50, 50, 0.35);
+    box-shadow: 0 6px 18px rgba(163, 53, 43, 0.4);
     animation: timer-final-pulse 1.4s ease-in-out infinite;
 }
-.timer-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--color-primary);
-    flex-shrink: 0;
-}
-.timer-pill.warn .timer-dot,
-.timer-pill.expired .timer-dot {
-    background: currentColor;
-}
-.timer-pill.final .timer-dot {
-    background: #fff;
-}
+.timer-pill.final::before { background: transparent; }
+.timer-pill.final .timer-ring-label { color: #fff; }
 @keyframes timer-final-pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.05); }
@@ -511,6 +618,63 @@ h1, h2, h3, h4 {
     color: var(--color-text-muted);
     margin-bottom: 0.5rem;
     font-weight: 800;
+}
+
+/* Clue-giver form as a numbered sequence (it genuinely is one: word, then
+   targets, then prediction, then confidence, then link) -- each section
+   heading auto-numbers via a CSS counter instead of a hand-typed digit, so
+   nothing here has to change if a step is ever added, removed, or
+   reordered. Scoped to this one wrapper; every other .panel-title on the
+   page (board heading, History, round summary, ...) is untouched. */
+.st-key-clue_form_steps {
+    counter-reset: clue-step;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+.st-key-clue_form_steps .panel-title.section-gap {
+    counter-increment: clue-step;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0;
+    font-size: 0.86rem;
+}
+.st-key-clue_form_steps .panel-title.section-gap::before {
+    content: counter(clue-step);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-strong);
+    font-size: 0.78rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+/* Each step's own working area reads as one card -- for the two containers
+   that already use Streamlit's own border=True (clue_hint_container,
+   before_ai_guess_panel) this only needs a background/radius tune-up
+   (their border is the inner stVerticalBlockBorderWrapper already); the
+   other three get the same card look added directly since they were never
+   bordered in the first place. */
+.st-key-clue_form_steps .st-key-clue_hint_container,
+.st-key-clue_form_steps .st-key-before_ai_guess_panel {
+    background: var(--color-card) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--color-shadow) !important;
+}
+.st-key-clue_form_steps .st-key-clue_targets_container,
+.st-key-clue_form_steps .st-key-clue_expected_container,
+.st-key-clue_form_steps .st-key-clue_general_link_container {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 0.9rem 1.05rem;
+    box-shadow: var(--color-shadow);
 }
 
 /* Top status bar: identity, progress stats, medals, role */
@@ -639,15 +803,16 @@ h1, h2, h3, h4 {
     border-radius: var(--radius-pill);
     white-space: nowrap;
 }
-.role-badge.human {
+.role-badge.human,
+.role-badge.ai {
+    /* Both variants read off --color-primary rather than one hardcoded
+       amber + one hardcoded blue -- the role accent switch above already
+       makes --color-primary amber on the clue-giver screen and teal on
+       the guesser screen, whichever side "human" or "ai" happens to be
+       labeled that round. */
     background: var(--color-primary-soft);
     color: var(--color-primary);
-    border: 1px solid rgba(29, 94, 168, 0.3);
-}
-.role-badge.ai {
-    background: var(--color-secondary-soft);
-    color: #8a5208;
-    border: 1px solid rgba(201, 128, 20, 0.35);
+    border: 1px solid var(--color-primary-soft);
 }
 /* The fixed timer pill's own action label ("Giving your clue" / "Guessing")
    already says the same thing as this badge ("You're giving the clue" /
@@ -720,26 +885,24 @@ body:has(.timer-row) .role-badge {
 .st-key-tutorial_human_clue_panel {
     max-width: 920px;
     margin-inline: auto;
-}
-.st-key-tutorial_ai_clue_panel [data-testid="stVerticalBlockBorderWrapper"],
-.st-key-tutorial_human_clue_panel [data-testid="stVerticalBlockBorderWrapper"] {
-    border-color: rgba(29, 94, 168, 0.15);
-    box-shadow: 0 14px 34px rgba(27, 48, 78, 0.07);
+    background: var(--color-card) !important;
+    border-color: var(--color-border) !important;
+    box-shadow: var(--color-shadow) !important;
 }
 
 /* Word board cards */
 .word-card {
     box-sizing: border-box;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     padding: 0.9rem 0.7rem;
     text-align: center;
     font-size: 0.98rem;
     font-weight: 700;
     letter-spacing: 0.01em;
     margin-bottom: 0.7rem;
-    border: 1px solid transparent;
-    height: 72px;
-    min-height: 72px;
+    border: 1.5px solid transparent;
+    height: 76px;
+    min-height: 76px;
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -747,6 +910,7 @@ body:has(.timer-row) .role-badge {
     flex-direction: column;
     gap: 0.22rem;
     font-family: var(--font-sans);
+    box-shadow: 0 2px 5px rgba(33, 28, 23, 0.06);
 }
 .word-hidden {
     /* Not yet revealed and not clickable (e.g. the guesser's board before
@@ -848,20 +1012,22 @@ body:has(.timer-row) .role-badge {
     background: var(--color-danger-soft);
 }
 
-/* Hint card (no explanation shown) */
+/* Hint card (no explanation shown) -- reads off --color-primary (teal on
+   the guesser screen, via the role accent switch) instead of a hardcoded
+   blue, the same way the rest of this screen's controls already do. */
 .hint-card {
-    background: linear-gradient(135deg, #f3f8ff, #dcecff);
-    border: 1px solid rgba(29, 94, 168, 0.22);
+    background: linear-gradient(135deg, var(--color-primary-soft), transparent 70%), var(--color-card);
+    border: 1px solid var(--color-primary-soft);
     border-radius: var(--radius-xl);
     padding: 0.82rem 1rem;
-    box-shadow: 0 10px 24px rgba(29, 94, 168, 0.10);
+    box-shadow: var(--color-shadow);
     margin: 0.6rem 0 0.55rem 0;
 }
 .hint-label {
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #315f91;
+    color: var(--color-primary-strong);
     font-weight: 800;
 }
 /* The guess-count chip sits right beside the clue word itself now, not
@@ -880,14 +1046,14 @@ body:has(.timer-row) .role-badge {
     font-size: clamp(1.45rem, 2vw + 0.35rem, 2.05rem);
     line-height: 1.05;
     font-weight: 900;
-    color: #0b4a8b;
+    color: var(--color-primary-strong);
     letter-spacing: 0.03em;
     word-break: break-word;
 }
 .hint-chip {
     border-radius: var(--radius-pill);
     padding: 0.34rem 0.72rem;
-    background: #0b4a8b;
+    background: var(--color-primary);
     color: #ffffff;
     font-weight: 800;
     font-size: 0.8rem;
@@ -914,7 +1080,6 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
     height: 88px;
     padding: 0.68rem 0.82rem;
     line-height: 1.35;
-    background: #f6f8fb;
 }
 .guess-rationale-status {
     margin: 0.2rem 0 0.45rem 0;
@@ -928,6 +1093,37 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
 .guess-rationale-status.pending {
     color: #9b4d11;
 }
+/* Same numbered-step-card treatment as the clue-giver's clue_form_steps
+   (bordered card + a circular numbered badge before the heading) so the
+   guesser's one real "step" -- write a reason before picking a card --
+   reads as the same visual system as the clue-giver screen, not a bare
+   heading floating on the page background. */
+.st-key-guesser_rationale_panel {
+    background: var(--color-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--color-shadow);
+    padding: 0.9rem 1.05rem;
+    margin-bottom: 0.9rem;
+}
+.st-key-guesser_rationale_panel .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.st-key-guesser_rationale_panel .panel-title::before {
+    content: "1";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-strong);
+    font-size: 0.78rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
 
 /* Game Guide */
 .st-key-game_guide_document {
@@ -935,10 +1131,10 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
     max-width: none;
     margin: 0 auto;
     padding: clamp(1rem, 2.6vw, 2rem);
-    border: 1px solid rgba(24, 76, 139, 0.08);
+    border: 1px solid var(--color-border);
     border-radius: 22px;
-    background: #fbfcfe;
-    box-shadow: 0 16px 46px rgba(24, 53, 91, 0.08);
+    background: var(--card-surface);
+    box-shadow: var(--color-shadow);
 }
 .st-key-game_guide_logos {
     margin-bottom: 0.7rem;
@@ -967,25 +1163,25 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
     margin-bottom: 0.85rem;
     padding: clamp(1.2rem, 2.5vw, 1.8rem) clamp(1.25rem, 3vw, 2.2rem);
     overflow: hidden;
-    border: 1px solid rgba(24, 76, 139, 0.09);
+    border: 1px solid rgba(205, 151, 72, 0.13);
     border-radius: 18px;
-    background: linear-gradient(110deg, #eef7ff 0%, #fffdf8 70%, #fff8eb 100%);
+    background: linear-gradient(110deg, #fffdf8 0%, #fff9ee 100%);
 }
 .game-guide-hero h1 {
     margin: 0;
-    color: #103b78;
+    color: var(--color-heading);
     font: 700 clamp(2rem, 4vw, 3rem)/1.05 var(--font-reading);
     letter-spacing: -0.01em;
 }
 .game-guide-hero h2 {
     margin: 0.35rem 0 0.45rem;
-    color: #123b76;
+    color: var(--color-heading);
     font: 720 clamp(1.2rem, 2.2vw, 1.65rem)/1.2 var(--font-sans);
 }
 .game-guide-hero p {
     max-width: 720px;
     margin: 0;
-    color: #294b77;
+    color: var(--color-text);
     font-size: 1rem;
     line-height: 1.52;
 }
@@ -999,9 +1195,9 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
     padding: 0.95rem 0.4rem;
     border-radius: 12px;
     text-align: center;
-    color: #123b76;
-    background: #9bc7ff;
-    box-shadow: 0 10px 20px rgba(37, 79, 133, 0.11);
+    color: var(--color-heading);
+    background: #f3cf8f;
+    box-shadow: 0 10px 20px rgba(60, 45, 20, 0.11);
     font: 700 0.9rem/1 var(--font-sans);
     transform: rotate(-11deg);
 }
@@ -1015,22 +1211,22 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
 .st-key-game_guide_document [data-testid="stExpander"] {
     margin-bottom: 0.58rem;
     overflow: hidden;
-    border: 1px solid rgba(22, 103, 196, 0.16);
+    border: 1px solid var(--color-border);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 3px 12px rgba(24, 53, 91, 0.035);
+    background: var(--color-card);
+    box-shadow: 0 3px 12px rgba(33, 28, 23, 0.035);
 }
 .st-key-game_guide_document [data-testid="stExpander"] summary {
     min-height: 58px;
     padding: 0.35rem 0.9rem;
-    color: #123b76;
-    background: linear-gradient(90deg, #f5faff, #ffffff);
+    color: var(--color-heading);
+    background: linear-gradient(90deg, var(--color-bg-alt), var(--color-card));
     font-size: 1rem;
     font-weight: 720;
 }
 .st-key-game_guide_document [data-testid="stExpander"] details[open] > summary {
-    border-bottom: 1px solid rgba(22, 103, 196, 0.11);
-    background: linear-gradient(90deg, #eaf5ff, #fbfdff);
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(90deg, var(--color-primary-soft), var(--color-card));
 }
 .st-key-game_guide_document [data-testid="stExpander"] summary strong {
     display: inline-grid;
@@ -1039,8 +1235,8 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
     height: 2rem;
     margin-right: 0.15rem;
     border-radius: 50%;
-    color: #075fc8;
-    background: #dcecff;
+    color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
     font-size: 0.9rem;
     line-height: 1;
 }
@@ -1051,17 +1247,17 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
     height: 2.55rem;
     margin-right: 0.25rem;
     border-radius: 10px;
-    color: #176fe2;
-    background: #edf5ff;
+    color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
     font-size: 1.45rem;
 }
 .st-key-game_guide_document [data-testid="stExpander"] summary:hover {
-    color: #075fc8;
-    background: #eef7ff;
+    color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
 }
 .st-key-game_guide_document [data-testid="stExpanderDetails"] {
     padding: 0.2rem 1rem 1rem;
-    color: #294b77;
+    color: var(--color-text);
     font-size: 0.97rem;
     line-height: 1.62;
 }
@@ -1072,18 +1268,18 @@ div[class*="st-key-guess_rationale_"] .stTextArea textarea {
     margin-bottom: 0.28rem;
 }
 .st-key-game_guide_document [data-testid="stExpanderDetails"] strong {
-    color: #123b76;
+    color: var(--color-heading);
 }
 div[class*="st-key-guide_clue_step_"] {
     margin: 0.55rem 0;
     padding: 0.85rem 1rem;
-    border: 1px solid rgba(24, 76, 139, 0.09);
+    border: 1px solid var(--color-border);
     border-radius: 12px;
-    background: #fbfdff;
+    background: var(--color-card);
 }
 div[class*="st-key-guide_clue_step_"] h4 {
     margin: 0 0 0.35rem;
-    color: #123b76;
+    color: var(--color-heading);
     font-size: 0.98rem;
 }
 .guide-step-number {
@@ -1094,21 +1290,21 @@ div[class*="st-key-guide_clue_step_"] h4 {
     margin-top: 0.1rem;
     border-radius: 50%;
     color: white;
-    background: #347fe5;
-    box-shadow: 0 5px 12px rgba(52, 127, 229, 0.22);
+    background: var(--color-primary-strong);
+    box-shadow: var(--color-shadow);
     font-weight: 760;
 }
 .st-key-guide_reminders {
     margin-top: 0.8rem;
     padding: 1.1rem 1.25rem;
-    border: 1px solid rgba(22, 103, 196, 0.14);
+    border: 1px solid var(--color-border);
     border-radius: 15px;
-    background: linear-gradient(100deg, #eaf5ff, #f5faff);
-    color: #294b77;
+    background: linear-gradient(100deg, var(--color-primary-soft), var(--color-card));
+    color: var(--color-text);
 }
 .st-key-guide_reminders h3 {
     margin: 0 0 0.45rem;
-    color: #123b76;
+    color: var(--color-heading);
     font-size: 1.05rem;
 }
 .guide-reminder-title {
@@ -1116,7 +1312,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
     gap: 0.7rem;
     align-items: center;
     margin-bottom: 0.55rem;
-    color: #123b76;
+    color: var(--color-heading);
     font-size: 1.05rem;
     font-weight: 760;
 }
@@ -1128,8 +1324,8 @@ div[class*="st-key-guide_clue_step_"] h4 {
     flex: none;
     border-radius: 50%;
     color: white;
-    background: #4d8dec;
-    box-shadow: 0 5px 12px rgba(52, 127, 229, 0.2);
+    background: var(--color-primary-strong);
+    box-shadow: var(--color-shadow);
 }
 .st-key-guide_reminders ul {
     columns: 2;
@@ -1159,7 +1355,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .st-key-consent_document [data-testid="stMarkdownContainer"],
 .st-key-debriefing_document [data-testid="stMarkdownContainer"] {
     font-family: var(--font-sans);
-    color: #26384a;
+    color: var(--color-text);
     font-size: 1.02rem;
     line-height: 1.68;
 }
@@ -1170,14 +1366,14 @@ div[class*="st-key-guide_clue_step_"] h4 {
     line-height: 1.22;
     letter-spacing: -0.01em;
     margin: 0 auto 0.85rem auto;
-    color: #12395f;
+    color: var(--color-heading);
     text-align: center;
     text-wrap: balance;
 }
 .st-key-consent_logos {
     margin: 0 auto 1.25rem auto;
     padding-bottom: 1.15rem;
-    border-bottom: 1px solid rgba(29, 94, 168, 0.14);
+    border-bottom: 1px solid var(--color-border);
 }
 .st-key-consent_logos [data-testid="stImage"] {
     display: flex;
@@ -1195,7 +1391,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
     font-size: 1.22rem;
     line-height: 1.35;
     margin: 2rem 0 0.8rem 0;
-    color: #174f80;
+    color: var(--color-heading);
 }
 .st-key-consent_document [data-testid="stMarkdownContainer"] > h3,
 .st-key-debriefing_document [data-testid="stMarkdownContainer"] > h3 {
@@ -1203,7 +1399,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
     font-size: 1.04rem;
     line-height: 1.4;
     margin: 1.65rem 0 0.5rem 0;
-    color: #183b5a;
+    color: var(--color-heading);
 }
 .st-key-consent_document [data-testid="stMarkdownContainer"] p,
 .st-key-debriefing_document [data-testid="stMarkdownContainer"] p {
@@ -1231,13 +1427,13 @@ div[class*="st-key-guide_clue_step_"] h4 {
     max-width: none;
     margin: 0 auto;
 }
-.st-key-consent_action_panel [data-testid="stVerticalBlockBorderWrapper"],
-.st-key-debriefing_action_panel [data-testid="stVerticalBlockBorderWrapper"] {
+.st-key-consent_action_panel,
+.st-key-debriefing_action_panel {
     padding: 1.05rem 1.15rem;
-    background: rgba(238, 246, 255, 0.94);
-    border: 1px solid rgba(29, 94, 168, 0.18);
+    background: var(--color-primary-soft);
+    border: 1px solid var(--color-border);
     border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(18, 34, 54, 0.06);
+    box-shadow: var(--color-shadow);
 }
 .st-key-consent_action_panel .stCheckbox label,
 .st-key-debriefing_action_panel .stCheckbox label {
@@ -1247,9 +1443,9 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .st-key-consent_document {
     max-width: none;
     padding: clamp(1rem, 2.6vw, 2rem);
-    background: #fbfcfe;
-    border-color: rgba(24, 76, 139, 0.08);
-    box-shadow: 0 16px 46px rgba(24, 53, 91, 0.08);
+    background: var(--card-surface);
+    border-color: var(--color-border);
+    box-shadow: var(--color-shadow);
 }
 .st-key-consent_logos {
     border: 0;
@@ -1283,21 +1479,21 @@ div[class*="st-key-guide_clue_step_"] h4 {
     margin-bottom: 0.65rem;
     padding: 0.3rem 0.65rem;
     border-radius: 999px;
-    color: #0968d7;
-    background: #e8f2ff;
+    color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
     font: 750 0.74rem/1 var(--font-sans);
     letter-spacing: 0.09em;
 }
 .information-hero h1 {
     margin: 0;
-    color: #103b78;
+    color: var(--color-heading);
     font: 700 clamp(1.75rem, 3.5vw, 2.75rem)/1.1 var(--font-reading);
     letter-spacing: -0.01em;
 }
 .information-study-title {
     max-width: 760px;
     margin: 0.5rem 0 0.95rem;
-    color: #183f78;
+    color: var(--color-text);
     font-size: clamp(1rem, 1.8vw, 1.2rem);
     line-height: 1.4;
 }
@@ -1306,17 +1502,17 @@ div[class*="st-key-guide_clue_step_"] h4 {
     grid-template-columns: 1.1fr 1fr auto;
     gap: 0.85rem;
     align-items: center;
-    color: #23466f;
+    color: var(--color-text);
     font-size: 0.88rem;
     line-height: 1.42;
 }
 .information-meta > div + div {
     padding-left: 0.85rem;
-    border-left: 1px solid rgba(24, 76, 139, 0.13);
+    border-left: 1px solid var(--color-border);
 }
 .information-meta a,
 .information-contact a {
-    color: #175fae;
+    color: var(--color-primary-strong);
     overflow-wrap: anywhere;
 }
 .information-word-cards {
@@ -1329,11 +1525,11 @@ div[class*="st-key-guide_clue_step_"] h4 {
     padding: 1.15rem 0.5rem;
     border-radius: 13px;
     text-align: center;
-    color: #123b76;
+    color: var(--color-heading);
     font: 700 1rem/1 var(--font-sans);
-    box-shadow: 0 12px 24px rgba(37, 79, 133, 0.12);
+    box-shadow: 0 12px 24px rgba(60, 45, 20, 0.12);
     transform: rotate(-12deg);
-    background: #9bc7ff;
+    background: #f3cf8f;
 }
 .information-word-cards span:nth-child(1) { top: 8px; left: 8%; }
 .information-word-cards span:nth-child(2) {
@@ -1350,12 +1546,12 @@ div[class*="st-key-guide_clue_step_"] h4 {
     gap: 1rem;
     margin-top: 0.9rem;
     padding: 1rem 1.2rem;
-    border: 1px solid rgba(24, 76, 139, 0.11);
+    border: 1px solid var(--color-border);
     border-radius: 15px;
-    background: rgba(255, 255, 255, 0.98);
+    background: var(--color-card);
 }
 .information-intro {
-    background: linear-gradient(100deg, #eef6ff, #f7fbff);
+    background: linear-gradient(100deg, var(--color-primary-soft), var(--color-card));
 }
 .information-icon,
 .information-number {
@@ -1365,26 +1561,26 @@ div[class*="st-key-guide_clue_step_"] h4 {
     height: 2.35rem;
     flex: none;
     border-radius: 50%;
-    color: #075fc8;
-    background: #dcecff;
+    color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
     font: 750 1rem/1 var(--font-sans);
 }
 .information-icon {
     color: white;
-    background: #0b6ee8;
+    background: var(--color-primary-strong);
 }
 .information-intro h2,
 .information-section h2,
 .information-contact h2 {
     margin: 0 0 0.28rem;
-    color: #123b76;
+    color: var(--color-heading);
     font: 720 1.02rem/1.35 var(--font-sans);
 }
 .information-intro p,
 .information-section p,
 .information-contact p {
     margin: 0 0 0.7rem;
-    color: #294b77;
+    color: var(--color-text);
     font-size: 0.96rem;
     line-height: 1.58;
 }
@@ -1395,7 +1591,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .information-section ul {
     margin: 0.35rem 0 0.2rem;
     padding-left: 1.25rem;
-    color: #294b77;
+    color: var(--color-text);
     font-size: 0.96rem;
     line-height: 1.48;
 }
@@ -1405,11 +1601,11 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .information-contact {
     display: block;
     padding-left: 1.3rem;
-    background: #f7faff;
+    background: var(--color-bg-alt);
 }
 .information-consent-lead {
     margin: 0 0 0.5rem;
-    color: #123b76;
+    color: var(--color-heading);
     font: 720 0.92rem/1.4 var(--font-sans);
     letter-spacing: 0.02em;
     text-transform: uppercase;
@@ -1417,7 +1613,7 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .information-consent-list {
     margin: 0 0 1rem;
     padding-left: 1.25rem;
-    color: #294b77;
+    color: var(--color-text);
     font-size: 0.94rem;
     line-height: 1.55;
 }
@@ -1427,9 +1623,9 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .st-key-debriefing_document {
     max-width: none;
     padding: clamp(1rem, 2.6vw, 2rem);
-    background: #fbfcfe;
-    border-color: rgba(24, 76, 139, 0.08);
-    box-shadow: 0 16px 46px rgba(24, 53, 91, 0.08);
+    background: var(--card-surface);
+    border-color: var(--color-border);
+    box-shadow: var(--color-shadow);
 }
 .debrief-contact {
     /* A fixed-column grid assumed a fixed item count; the section has a
@@ -1442,14 +1638,14 @@ div[class*="st-key-guide_clue_step_"] h4 {
     align-items: center;
     gap: 0.55rem 1.15rem;
     padding: 0.4rem 0.75rem 1.1rem;
-    color: #294b77;
+    color: var(--color-text);
     font-family: var(--font-sans);
     font-size: 0.9rem;
     line-height: 1.4;
 }
 .debrief-contact a,
 .debrief-section a {
-    color: #175fae;
+    color: var(--color-primary-strong);
     overflow-wrap: anywhere;
 }
 .debrief-hero {
@@ -1460,42 +1656,42 @@ div[class*="st-key-guide_clue_step_"] h4 {
 }
 .debrief-hero h1 {
     margin: 0;
-    color: #103b78;
+    color: var(--color-heading);
     font: 700 clamp(2rem, 4vw, 3rem)/1.08 var(--font-reading);
     letter-spacing: -0.01em;
 }
 .debrief-study-title {
     max-width: 850px;
     margin: 0.7rem 0 1.15rem;
-    color: #183f78;
+    color: var(--color-text);
     font-size: clamp(1rem, 1.8vw, 1.25rem);
     line-height: 1.48;
 }
 .debrief-thanks {
     margin: 0;
-    color: #0968d7;
+    color: var(--color-primary-strong);
     font-weight: 720;
 }
 .debrief-introduction,
 .debrief-section {
     margin-top: 0.9rem;
     padding: 1.15rem 1.3rem;
-    border: 1px solid rgba(24, 76, 139, 0.11);
+    border: 1px solid var(--color-border);
     border-radius: 15px;
-    background: rgba(255, 255, 255, 0.98);
+    background: var(--color-card);
 }
 .debrief-introduction {
-    background: linear-gradient(100deg, #eef6ff, #f7fbff);
+    background: linear-gradient(100deg, var(--color-primary-soft), var(--color-card));
 }
 .debrief-section h2 {
     margin: 0 0 0.55rem;
-    color: #123b76;
+    color: var(--color-heading);
     font: 720 1.08rem/1.35 var(--font-sans);
 }
 .debrief-introduction p,
 .debrief-section p,
 .debrief-section li {
-    color: #294b77;
+    color: var(--color-text);
     font-size: 0.97rem;
     line-height: 1.62;
 }
@@ -1518,33 +1714,33 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .debrief-condition {
     margin-top: 1rem !important;
     padding: 0.85rem 1rem;
-    border-left: 4px solid #0b6ee8;
+    border-left: 4px solid var(--color-primary-strong);
     border-radius: 0 10px 10px 0;
-    background: #edf6ff;
-    color: #103b78 !important;
+    background: var(--color-primary-soft);
+    color: var(--color-heading) !important;
     font-weight: 720;
 }
 .debrief-completion-code-section {
-    border: 1px solid rgba(11, 110, 232, 0.25);
-    background: #edf6ff;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-primary-soft);
 }
 .debrief-completion-code {
     margin: 0.6rem 0 0 !important;
     padding: 0.75rem 1rem;
     border-radius: 10px;
     background: #ffffff;
-    border: 1px dashed rgba(11, 110, 232, 0.45);
-    color: #103b78 !important;
+    border: 1px dashed var(--color-primary-strong);
+    color: var(--color-heading) !important;
     font: 750 1.4rem/1.3 "Courier New", monospace !important;
     letter-spacing: 0.12em;
     text-align: center;
     user-select: all;
 }
 .debrief-final-section {
-    background: #f7faff;
+    background: var(--color-bg-alt);
 }
 .debrief-thanks-final {
-    color: #103b78 !important;
+    color: var(--color-heading) !important;
     font-weight: 720;
 }
 
@@ -1730,6 +1926,10 @@ div[class*="st-key-guide_clue_step_"] h4 {
     color: var(--color-text-muted);
     font-weight: 700;
     font-size: 0.92rem;
+    padding: 0.9rem 1rem;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-card);
 }
 /* The sidebar genuinely has less width than round_summary's panel even
    with the stacked layout above -- a touch less padding and a smaller
@@ -1802,12 +2002,29 @@ div[class*="st-key-guide_clue_step_"] h4 {
     color: var(--color-heading) !important;
     font-weight: 650;
 }
-.st-key-reflection_panel .reflection-ai-explanation {
+.reflection-ai-explanation {
     background: #FFFFFF !important;
     border: 1px solid #E5E5E5 !important;
     border-radius: 12px !important;
     padding: 0.62rem 0.78rem !important;
     box-shadow: 0 4px 12px rgba(18, 34, 54, 0.05) !important;
+}
+/* Adaptive-condition only (see _share_explanations in ui/screens.py) -- the
+   one variant of this box carrying real information about how the AI
+   reasoned, easy to skim past as just another neutral card among the
+   outcome banner and rating question around it. A distinct accent (not the
+   app's neutral card styling) is the point: a participant should notice
+   this is worth reading, not treat it as boilerplate. */
+.reflection-ai-explanation.has-ai-explanation {
+    background: var(--card-success-bg) !important;
+    border: 1px solid var(--card-success-border) !important;
+    border-left: 4px solid var(--card-success-border) !important;
+}
+.reflection-ai-explanation.has-ai-explanation .panel-title {
+    color: var(--card-success-text) !important;
+}
+.reflection-ai-explanation.has-ai-explanation .subtle-text {
+    color: var(--card-success-text) !important;
 }
 .st-key-reflection_panel .reflection-compact-head {
     margin-bottom: 0.1rem !important;
@@ -1844,9 +2061,9 @@ div[class*="st-key-guide_clue_step_"] h4 {
     box-shadow: none !important;
 }
 .st-key-reflection_panel .stTextArea textarea {
-    background: #EEF0F3 !important;
+    background: var(--color-card) !important;
     color: #111827 !important;
-    border: 1px solid #D5DAE1 !important;
+    border: 1px solid var(--color-border-strong) !important;
     border-radius: 10px !important;
     min-height: 78px;
     height: 78px;
@@ -1857,14 +2074,14 @@ div[class*="st-key-guide_clue_step_"] h4 {
     color: #111827 !important;
 }
 .st-key-reflection_panel .stTextArea textarea:focus {
-    border-color: rgba(29, 94, 168, 0.42) !important;
-    box-shadow: 0 0 0 3px rgba(29, 94, 168, 0.14) !important;
-    background: #EEF0F3 !important;
+    border-color: var(--color-primary-strong) !important;
+    box-shadow: 0 0 0 3px var(--color-primary-soft) !important;
+    background: var(--color-card) !important;
     color: #111827 !important;
 }
 .st-key-reflection_panel .stSelectbox [data-baseweb="select"] > div:focus-within {
-    border-color: rgba(29, 94, 168, 0.34) !important;
-    box-shadow: 0 0 0 3px rgba(29, 94, 168, 0.12) !important;
+    border-color: var(--color-primary-strong) !important;
+    box-shadow: 0 0 0 3px var(--color-primary-soft) !important;
     background: #FFFFFF !important;
 }
 .st-key-reflection_panel .stSelectbox [data-baseweb="select"] * {
@@ -1888,9 +2105,9 @@ div[data-baseweb="popover"] [role="option"]:hover {
 .stSelectbox [data-baseweb="select"] > div,
 .stTextArea textarea {
     border-radius: var(--radius-md);
-    background: #EEF0F3;
+    background: var(--color-card);
     color: #111827;
-    border: 1px solid #D5DAE1;
+    border: 1px solid var(--color-border-strong);
     font-family: var(--font-sans);
 }
 .stTextArea textarea {
@@ -1905,9 +2122,9 @@ div[data-baseweb="popover"] [role="option"]:hover {
 .stTextInput input:focus,
 .stTextArea textarea:focus {
     color: #111827;
-    background: #EEF0F3;
-    border-color: rgba(29, 94, 168, 0.42);
-    box-shadow: 0 0 0 3px rgba(29, 94, 168, 0.14);
+    background: var(--color-card);
+    border-color: var(--color-primary-strong);
+    box-shadow: 0 0 0 3px var(--color-primary-soft);
     outline: none;
 }
 .stSelectbox [data-baseweb="select"] * {
@@ -2007,20 +2224,20 @@ button[data-baseweb="button"]:disabled {
 [data-testid="stElementContainer"]:has(.skip-button-marker)
     + [data-testid="stElementContainer"]
     [data-testid="stButton"] > button {
-    background: linear-gradient(135deg, #c9861a, #8a5208);
-    border: 2px solid rgba(138, 82, 8, 0.55);
-    box-shadow: 0 10px 24px rgba(138, 82, 8, 0.32);
+    /* Reads off --color-primary (role accent switch above) rather than a
+       hardcoded amber, so it stays teal on the guesser screen where this
+       button actually lives. */
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
+    border: 2px solid var(--color-primary-strong);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
     font-size: 1.4rem;
     padding: 0.85rem 1.5rem;
-    /* Same pill shape as .timer-pill right above it -- they're meant to
-       read as one matched two-piece control, not a pill next to a
-       rectangle. */
     border-radius: var(--radius-pill);
 }
 [data-testid="stElementContainer"]:has(.skip-button-marker)
     + [data-testid="stElementContainer"]
     [data-testid="stButton"] > button:hover {
-    box-shadow: 0 12px 28px rgba(138, 82, 8, 0.38);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
 }
 .st-key-before_ai_guess_panel,
 .st-key-before_ai_guess_panel [data-testid="stVerticalBlockBorderWrapper"] {
@@ -2041,12 +2258,7 @@ body:has(.turn-invalid-marker.invalid-hint) .st-key-clue_hint_container,
 body:has(.turn-invalid-marker.invalid-targets) .st-key-clue_targets_container,
 body:has(.turn-invalid-marker.invalid-expected) .st-key-clue_expected_container,
 body:has(.turn-invalid-marker.invalid-rating) .st-key-clue_rating_container,
-body:has(.turn-invalid-marker.invalid-link) .st-key-clue_general_link_container,
-body:has(.turn-invalid-marker.invalid-hint) .st-key-tutorial_clue_hint_container,
-body:has(.turn-invalid-marker.invalid-targets) .st-key-tutorial_clue_targets_container,
-body:has(.turn-invalid-marker.invalid-expected) .st-key-tutorial_clue_expected_container,
-body:has(.turn-invalid-marker.invalid-rating) .st-key-tutorial_clue_rating_container,
-body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_container {
+body:has(.turn-invalid-marker.invalid-link) .st-key-clue_general_link_container {
     border: 3px solid var(--color-danger) !important;
     border-radius: var(--radius-md, 10px);
     padding: 0.6rem;
@@ -2150,10 +2362,10 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     max-width: none;
     margin: 0 auto;
     padding: clamp(1rem, 2.6vw, 2rem);
-    border: 1px solid rgba(24, 76, 139, 0.08);
+    border: 1px solid var(--color-border);
     border-radius: 22px;
-    background: #fbfcfe;
-    box-shadow: 0 16px 46px rgba(24, 53, 91, 0.08);
+    background: var(--card-surface);
+    box-shadow: var(--color-shadow);
 }
 .st-key-participant_profile_logos {
     margin-bottom: 0.7rem;
@@ -2180,7 +2392,7 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     min-height: 0;
     margin-bottom: 0.35rem;
     padding: 0 0.45rem 0.35rem;
-    border-bottom: 1px solid rgba(24, 76, 139, 0.08);
+    border-bottom: 1px solid var(--color-border);
 }
 .st-key-consent_logos [data-testid="stImage"],
 .st-key-game_guide_logos [data-testid="stImage"],
@@ -2202,19 +2414,19 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     margin-bottom: 0.9rem;
     padding: clamp(1.2rem, 2.5vw, 1.8rem) clamp(1.25rem, 3vw, 2.2rem);
     overflow: hidden;
-    border: 1px solid rgba(24, 76, 139, 0.09);
+    border: 1px solid rgba(205, 151, 72, 0.13);
     border-radius: 18px;
-    background: linear-gradient(110deg, #eef7ff 0%, #fffdf8 72%, #fff8eb 100%);
+    background: linear-gradient(110deg, #fffdf8 0%, #fff9ee 100%);
 }
 .participant-profile-hero h1 {
     margin: 0.15rem 0 0.45rem;
-    color: #103b78;
+    color: var(--color-heading);
     font: 700 clamp(2rem, 4vw, 3rem)/1.06 var(--font-reading);
     letter-spacing: -0.01em;
 }
 .participant-profile-hero p {
     margin: 0;
-    color: #294b77;
+    color: var(--color-text);
     font-size: 1.05rem;
     line-height: 1.5;
 }
@@ -2267,14 +2479,14 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
 .st-key-participant_profile_panel {
     max-width: none;
 }
-.st-key-participant_profile_panel [data-testid="stVerticalBlockBorderWrapper"] {
+.st-key-participant_profile_panel {
     padding: 0.45rem 1.35rem 1.2rem;
-    border-color: rgba(24, 76, 139, 0.13) !important;
-    background: rgba(255, 255, 255, 0.98) !important;
+    border-color: var(--color-border) !important;
+    background: var(--color-card) !important;
 }
 .st-key-participant_profile_panel div[class*="st-key-profile_"][class*="_group"] {
     padding: 1rem 0 1.1rem;
-    border-bottom: 1px solid rgba(24, 76, 139, 0.11);
+    border-bottom: 1px solid var(--color-border);
 }
 .st-key-participant_profile_panel .st-key-profile_codenames_group {
     border-bottom: 0 !important;
@@ -2283,7 +2495,7 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     margin-bottom: 0.38rem;
 }
 .st-key-participant_profile_panel [data-testid="stWidgetLabel"] p {
-    color: #123b76 !important;
+    color: var(--color-heading) !important;
     font-size: 1rem;
     font-weight: 740;
     line-height: 1.35;
@@ -2291,13 +2503,13 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
 .st-key-participant_profile_panel .stTextInput input,
 .st-key-participant_profile_panel [data-baseweb="select"] > div {
     min-height: 48px;
-    border-color: rgba(24, 76, 139, 0.20);
+    border-color: var(--color-border-strong);
     border-radius: 10px;
-    background: #fbfdff;
+    background: var(--color-card);
 }
 .st-key-participant_profile_panel .stTextInput input:focus {
-    border-color: #347fe5;
-    box-shadow: 0 0 0 2px rgba(52, 127, 229, 0.13);
+    border-color: var(--color-primary-strong);
+    box-shadow: 0 0 0 2px var(--color-primary-soft);
 }
 .st-key-participant_profile_panel .stRadio [role="radiogroup"] {
     gap: 0.5rem;
@@ -2305,18 +2517,18 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
 .st-key-participant_profile_panel .stRadio [role="radiogroup"] label {
     min-height: 44px;
     padding: 0.48rem 0.72rem;
-    border: 1px solid rgba(24, 76, 139, 0.16);
+    border: 1px solid var(--color-border-strong);
     border-radius: 10px;
     background: #ffffff;
     transition: border-color 120ms ease, background-color 120ms ease;
 }
 .st-key-participant_profile_panel .stRadio [role="radiogroup"] label:hover {
-    border-color: #5b99e8;
-    background: #f5faff;
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
 }
 .st-key-participant_profile_panel .stRadio [role="radiogroup"] label:has(input:checked) {
-    border-color: #347fe5;
-    background: #eaf4ff;
+    border-color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
 }
 .st-key-participant_profile_panel .stButton {
     margin-top: 0.75rem;
@@ -2330,16 +2542,16 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     flex-direction: column;
     min-height: 570px;
     padding: 1.15rem;
-    border: 1px solid rgba(22, 103, 196, 0.10);
+    border: 1px solid var(--color-border);
     border-radius: 14px;
-    background: linear-gradient(160deg, #eef7ff, #f8fbff);
+    background: linear-gradient(160deg, var(--color-primary-soft), var(--color-card));
 }
 .profile-aside section {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 0.35rem 0.7rem;
     padding-bottom: 1.1rem;
-    border-bottom: 1px solid rgba(24, 76, 139, 0.12);
+    border-bottom: 1px solid var(--color-border);
 }
 .profile-aside section + section {
     margin-top: 1.1rem;
@@ -2352,21 +2564,21 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     height: 2.15rem;
     border-radius: 50%;
     color: white;
-    background: #1670e5;
+    background: var(--color-primary-strong);
     font-weight: 800;
 }
 .profile-shield {
-    color: #075fc8;
-    background: #dcecff;
+    color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
 }
 .profile-aside h2 {
     margin: 0;
-    color: #123b76;
+    color: var(--color-heading);
     font: 720 1rem/1.35 var(--font-sans);
 }
 .profile-aside p {
     margin: 0;
-    color: #36577e;
+    color: var(--color-text);
     font-size: 0.9rem;
     line-height: 1.55;
 }
@@ -2380,10 +2592,10 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
     width: 88px;
     padding: 0.85rem 0.3rem;
     border-radius: 10px;
-    color: #123b76;
+    color: var(--color-heading);
     text-align: center;
-    background: #9bc7ff;
-    box-shadow: 0 8px 18px rgba(37, 79, 133, 0.10);
+    background: #f3cf8f;
+    box-shadow: 0 8px 18px rgba(60, 45, 20, 0.10);
     font: 700 0.82rem/1 var(--font-sans);
     transform: rotate(-10deg);
 }
@@ -2411,18 +2623,18 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-tutorial_clue_general_link_c
 .st-key-board_card_grid .stButton button[kind="secondary"],
 .st-key-board_card_grid .stButton [data-testid="stBaseButton-secondary"],
 .st-key-board_card_grid [data-testid="stButton"] button[kind="secondary"] {
-    height: 72px;
-    min-height: 72px;
-    max-height: 72px;
+    height: 76px;
+    min-height: 76px;
+    max-height: 76px;
     overflow: hidden;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     padding: 0.9rem 0.7rem;
     text-align: center;
     font-size: 0.98rem;
     font-weight: 700;
     letter-spacing: 0.01em;
     margin-bottom: 0.7rem;
-    box-shadow: none;
+    box-shadow: 0 2px 5px rgba(33, 28, 23, 0.06);
 }
 .st-key-board_card_grid .stButton > button[kind="secondary"]:hover,
 .st-key-board_card_grid .stButton button[kind="secondary"]:hover,
@@ -2728,16 +2940,16 @@ div[data-testid="stAlert"] {
 .participant-profile-card-art i:nth-of-type(1) { top: 23px; }
 .participant-profile-card-art i:nth-of-type(2) { top: 38px; width: 34px; }
 .participant-profile-card-art i:nth-of-type(3) { top: 53px; width: 28px; }
-.st-key-participant_profile_panel [data-testid="stVerticalBlockBorderWrapper"] {
+.st-key-participant_profile_panel {
     padding: 0.25rem 1.15rem 0.9rem;
-    background: linear-gradient(135deg, #ffffff 0%, #fbfdff 100%) !important;
+    background: linear-gradient(135deg, #ffffff 0%, var(--color-card) 100%) !important;
 }
 .st-key-participant_profile_panel div[class*="st-key-profile_"][class*="_group"] {
     padding: 0.72rem 0 0.82rem;
 }
 .profile-aside {
-    border-color: rgba(24, 111, 226, 0.16);
-    background: linear-gradient(180deg, #eff7ff 0%, #f8fbff 100%);
+    border-color: var(--color-border);
+    background: linear-gradient(180deg, var(--color-primary-soft) 0%, var(--color-card) 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
@@ -2808,11 +3020,8 @@ div[data-testid="stAlert"] {
         justify-content: center;
     }
     .timer-pill {
-        width: 100%;
-        justify-content: center;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
+        width: 88px;
+        height: 88px;
     }
     .hero {
         border-radius: var(--radius-lg);

@@ -93,7 +93,7 @@ class TutorialTests(unittest.TestCase):
         # Only the real target words are offered, like the real game -- not
         # the whole board with non-targets shown disabled.
         self.assertIn(
-            "render_hint_target_selector(\n                    tutorial_target_options,",
+            "render_hint_target_selector(\n                        tutorial_target_options,",
             source,
         )
         # The skip button moved next to the timer (small "Skip" button); the

@@ -178,9 +178,6 @@ def init_session_state():
         "remote_log_error": "",
         "pending_hint_meta": None,
         "pending_reflection_turn": None,
-        "idle_watchdog_reset_at": "",
-        "idle_watchdog_popup_logged": False,
-        "idle_watchdog_trigger_count": 0,
     }
     for key, value in defaults.items():
         if key not in st.session_state:

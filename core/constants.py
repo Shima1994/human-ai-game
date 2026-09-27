@@ -38,7 +38,7 @@ BOARD_MATERIAL_VERSION = "v2026-09-26"
 
 VALID_CONDITIONS = frozenset({"baseline", "adaptive"})
 DEFAULT_CONDITION = "adaptive"
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 N_ROUNDS = 4
 MAX_TEAM_SCORE = 20
@@ -58,11 +58,6 @@ GUESSER_TIMER_SECONDS = CLUE_TIMER_SECONDS
 # a guess/clue before the round ends automatically as a loss. This bounds
 # how long an indefinitely-stalling participant can be paid for.
 FINAL_GUESS_TIMER_SECONDS = 30
-# Screens with no countdown of their own (consent, tutorial dialogs, the
-# between-turn reflection step, round summary, questionnaire/debriefing) get
-# a soft, dismissible "still there?" check instead, purely for later
-# bot/disengagement filtering -- see ui.screens.render_idle_watchdog.
-GLOBAL_IDLE_TIMEOUT_SECONDS = 60
 AI_API_TIMEOUT_SECONDS = 20
 # The clue-giver's own decision timer (unlike the guesser's) doesn't touch
 # the shared skip budget at all for their first timeout each round -- they

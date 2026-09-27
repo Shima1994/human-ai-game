@@ -238,6 +238,61 @@ def render_top_status():
     )
 
 
+def render_tutorial_status(round_label, role_label, role_variant, stats):
+    """Same visual status bar as render_top_status, for the two practice
+    rounds -- which never call that function since it reads real-game
+    session-state fields (st.session_state.round, .found_targets,
+    .round_interactions, .medal_counts, ...) the tutorial doesn't populate.
+    Left without this, the tutorial's own header was a bare heading with no
+    equivalent of the name/progress/role info the real screens always show,
+    which read as a different, less-finished-looking screen entirely.
+
+    stats is a list of up to three (label, value, total) tuples rendered as
+    the same stat-block/mini-bar pattern; medals are omitted entirely since
+    practice rounds never award any."""
+    def _bar(value, total):
+        pct = 0 if not total else max(0, min(100, round(100 * value / total)))
+        return pct
+
+    # Each block built as one continuous string, not a multi-line template --
+    # embedding a multi-line, indented template's actual *content* (not just
+    # the Python source) into the outer markdown call leaves the same
+    # blank-but-indented lines Markdown misreads as an indented code block
+    # (see the comment on the outer call below).
+    stat_blocks = "".join(
+        f'<div class="stat-block">'
+        f'<div class="stat-label">{escape(label)}</div>'
+        f'<div class="stat-value-row"><span class="big">{value}</span><span class="of">/ {total}</span></div>'
+        f'<div class="mini-bar"><span style="width:{_bar(value, total)}%"></span></div>'
+        f"</div>"
+        for label, value, total in stats
+    )
+    # Round 2 has no per-turn stats to show (a single clue submission, not a
+    # back-and-forth round) -- omit the separator and stats block entirely
+    # rather than leave a divider with nothing after it.
+    sep_and_stats = (
+        f'<div class="status-sep"></div><div class="status-stats">{stat_blocks}</div>'
+        if stats
+        else ""
+    )
+    # Single-line, no blank/whitespace-only rows -- when sep_and_stats is ""
+    # (round 2, no stats), a multi-line template with it on its own indented
+    # line leaves a blank-but-indented row, which Markdown reads as starting
+    # an indented code block: the rest of the HTML then renders as literal
+    # text instead of being parsed (same trap noted elsewhere in this file).
+    st.markdown(
+        '<div class="status-bar">'
+        '<div class="status-id"><div class="status-avatar">P</div><div>'
+        '<div class="status-name">Practice</div>'
+        f'<div class="status-round">{escape(round_label)}</div>'
+        "</div></div>"
+        f"{sep_and_stats}"
+        f'<span class="role-badge {role_variant}"><span class="role-dot"></span>{escape(role_label)}</span>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def render_round_chip(text):
     st.markdown(
         f"<div class='round-chip'>{escape(text)}</div>",
@@ -246,11 +301,12 @@ def render_round_chip(text):
 
 
 def render_clue_timer(remaining_seconds, pinned=True):
-    """A small pill, sticky to the top of the viewport instead of scrolling
-    away with the page -- so it stays visible during every timed decision,
-    not just while the participant happens to be scrolled to the top.
+    """A ring countdown (conic-gradient arc around a hollow clock face),
+    sticky to the top of the viewport instead of scrolling away with the
+    page -- so it stays visible during every timed decision, not just while
+    the participant happens to be scrolled to the top.
 
-    pinned=False renders the identical pill in normal document flow next
+    pinned=False renders the identical ring in normal document flow next
     to wherever it's called from (no position:fixed) instead -- used to
     sit the timer directly beside the board heading rather than floating
     far above it. Callers that use this must accept the tradeoff that the
@@ -258,7 +314,7 @@ def render_clue_timer(remaining_seconds, pinned=True):
     pinned=True (the default, used by the tutorial and any other caller)
     keeps the original always-on-screen behavior unchanged.
 
-    The pill itself (label, color, border) is a plain st.markdown element,
+    The ring itself (arc angle, color, border) is a plain st.markdown element,
     not a custom HTML/JS component -- those render inside a sandboxed iframe
     document and so could never pick up the app's own fonts/colors, which is
     why an earlier iframe-based version of this always looked like plain
@@ -287,35 +343,49 @@ def render_clue_timer(remaining_seconds, pinned=True):
     # The clue-giver/guesser role label used to prefix every state ("Guessing
     # -- 01:13 left"), but the role is already obvious from the screen the
     # participant is on, so it just made the pill wider without adding
-    # information -- dropped everywhere except "Final chance", which is a
-    # real state change worth calling out, not a restated role.
+    # information -- dropped everywhere except the urgency states below,
+    # each a real state change worth calling out (and, for "warn", not
+    # something the color/pulse change alone should have to carry).
     if is_final_guess:
         state_class = " final"
-        prefix, suffix = "Final chance — ", " left"
+        caption = "Final chance"
     elif remaining <= 0:
         state_class = " expired"
-        prefix, suffix = "", "Time's up"
+        caption = "Time&rsquo;s up"
     elif remaining <= 15:
         state_class = " warn"
-        prefix, suffix = "", " left"
+        caption = "Hurry"
     else:
         state_class = ""
-        prefix, suffix = "", " left"
+        caption = ""
     clock_html = (
-        ""
+        "&ndash;&ndash;:&ndash;&ndash;"
         if remaining <= 0
         else f'<span class="timer-clock" data-deadline-ms="{deadline_ms}">{clock}</span>'
     )
+    # The ring's filled arc, computed server-side from remaining/total so it
+    # already shows the right angle on first paint -- it only advances again
+    # on the next autorefresh (same cadence the pill's color states always
+    # updated at), not smoothly every second like the clock digits (those
+    # still tick client-side every second via the cross-frame script below).
+    total = st.session_state.get("clue_timer_duration_seconds") or remaining or 1
+    # The filled arc represents time REMAINING (starts as a full circle,
+    # empties out as the deadline approaches) -- the more familiar
+    # countdown-ring convention, not "elapsed so far."
+    progress_deg = max(0, min(360, round(360 * (remaining / total))))
+    caption_html = (
+        f'<div class="timer-caption">{caption}</div>' if caption else ""
+    )
     row_class = "timer-row" if pinned else "timer-row-inline"
+    # Single-line, no blank/whitespace-only rows -- when caption_html is ""
+    # (the common case), a multi-line template with it on its own indented
+    # line leaves a blank-but-indented row, which Markdown reads as starting
+    # an indented code block: the rest of the HTML then renders as literal
+    # text instead of being parsed (same trap noted elsewhere in this file).
     st.markdown(
-        f"""
-        <div class="{row_class}">
-            <span class="timer-pill{state_class}" aria-live="polite">
-                <span class="timer-dot"></span>
-                {escape(prefix)}{clock_html}{escape(suffix)}
-            </span>
-        </div>
-        """,
+        f'<div class="{row_class}">{caption_html}'
+        f'<span class="timer-pill{state_class}" style="--ring-progress: {progress_deg}deg;" aria-live="polite">'
+        f'<span class="timer-ring-label">{clock_html}</span></span></div>',
         unsafe_allow_html=True,
     )
     # The pill's text is otherwise only as fresh as the last rerun (every
@@ -379,21 +449,6 @@ def render_clue_timer(remaining_seconds, pinned=True):
     # few seconds late is harmless) while meaningfully cutting how often
     # this collides with either a participant click or a slow AI response.
     st_autorefresh(interval=10000, key="clue_timer_autorefresh")
-
-
-def render_idle_watchdog_ticker():
-    """Headless polling tick for the global idle-detection watchdog (see
-    ui.screens.render_idle_watchdog) -- same technique as the clue timer's
-    own autorefresh above, just on a screen that has no visible countdown.
-
-    Returns the autorefresh's own fire count, which only increments when
-    ITS OWN interval elapses -- a rerun caused by anything else (a real
-    click, a text commit) re-renders this component with that count
-    unchanged. The caller compares counts across reruns to tell "nothing
-    happened for 5s" apart from "the participant just did something,"
-    without which typing a long answer for over a minute got flagged as
-    idle and repeatedly interrupted by the watchdog's own popup."""
-    return st_autorefresh(interval=10000, key="idle_watchdog_autorefresh")
 
 
 def _render_static_card(word, role, revealed, guessed=False):
