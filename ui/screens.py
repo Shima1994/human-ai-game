@@ -19,6 +19,7 @@ from core.ai_service import (
 from core.constants import (
     AI_API_TIMEOUT_SECONDS,
     CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND,
+    DEBUG_MODE,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_POSSIBLE_SESSION_SCORE,
     MAX_SKIPS_PER_ROUND,
@@ -75,6 +76,7 @@ from ui.components import (
     render_hint_panel,
     render_hint_target_selector,
     render_interaction_history,
+    render_overview_board_preview,
     render_rating_scale_endpoints,
     render_round_chip,
     render_top_status,
@@ -155,14 +157,32 @@ ENGLISH_ONLY_ERROR = "Please write your explanation in English only."
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
 
+def _render_logo_row():
+    """The university/COLAPS logo pair shown at the top of the consent,
+    game guide, and participant profile pages -- with the DEBUG_MODE-only
+    "Skip to Round 1" shortcut tucked between them (see
+    render_debug_skip_to_round_one) instead of its own separate row, which
+    left a whole extra band of empty space above the page's real content."""
+    show_debug = DEBUG_MODE and not st.session_state.get("tutorial_completed")
+    if show_debug:
+        university_col, debug_col, colaps_col = st.columns(
+            [1, 0.6, 1], gap="large", vertical_alignment="center"
+        )
+    else:
+        university_col, colaps_col = st.columns(2, gap="large", vertical_alignment="center")
+    with university_col:
+        st.image(str(ASSETS_DIR / "university_duisburg_essen.png"), width=190)
+    if show_debug:
+        with debug_col:
+            render_debug_skip_to_round_one()
+    with colaps_col:
+        st.image(str(ASSETS_DIR / "colaps.png"), width=180)
+
+
 def screen_consent():
     with st.container(key="consent_document"):
         with st.container(key="consent_logos"):
-            university_col, colaps_col = st.columns(2, gap="large", vertical_alignment="center")
-            with university_col:
-                st.image(str(ASSETS_DIR / "university_duisburg_essen.png"), width=190)
-            with colaps_col:
-                st.image(str(ASSETS_DIR / "colaps.png"), width=180)
+            _render_logo_row()
         st.markdown(
             f"""
             <section class="information-hero">
@@ -173,7 +193,7 @@ def screen_consent():
                     <div class="information-meta">
                         <div><strong>Shima Ghasempour</strong><br><a href="mailto:shima.ghasempoour-ardestani@stud.uni-due.de">shima.ghasempoour-ardestani@stud.uni-due.de</a></div>
                         <div><strong>Department of Human-centered Computing and Cognitive Science</strong></div>
-                        <div><strong>September 2026</strong></div>
+                        <div><strong>October 2026</strong></div>
                     </div>
                 </div>
                 <div class="information-word-cards" aria-hidden="true">
@@ -241,15 +261,7 @@ def screen_consent():
 def screen_welcome():
     with st.container(key="game_guide_document"):
         with st.container(key="game_guide_logos"):
-            university_col, colaps_col = st.columns(
-                2, gap="large", vertical_alignment="center"
-            )
-            with university_col:
-                st.image(
-                    str(ASSETS_DIR / "university_duisburg_essen.png"), width=190
-                )
-            with colaps_col:
-                st.image(str(ASSETS_DIR / "colaps.png"), width=180)
+            _render_logo_row()
 
         st.markdown(
             """
@@ -271,7 +283,11 @@ def screen_welcome():
         with st.expander(
             "**1**　Overview", expanded=True, icon=":material/groups:"
         ):
-            st.markdown(GUIDE_OVERVIEW)
+            overview_text_col, overview_preview_col = st.columns([4, 1])
+            with overview_text_col:
+                st.markdown(GUIDE_OVERVIEW)
+            with overview_preview_col:
+                render_overview_board_preview()
         with st.expander(
             "**2**　Your Role", expanded=True, icon=":material/switch_account:"
         ):
@@ -430,6 +446,11 @@ def _tutorial_round1_result_dialog(result):
         st.success("Correct — the clue referred to both target cards.")
     elif result == "bomb":
         st.error("Bomb selected — just as in the real game, the round ends immediately.")
+    elif result == "timeout":
+        st.warning(
+            "Time ran out before you guessed. The intended cards were Cat and Dog "
+            "— the revealed colors show each card's role."
+        )
     else:
         st.warning("The intended cards were Cat and Dog. The revealed colors show each card's role.")
     st.markdown(f"**AI's explanation:** {TUTORIAL_AI_EXPLANATION}")
@@ -454,7 +475,6 @@ def _tutorial_round1_result_dialog(result):
 
 @st.dialog("Simulated AI's decision", width="large")
 def _tutorial_round2_result_dialog(ai_guesses):
-    st.success("The simulated AI has made its decision. Your submitted General Link is now locked.")
     st.markdown("**Simulated AI guesses:** " + ", ".join(ai_guesses))
     rating_after = st.radio(
         "After the guesses, how well do you think you and the AI understood each other?",
@@ -482,13 +502,19 @@ def _tutorial_round2_result_dialog(ai_guesses):
 def screen_tutorial():
     """Run two isolated deterministic practice rounds before the experiment."""
     step = st.session_state.get("tutorial_step", "introduction")
-    # No hero/header card here -- the real game's own screens (screen_human_clue,
-    # screen_human_guesser) never have one above render_top_status() either;
-    # an earlier decorative "TUTORIAL · PRACTICE ROUND / Try the game first"
-    # hero card made the tutorial look like a different, extra-padded screen
-    # instead of the same one the real game uses. A plain round chip (the
-    # same component the real round-summary screen uses) is enough context.
-    render_round_chip("Practice round")
+    # No hero/header card in the main column -- the real game's own screens
+    # (screen_human_clue, screen_human_guesser) never have one above
+    # render_top_status() either; an earlier decorative "TUTORIAL · PRACTICE
+    # ROUND / Try the game first" hero card made the tutorial look like a
+    # different, extra-padded screen instead of the same one the real game
+    # uses. The label lives in the sidebar instead, above the History panel
+    # added later in this same run (Streamlit appends sidebar content in
+    # execution order, so declaring this first keeps it on top) -- that
+    # leaves the main column starting directly at the actual round content,
+    # instead of a standalone chip floating above a lot of empty space.
+    with st.sidebar:
+        with st.container(key="tutorial_sidebar_label"):
+            render_round_chip("Practice round")
 
     if step == "introduction":
         _tutorial_intro_dialog()
@@ -787,12 +813,7 @@ def screen_tutorial():
                 if skip_disabled:
                     st.caption("Both practice skips have been used; continue by selecting cards.")
 
-            if result == "timeout":
-                st.warning("Practice time expired. This does not affect your study participation or score.")
-                if st.button("Retry with a fresh timer", use_container_width=True):
-                    _reset_tutorial_practice()
-                    st.rerun()
-            elif result in {"correct", "incorrect", "bomb"}:
+            if result in {"correct", "incorrect", "bomb", "timeout"}:
                 _tutorial_round1_result_dialog(result)
         return
 
@@ -1117,15 +1138,7 @@ def _history_with_pending_ai_guess(pending_review):
 def screen_name():
     with st.container(key="participant_profile_page"):
         with st.container(key="participant_profile_logos"):
-            university_col, colaps_col = st.columns(
-                2, gap="large", vertical_alignment="center"
-            )
-            with university_col:
-                st.image(
-                    str(ASSETS_DIR / "university_duisburg_essen.png"), width=190
-                )
-            with colaps_col:
-                st.image(str(ASSETS_DIR / "colaps.png"), width=180)
+            _render_logo_row()
         st.markdown(
             """
             <section class="participant-profile-hero">
@@ -1783,7 +1796,7 @@ def _guess_outcome_summary(item):
     if outcome == "bomb":
         return "error", f"Bomb hit: {', '.join(bomb)}. The round has ended."
     if outcome in ("skip", "partial_skip") or not guesses:
-        return "info", "Skipped -- no cards were guessed this turn."
+        return "info", "Skipped — no cards were guessed this turn."
     if outcome == "correct" and not neutral:
         was_were = "was" if len(correct) == 1 else "were"
         return "success", f"Correct: {', '.join(correct)} {was_were} the target."
@@ -1894,11 +1907,16 @@ def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
         if not human_clue_giver and ai_explanation:
             header_body = escape(ai_explanation)
         elif had_guesses:
-            header_body = "Rate the shared understanding after the AI's guesses."
+            # The radio question right below this card already asks the
+            # specific thing ("After the guesses, how well do you think you
+            # understood the AI?") -- a generic restatement here ("Rate the
+            # shared understanding after the AI's guesses.") said the same
+            # thing twice in a row with nothing new in between.
+            header_body = ""
         elif human_clue_giver:
-            header_body = "The AI didn't guess this turn -- rate how well you think it understood your clue."
+            header_body = "The AI didn't guess this turn — rate how well you think it understood your clue."
         else:
-            header_body = "You didn't guess this turn -- rate how well you understood the AI's clue."
+            header_body = "You didn't guess this turn — rate how well you understood the AI's clue."
         reflection_title = (
             "Shared-understanding rating"
             if human_clue_giver
@@ -1912,13 +1930,14 @@ def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
         has_ai_explanation_class = (
             " has-ai-explanation" if not human_clue_giver and ai_explanation else ""
         )
+        header_body_html = (
+            f'<p class="subtle-text" style="margin:0;">{header_body}</p>' if header_body else ""
+        )
         st.markdown(
-            f"""
-            <div class="glass-card compact-card reflection-ai-explanation{has_ai_explanation_class} reflection-compact-head">
-                <div class="panel-title">{reflection_title}</div>
-                <p class="subtle-text" style="margin:0;">{header_body}</p>
-            </div>
-            """,
+            f'<div class="glass-card compact-card reflection-ai-explanation{has_ai_explanation_class} reflection-compact-head">'
+            f'<div class="panel-title">{reflection_title}</div>'
+            f"{header_body_html}"
+            "</div>",
             unsafe_allow_html=True,
         )
     # A no-guess turn (full skip) has no completed exchange to judge *mutual*
@@ -2089,7 +2108,7 @@ def screen_human_clue():
     if clue_giver_timeout_notice == "free":
         st.warning(
             "Time expired. This is a one-time grace period, so it didn't cost "
-            "anything -- please submit your clue before the timer runs out from now on."
+            "anything — please submit your clue before the timer runs out from now on."
         )
     elif clue_giver_timeout_notice == "interaction":
         st.warning(
@@ -2941,11 +2960,11 @@ def screen_round_summary():
         )
 
         if st.session_state.round_bomb_hit:
-            st.error("Bomb hit. The round ended immediately -- points already earned still count, but no star this round.")
+            st.error("Bomb hit. The round ended immediately — points already earned still count, but no star this round.")
         elif timed_out_loss:
             st.error(
                 "Both skips were used and the final 30-second decision window ran out. "
-                "The round ended automatically -- no star this round."
+                "The round ended automatically — no star this round."
             )
 
         st.markdown(

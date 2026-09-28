@@ -154,10 +154,31 @@ body:has(.role-marker-guess) {
 .block-container {
     width: 100%;
     max-width: 1600px;
-    padding-top: 0.75rem;
+    padding-top: 0;
     padding-right: clamp(1rem, 2.5vw, 2.5rem);
     padding-bottom: 2rem;
     padding-left: clamp(1rem, 2.5vw, 2.5rem);
+}
+/* Local-testing-only shortcut (see render_debug_skip_to_round_one) -- kept
+   as small and unobtrusive as a real control can be, so it doesn't read as
+   part of the page a participant is meant to see. */
+.st-key-debug_skip_to_round_one .stButton > button,
+.st-key-debug_skip_to_round_one [data-testid="stButton"] button {
+    padding: 0.02rem 0.4rem;
+    min-height: 0;
+    height: auto;
+    line-height: 1.6;
+    font-size: 0.58rem;
+    font-weight: 600;
+    border-radius: var(--radius-pill);
+}
+/* Sidebar-only "Practice round" label (see screen_tutorial) -- placed
+   above the History panel, bigger than the ordinary .round-chip so it
+   reads as the practice section's own header, not just another chip. */
+.st-key-tutorial_sidebar_label .round-chip {
+    font-size: 1.35rem;
+    padding: 0.55rem 1.15rem;
+    margin-bottom: 0.7rem;
 }
 /* With the history sidebar open, Streamlit centers .block-container in
    whatever space is left over -- on a wide/ultrawide monitor that leftover
@@ -446,6 +467,19 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
 body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .timer-pill .timer-ring-label {
     font-size: 1.7rem;
 }
+/* Streamlit's own column div (not the keyed container inside it) can
+   flex-shrink below the timer card's actual content width -- e.g. once the
+   live History sidebar is also open and eating into the row's total width
+   -- letting the 136-148px ring overflow its column and get clipped at the
+   page's own edge instead of just wrapping/reflowing. Guarantee the column
+   never shrinks past what the ring needs; the much more flexible board
+   column next to it absorbs the squeeze instead. Same guard on the real
+   guesser screen's own timer column, which shares this exact layout. */
+[data-testid="column"]:has(.st-key-tutorial_timer_stack),
+[data-testid="column"]:has(.st-key-guesser_timer_skip_stack) {
+    min-width: 168px;
+    flex-shrink: 0;
+}
 /* st_autorefresh is a headless polling component -- no UI of its own --
    but its default element-container still reserves visible height, which
    showed up as an odd gap between the timer and skip pills once they sat
@@ -677,28 +711,34 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
     box-shadow: var(--color-shadow);
 }
 
-/* Top status bar: identity, progress stats, medals, role */
+/* Top status bar: identity, progress stats, medals, role.
+   ~30% more compact than the original sizing (padding/gaps/font-sizes all
+   scaled down together) -- the points/star chips and role badge also moved
+   into their own stacked .status-side column (see render_top_status) so
+   that group takes one narrow slice on the right instead of three separate
+   items competing for space in the same row, which used to force the whole
+   bar to wrap onto a second line once the History sidebar was also open. */
 .status-bar {
     display: flex;
     align-items: center;
-    gap: 1.1rem;
+    gap: 0.85rem;
     flex-wrap: wrap;
     background: rgba(245, 238, 225, 0.92);
     border: 1px solid rgba(212, 198, 171, 0.58);
     border-radius: var(--radius-xl);
-    padding: 0.85rem 1.05rem;
-    margin-top: 0.85rem;
-    margin-bottom: 1rem;
+    padding: 0.6rem 0.85rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.6rem;
     box-shadow: 0 8px 24px rgba(115, 102, 75, 0.06);
 }
 .status-id {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.5rem;
 }
 .status-avatar {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     background: var(--color-primary-soft);
     color: var(--color-primary);
@@ -706,18 +746,27 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
     align-items: center;
     justify-content: center;
     font-weight: 800;
-    font-size: 0.82rem;
+    font-size: 0.74rem;
     flex-shrink: 0;
 }
 .status-name {
     font-weight: 800;
-    font-size: 0.92rem;
+    font-size: 0.85rem;
     color: var(--color-heading);
     line-height: 1.2;
 }
 .status-round {
-    font-size: 0.76rem;
+    font-size: 0.7rem;
     color: var(--color-text-muted);
+}
+/* The points/star chips stack above the role badge, right-aligned -- see
+   the comment on .status-bar above for why. */
+.status-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    margin-left: auto;
 }
 .status-sep {
     width: 1px;
@@ -730,15 +779,25 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
     flex-wrap: wrap;
     flex: 1;
 }
+/* render_tutorial_status's round 2 (no per-turn stats to show) omits
+   .status-sep/.status-stats entirely -- without status-stats' flex:1 to
+   soak up the remaining width, the role-badge landed right next to the
+   name/round instead of pinned to the far edge like every other status
+   bar (round 1, and the real game's render_top_status). Matches only when
+   role-badge is the *immediate* next sibling of status-id, i.e. only when
+   there's no stats block in between. */
+.status-id + .role-badge {
+    margin-left: auto;
+}
 .stat-block {
-    min-width: 96px;
+    min-width: 80px;
 }
 .stat-label {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--color-text-muted);
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.2rem;
     font-weight: 700;
 }
 .stat-value-row {
@@ -747,20 +806,20 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
     gap: 0.3rem;
 }
 .stat-value-row .big {
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     font-weight: 800;
     color: var(--color-heading);
 }
 .stat-value-row .of {
-    font-size: 0.76rem;
+    font-size: 0.7rem;
     color: var(--color-text-muted);
 }
 .mini-bar {
-    width: 78px;
-    height: 5px;
+    width: 65px;
+    height: 4px;
     border-radius: var(--radius-pill);
     background: rgba(18, 34, 54, 0.10);
-    margin-top: 0.35rem;
+    margin-top: 0.25rem;
     overflow: hidden;
 }
 .mini-bar span {
@@ -774,15 +833,15 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
 }
 .medal-cluster {
     display: flex;
-    gap: 0.4rem;
+    gap: 0.35rem;
 }
 .medal-chip {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    font-size: 0.85rem;
+    gap: 0.25rem;
+    font-size: 0.74rem;
     font-weight: 800;
-    padding: 0.28rem 0.6rem;
+    padding: 0.2rem 0.5rem;
     border-radius: var(--radius-pill);
 }
 .medal-chip.gold {
@@ -804,10 +863,10 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
 .role-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    font-size: 0.82rem;
+    gap: 0.4rem;
+    font-size: 0.74rem;
     font-weight: 800;
-    padding: 0.42rem 0.85rem 0.42rem 0.65rem;
+    padding: 0.3rem 0.65rem 0.3rem 0.5rem;
     border-radius: var(--radius-pill);
     white-space: nowrap;
 }
@@ -897,6 +956,29 @@ body:has(.timer-row) .role-badge {
     border-color: var(--color-border) !important;
     box-shadow: var(--color-shadow) !important;
 }
+/* Compact the gaps between this panel's own rows (clue card, rationale
+   label, textarea, caption, board+timer) -- the board/timer row (with the
+   countdown ring participants actually need to see) was landing below the
+   first screenful, forcing a scroll before the timer was visible at all. */
+.st-key-tutorial_ai_clue_panel [data-testid="stVerticalBlockBorderWrapper"],
+.st-key-tutorial_human_clue_panel [data-testid="stVerticalBlockBorderWrapper"] {
+    padding: 0.75rem 0.9rem !important;
+}
+.st-key-tutorial_ai_clue_panel [data-testid="stVerticalBlock"],
+.st-key-tutorial_human_clue_panel [data-testid="stVerticalBlock"] {
+    gap: 0.4rem !important;
+}
+/* The "write your reasoning first" caption (and its warning/success
+   replacements once you start typing) sit directly under the textarea with
+   no border of their own -- give them almost no margin so they read as
+   attached to the box above instead of a separate floating line. */
+.st-key-tutorial_ai_clue_panel [data-testid="stCaptionContainer"],
+.st-key-tutorial_human_clue_panel [data-testid="stCaptionContainer"],
+.st-key-tutorial_ai_clue_panel [data-testid="stAlert"],
+.st-key-tutorial_human_clue_panel [data-testid="stAlert"] {
+    margin-top: -0.15rem;
+    margin-bottom: 0;
+}
 
 /* Word board cards */
 .word-card {
@@ -965,6 +1047,22 @@ body:has(.timer-row) .role-badge {
     border-width: 2px;
     box-shadow: inset 0 0 0 1px var(--card-danger-border), 0 8px 18px rgba(197, 48, 48, 0.2);
 }
+.overview-board-preview {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+    max-width: 168px;
+    margin: 0 0 0 auto;
+}
+.overview-mini-card {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
 .card-mark {
     font-size: 0.82rem;
     line-height: 1;
@@ -1027,9 +1125,9 @@ body:has(.timer-row) .role-badge {
     background: linear-gradient(135deg, var(--color-primary-soft), transparent 70%), var(--color-card);
     border: 1px solid var(--color-primary-soft);
     border-radius: var(--radius-xl);
-    padding: 0.82rem 1rem;
+    padding: 0.55rem 0.85rem;
     box-shadow: var(--color-shadow);
-    margin: 0.6rem 0 0.55rem 0;
+    margin: 0.3rem 0;
 }
 .hint-label {
     font-size: 0.72rem;
@@ -1038,17 +1136,8 @@ body:has(.timer-row) .role-badge {
     color: var(--color-primary-strong);
     font-weight: 800;
 }
-/* The guess-count chip sits right beside the clue word itself now, not
-   right-aligned across the card -- this screen's timer+skip cluster is
-   position:fixed at the same top-right corner (see .st-key-timer_skip_stack
-   below) and was landing directly on top of a right-aligned chip, hiding
-   it behind the Skip pill. */
 .hint-main {
     display: flex;
-    /* center, not baseline -- baseline aligned the pill's own text baseline
-       to the big word's, which (since the pill has vertical padding around
-       short text with no descenders) visually dropped it below the word's
-       center instead of sitting level with it. */
     align-items: center;
     flex-wrap: wrap;
     gap: 0.6rem;
@@ -1061,15 +1150,6 @@ body:has(.timer-row) .role-badge {
     color: var(--color-primary-strong);
     letter-spacing: 0.03em;
     word-break: break-word;
-}
-.hint-chip {
-    border-radius: var(--radius-pill);
-    padding: 0.34rem 0.72rem;
-    background: var(--color-primary);
-    color: #ffffff;
-    font-weight: 800;
-    font-size: 0.8rem;
-    white-space: nowrap;
 }
 .guess-rationale-head {
     display: flex;
@@ -1613,6 +1693,8 @@ div[class*="st-key-guide_clue_step_"] h4 {
 .information-contact {
     display: block;
     padding-left: 1.3rem;
+    padding-bottom: 1.4rem;
+    margin-bottom: 0.4rem;
     background: var(--color-bg-alt);
 }
 .information-consent-lead {
@@ -2083,7 +2165,12 @@ div[class*="st-key-guide_clue_step_"] h4 {
     box-shadow: none !important;
 }
 .st-key-reflection_panel .stTextArea textarea::placeholder {
-    color: #111827 !important;
+    /* A placeholder matching the real-text color read as already-typed
+       content, not an example to replace -- unlike --color-text-muted
+       (deliberately not gray, see the :root comment), a placeholder is
+       expected to look visually distinct from real input by convention,
+       so it keeps its own muted tone here regardless of that decision. */
+    color: #6b7280 !important;
 }
 .st-key-reflection_panel .stTextArea textarea:focus {
     border-color: var(--color-primary-strong) !important;
@@ -2123,13 +2210,21 @@ div[data-baseweb="popover"] [role="option"]:hover {
     font-family: var(--font-sans);
 }
 .stTextArea textarea {
-    min-height: 140px;
-    line-height: 1.45;
-    padding: 0.85rem 1rem;
+    /* Compact by default (2-3 lines) so the page -- including whatever
+       sits below it, like a board+timer row -- fits without scrolling on
+       first load; the native resize handle (bottom-right corner) still
+       lets a participant drag it taller for a longer answer. */
+    min-height: 68px;
+    line-height: 1.4;
+    padding: 0.65rem 0.85rem;
 }
 .stTextInput input::placeholder,
 .stTextArea textarea::placeholder {
-    color: #111827;
+    /* Deliberately distinct from the real-text color (unlike
+       --color-text-muted, see the :root comment) -- a placeholder that
+       looks identical to typed text reads as content already filled in,
+       not an example still waiting to be replaced. */
+    color: #6b7280;
 }
 .stTextInput input:focus,
 .stTextArea textarea:focus {
@@ -2680,22 +2775,27 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-clue_general_link_container 
    beats that, no matter how specific the ancestor selector is, so the
    label color has to be set directly on the <p> (same fix already used
    for radio option labels above). */
-[class*="hint_target_chips"] .stButton > button [data-testid="stMarkdownContainer"] p,
+[class*="hint_target_chips"] .stButton > button:not([data-testid="stBaseButton-primary"]) [data-testid="stMarkdownContainer"] p,
 [class*="hint_target_chips"] [data-testid="stBaseButton-secondary"] [data-testid="stMarkdownContainer"] p {
     color: var(--color-heading) !important;
     -webkit-text-fill-color: var(--color-heading) !important;
     font-size: 0.85rem !important;
 }
-[class*="hint_target_chips"] .stButton > button:hover {
+[class*="hint_target_chips"] .stButton > button:not([data-testid="stBaseButton-primary"]):hover {
     border-color: var(--color-primary);
 }
-[class*="hint_target_chips"] .stButton > button:hover [data-testid="stMarkdownContainer"] p {
+[class*="hint_target_chips"] .stButton > button:not([data-testid="stBaseButton-primary"]):hover [data-testid="stMarkdownContainer"] p {
     color: var(--color-primary) !important;
     -webkit-text-fill-color: var(--color-primary) !important;
 }
 [class*="hint_target_chips"] [data-testid="stBaseButton-primary"] {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
+    /* !important: the shared secondary+primary base rule above already sets
+       background/border on both button kinds -- without !important here,
+       an identical-specificity selector fight left a selected ("✓ Apple")
+       chip looking pixel-identical to an unselected one, with only the tiny
+       checkmark glyph to tell them apart. */
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 [class*="hint_target_chips"] [data-testid="stBaseButton-primary"] [data-testid="stMarkdownContainer"] p {
     color: #fff !important;
@@ -2826,11 +2926,15 @@ div[data-testid="stAlert"] {
     font-family: var(--font-sans);
 }
 
-/* Compact study-page mastheads: keep the first content visible on laptops. */
+/* Compact study-page mastheads: keep the first content visible on laptops.
+   Top padding cut separately, well below the other three sides -- with
+   .block-container's own top padding already at 0, this is now the only
+   thing standing between the page's real content and the very top of the
+   viewport, so it needs to be as small as the logos/heading can tolerate. */
 .st-key-consent_document,
 .st-key-game_guide_document,
 .st-key-participant_profile_page {
-    padding: clamp(0.8rem, 1.5vw, 1.25rem);
+    padding: 0.3rem clamp(0.8rem, 1.5vw, 1.25rem) clamp(0.8rem, 1.5vw, 1.25rem);
 }
 .st-key-consent_logos,
 .st-key-game_guide_logos,
@@ -2850,108 +2954,110 @@ div[data-testid="stAlert"] {
 }
 .information-hero {
     grid-template-columns: minmax(0, 2fr) minmax(140px, 0.38fr);
-    gap: 0.8rem;
-    padding: clamp(0.9rem, 1.6vw, 1.2rem);
+    gap: 0.65rem;
+    padding: clamp(0.75rem, 1.3vw, 1rem);
+    margin-bottom: 0.6rem;
 }
 .information-eyebrow {
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.3rem;
     padding: 0.24rem 0.55rem;
     font-size: 0.66rem;
 }
 .information-hero h1 {
-    font-size: clamp(1.6rem, 2.5vw, 2.15rem);
+    font-size: clamp(1.4rem, 2.2vw, 1.85rem);
 }
 .information-study-title {
-    margin: 0.3rem 0 0.6rem;
-    font-size: clamp(0.92rem, 1.35vw, 1.08rem);
-    line-height: 1.35;
+    margin: 0.22rem 0 0.45rem;
+    font-size: clamp(0.86rem, 1.25vw, 1rem);
+    line-height: 1.28;
 }
 .information-meta {
-    gap: 0.6rem;
+    gap: 0.5rem;
     font-size: 0.78rem;
-    line-height: 1.25;
+    line-height: 1.2;
 }
 .information-word-cards {
-    min-height: 90px;
+    min-height: 75px;
 }
 .information-word-cards span {
-    width: 72px;
-    padding: 0.6rem 0.3rem;
-    font-size: 0.72rem;
+    width: 64px;
+    padding: 0.5rem 0.28rem;
+    font-size: 0.68rem;
 }
 .information-word-cards span:nth-child(1) { top: 0; left: 8%; }
-.information-word-cards span:nth-child(2) { top: 30px; left: 42%; }
-.information-word-cards span:nth-child(3) { top: 58px; left: 14%; }
+.information-word-cards span:nth-child(2) { top: 24px; left: 42%; }
+.information-word-cards span:nth-child(3) { top: 48px; left: 14%; }
 .information-intro,
 .information-section,
 .information-contact {
     margin-top: 0.6rem;
 }
 .game-guide-hero {
-    grid-template-columns: minmax(0, 2fr) minmax(145px, 0.42fr);
-    min-height: 128px;
-    padding: clamp(0.9rem, 1.7vw, 1.25rem) clamp(1rem, 2vw, 1.5rem);
+    grid-template-columns: minmax(0, 2fr) minmax(120px, 0.42fr);
+    min-height: 0;
+    margin-bottom: 0.5rem;
+    padding: clamp(0.55rem, 1vw, 0.8rem) clamp(0.7rem, 1.4vw, 1rem);
 }
 .game-guide-hero h1 {
-    font-size: clamp(1.75rem, 3vw, 2.4rem);
+    font-size: clamp(1.3rem, 2.2vw, 1.75rem);
 }
 .game-guide-hero h2 {
-    margin: 0.22rem 0 0.3rem;
-    font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+    margin: 0.12rem 0 0.18rem;
+    font-size: clamp(0.85rem, 1.3vw, 1.05rem);
 }
 .game-guide-hero p {
-    font-size: 0.9rem;
-    line-height: 1.4;
+    font-size: 0.85rem;
+    line-height: 1.3;
 }
 .game-guide-word-cards {
-    min-height: 100px;
+    min-height: 65px;
 }
 .game-guide-word-cards span {
-    width: 70px;
-    padding: 0.65rem 0.3rem;
-    font-size: 0.7rem;
+    width: 55px;
+    padding: 0.45rem 0.25rem;
+    font-size: 0.62rem;
 }
 .game-guide-word-cards span:nth-child(1) { top: 0; left: 4%; }
-.game-guide-word-cards span:nth-child(2) { top: 31px; left: 40%; }
-.game-guide-word-cards span:nth-child(3) { top: 62px; left: 12%; }
+.game-guide-word-cards span:nth-child(2) { top: 20px; left: 40%; }
+.game-guide-word-cards span:nth-child(3) { top: 40px; left: 12%; }
 .participant-profile-hero {
     grid-template-columns: minmax(0, 2fr) minmax(140px, 0.4fr);
-    min-height: 124px;
-    margin-bottom: 0.65rem;
-    padding: clamp(0.9rem, 1.7vw, 1.25rem) clamp(1rem, 2vw, 1.5rem);
+    min-height: 85px;
+    margin-bottom: 0.45rem;
+    padding: clamp(0.6rem, 1.1vw, 0.85rem) clamp(0.75rem, 1.5vw, 1.1rem);
 }
 .participant-profile-hero h1 {
-    margin: 0.05rem 0 0.28rem;
-    font-size: clamp(1.75rem, 3vw, 2.4rem);
+    margin: 0.03rem 0 0.15rem;
+    font-size: clamp(1.35rem, 2.3vw, 1.85rem);
 }
 .participant-profile-hero p {
-    font-size: 0.92rem;
+    font-size: 0.85rem;
 }
 .participant-profile-card-art {
-    width: 130px;
-    height: 82px;
-    border-radius: 13px;
+    width: 105px;
+    height: 66px;
+    border-radius: 11px;
 }
 .profile-avatar {
-    top: 18px;
-    left: 20px;
-    width: 34px;
-    height: 34px;
+    top: 14px;
+    left: 16px;
+    width: 27px;
+    height: 27px;
 }
 .profile-avatar::after {
-    left: -6px;
-    bottom: -21px;
-    width: 46px;
-    height: 23px;
+    left: -5px;
+    bottom: -17px;
+    width: 37px;
+    height: 18px;
 }
 .participant-profile-card-art i {
-    right: 18px;
-    width: 42px;
-    height: 5px;
+    right: 15px;
+    width: 34px;
+    height: 4px;
 }
-.participant-profile-card-art i:nth-of-type(1) { top: 23px; }
-.participant-profile-card-art i:nth-of-type(2) { top: 38px; width: 34px; }
-.participant-profile-card-art i:nth-of-type(3) { top: 53px; width: 28px; }
+.participant-profile-card-art i:nth-of-type(1) { top: 17px; }
+.participant-profile-card-art i:nth-of-type(2) { top: 29px; width: 27px; }
+.participant-profile-card-art i:nth-of-type(3) { top: 41px; width: 22px; }
 .st-key-participant_profile_panel {
     padding: 0.25rem 1.15rem 0.9rem;
     background: linear-gradient(135deg, #ffffff 0%, var(--color-card) 100%) !important;

@@ -34,11 +34,11 @@ CLUE_GIVER_STEPS = (
 
 Try to choose a clue that connects as many target cards as possible.
 
-However, be careful: a clue that is too broad may also lead the AI toward neutral cards or, most importantly, a bomb card.
-
 For example, if two target cards are strongly related to “food”, you might give:
 
-**food — 2**""",
+**food**
+
+**Warning:** a clue that is too broad may also lead the AI toward neutral cards, or, more dangerously, toward a bomb card.""",
     ),
     (
         "Choose the clue number",
@@ -48,7 +48,7 @@ The number tells the AI how many cards you intend it to identify.
 
 For example:
 
-**food — 2**
+**food - 2**
 
 means that your clue “food” refers to exactly two intended target cards.""",
     ),
@@ -60,9 +60,9 @@ The number of selected intended cards must match your clue number.
 
 For example, if your clue is:
 
-**food — 2**
+**food - 2**
 
-you must select exactly two intended target cards.""",
+you must select exactly two intended target cards from the board's target cards.""",
     ),
     (
         "Predict what the AI will choose",
@@ -106,7 +106,7 @@ Your task is to interpret the clue and select the cards that you believe the AI 
 
 For example:
 
-**animal — 2**
+**animal - 2**
 
 means that the AI is trying to communicate two cards that it believes are related to “animal”.
 
@@ -148,16 +148,16 @@ Your goal is therefore not simply to choose the largest possible number. Try to 
     ),
     (
         "Interactions and Round Limit",
-        """Each round allows a maximum of 3 completed interactions.
+        """Each round allows a maximum of 3 completed turns.
 
-An interaction is one clue-and-response exchange between you and the AI.
+A turn (also called an interaction) is one clue-and-response exchange between you and the AI. This is the same "turn" shown in the status bar above the board.
 
 A round can end earlier if:
 
 - all 5 target cards are found, or
 - a bomb card is selected.
 
-Otherwise, the round ends when the maximum of 3 completed interactions has been reached.""",
+Otherwise, the round ends when the maximum of 3 completed turns has been reached.""",
     ),
     (
         "Skipping",
@@ -165,9 +165,9 @@ Otherwise, the round ends when the maximum of 3 completed interactions has been 
 
 You may use the Skip option up to 2 times within a round.
 
-If you skip before submitting a card selection, the skip does not use one of the three completed interaction opportunities.
+If you skip before submitting a card selection, the skip does not use one of the three completed turns.
 
-If you have already submitted a behavioural response before using Skip, that interaction still counts as a completed interaction.
+If you have already submitted a response before using Skip, that turn still counts as a completed turn.
 
 Skipping is therefore available as a safety mechanism when communication is unclear, but the number of skips is limited.""",
     ),

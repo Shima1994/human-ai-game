@@ -9,7 +9,7 @@ Shima Ghasempour — [shima.ghasempoour-ardestani@stud.uni-due.de](mailto:shima.
 
 Department of Human-centered Computing and Cognitive Science
 
-September 2026
+October 2026
 
 ## Information for Participants
 

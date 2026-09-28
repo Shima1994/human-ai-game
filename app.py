@@ -2,13 +2,11 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
-from core.constants import DEBUG_MODE
 from core.game_logic import BoardGenerationError, setup_new_round
 from core.state import init_session_state
 from core.storage import log_event
 from ui.components import close_maxed_multiselects, render_app_header, scroll_page_to_top
 from ui.screens import (
-    render_debug_skip_to_round_one,
     screen_consent,
     screen_game_over,
     screen_human_clue,
@@ -66,9 +64,6 @@ def main():
     inject_css()
     _scroll_after_view_change()
     close_maxed_multiselects()
-
-    if DEBUG_MODE and not st.session_state.tutorial_completed:
-        render_debug_skip_to_round_one()
 
     if not st.session_state.consent_given:
         screen_consent()

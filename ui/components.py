@@ -189,6 +189,35 @@ def render_app_header():
     )
 
 
+# A fixed, non-random layout (not shuffled per render) -- purely decorative,
+# so the same 5 target / 9 neutral / 2 bomb mini-cards should look identical
+# on every visit rather than changing across reruns. Order picked so same-
+# role cards aren't clustered together (reads as a plausible board, not a
+# sorted legend).
+_OVERVIEW_BOARD_PREVIEW_ROLES = (
+    "neutral", "target", "neutral", "neutral",
+    "bomb", "neutral", "target", "neutral",
+    "target", "neutral", "neutral", "bomb",
+    "target", "neutral", "neutral", "target",
+)
+
+
+def render_overview_board_preview():
+    """A small 4x4 grid of color-coded, unlabeled mini-cards next to the
+    Game Guide's Overview text -- the same target/neutral/bomb colors and
+    glyphs as the real board (see ROLE_CLASS/ROLE_MARK), just small enough
+    to read as a symbol for "16 cards: mostly neutral, a few targets, two
+    bombs" rather than an actual board to study."""
+    cells = "".join(
+        f'<span class="overview-mini-card {ROLE_CLASS[role]}">{ROLE_MARK[role]}</span>'
+        for role in _OVERVIEW_BOARD_PREVIEW_ROLES
+    )
+    st.markdown(
+        f'<div class="overview-board-preview" aria-hidden="true">{cells}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_top_status():
     is_clue_giver = st.session_state.role == "human_clue"
     role_label = "You're giving the clue" if is_clue_giver else "AI clues — you guess"
@@ -237,11 +266,13 @@ def render_top_status():
                     <div class="mini-bar warn"><span style="width:{_bar(MAX_SKIPS_PER_ROUND - skips, MAX_SKIPS_PER_ROUND)}%"></span></div>
                 </div>
             </div>
-            <div class="medal-cluster">
-                <span class="medal-chip points">{total_score} pts</span>
-                <span class="medal-chip star">&#11088; {stars} / {N_ROUNDS}</span>
+            <div class="status-side">
+                <span class="role-badge {role_variant}"><span class="role-dot"></span>{escape(role_label)}</span>
+                <div class="medal-cluster">
+                    <span class="medal-chip points">{total_score} pts</span>
+                    <span class="medal-chip star">&#11088; {stars} / {N_ROUNDS}</span>
+                </div>
             </div>
-            <span class="role-badge {role_variant}"><span class="role-dot"></span>{escape(role_label)}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -573,14 +604,18 @@ def render_board_lock_note(message, visible=True):
 
 
 def render_hint_panel(current_hint, hint_number, previous_hint=None):
+    # Same "word - number" format the game guide teaches (see "food - 2" in
+    # ui/game_guide.py) -- a separate "N guesses" chip read as a different,
+    # unexplained format instead of the one the guide already showed. A
+    # plain hyphen, not an em dash, so there's no ambiguity about how many
+    # dash characters are actually there.
     st.markdown(
         f"""
         <div class="hint-card">
             <div class="hint-copy">
                 <div class="hint-label">AI clue</div>
                 <div class="hint-main">
-                    <span class="hint-word">{escape(current_hint.upper())}</span>
-                    <span class="hint-chip">{hint_number} guesses</span>
+                    <span class="hint-word">{escape(current_hint.upper())} - {hint_number}</span>
                 </div>
             </div>
         </div>
