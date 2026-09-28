@@ -19,7 +19,7 @@ from core.constants import (
     SCHEMA_VERSION,
     VALID_CONDITIONS,
 )
-from core.game_logic import compute_score_change
+from core.game_logic import compute_round_score, get_final_medal
 
 
 # Field lists are the canonical schema: every key inside a row's JSONB `data`
@@ -45,6 +45,8 @@ SESSIONS_LOG_FIELDS = [
     "total_rounds_completed",
     "total_turns_completed",
     "final_total_score",
+    "final_star_count",
+    "final_medal",
     "user_agent",
     "device_type",
     "screen_size",
@@ -101,6 +103,9 @@ ROUNDS_LOG_FIELDS = [
     "number_of_turns",
     "round_score",
     "medal",
+    "round_star",
+    "round_star_awarded_at",
+    "total_stars_so_far",
     "round_completed",
     "round_terminated_by_bomb",
     "bomb_selected",
@@ -165,6 +170,7 @@ TURNS_LOG_FIELDS = [
     "alignment_status",
     "error_type",
     "turn_score_delta",
+    "turn_points",
     "turn_start_time",
     "turn_end_time",
     "turn_duration_seconds",
@@ -425,6 +431,7 @@ def clean_interaction_history(history):
                 "target_yield": item.get("target_yield", ""),
                 "jaccard_alignment": item.get("jaccard_alignment", ""),
                 "turn_score_delta": item.get("turn_score_delta", ""),
+                "turn_points": item.get("turn_points", 0),
                 "turn_start_time": item.get("turn_start_time", ""),
                 "turn_end_time": item.get("turn_end_time", ""),
                 "turn_duration_seconds": item.get("turn_duration_seconds", ""),
@@ -527,6 +534,8 @@ def _session_row(completed=False):
             else 0
         ),
         "final_total_score": st.session_state.get("score", 0),
+        "final_star_count": st.session_state.get("total_stars_so_far", 0),
+        "final_medal": get_final_medal(st.session_state.get("score", 0)),
         "user_agent": st.session_state.get("user_agent", "unknown"),
         "device_type": st.session_state.get("device_type", "unknown"),
         "screen_size": st.session_state.get("screen_size", "unknown"),
@@ -774,6 +783,9 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "number_of_turns": st.session_state.round_interactions,
         "round_score": score_change,
         "medal": st.session_state.round_medal,
+        "round_star": bool(st.session_state.get("round_star", False)),
+        "round_star_awarded_at": st.session_state.get("round_star_awarded_at", ""),
+        "total_stars_so_far": st.session_state.get("total_stars_so_far", 0),
         "round_completed": bool(st.session_state.round_finished),
         "round_terminated_by_bomb": bool(st.session_state.round_bomb_hit),
         "bomb_selected": bool(selected_bombs),
@@ -938,6 +950,7 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "alignment_status": item.get("alignment_status", ""),
         "error_type": item.get("error_type", "none"),
         "turn_score_delta": item.get("turn_score_delta", ""),
+        "turn_points": item.get("turn_points", ""),
         "turn_start_time": item.get("turn_start_time", ""),
         "turn_end_time": item.get("turn_end_time", ""),
         "turn_duration_seconds": _format_optional_float(item.get("turn_duration_seconds", "")),
@@ -1096,14 +1109,7 @@ def append_analysis_logs(participant_id, timestamp, score_change, clean_history)
 def log_round(participant_id):
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    guesses = st.session_state.guesses
-    bomb_words = st.session_state.get("bomb_words") or [st.session_state.bomb_word]
-    score_change = compute_score_change(
-        guesses,
-        st.session_state.target_words,
-        bomb_words,
-        st.session_state.round_interactions,
-    )
+    score_change = compute_round_score(st.session_state.interaction_history)
     clean_history = clean_interaction_history(st.session_state.interaction_history)
 
     st.session_state.last_score_change = score_change

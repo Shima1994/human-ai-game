@@ -28,7 +28,7 @@ class GameGuideTests(unittest.TestCase):
                 "Skipping",
                 "Time Limit",
                 "After an Interaction",
-                "Medals and Performance",
+                "Scoring, Stars, and Medals",
             ],
         )
         # Communicative Repair was deliberately removed -- purely theoretical
@@ -76,8 +76,10 @@ class GameGuideTests(unittest.TestCase):
             "a timeout uses one of your skips",
             "your first timeout in a round is free",
             "After an Interaction",
-            "Gold Medal",
-            "Silver Medal",
+            "2 points when your teammate selects the card you had in mind",
+            "1 point for another valid target card",
+            "earn a star",
+            "final medal",
             "MOST IMPORTANT THINGS TO REMEMBER",
         )
         content += "\nMOST IMPORTANT THINGS TO REMEMBER"

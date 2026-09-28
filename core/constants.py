@@ -41,8 +41,6 @@ DEFAULT_CONDITION = "adaptive"
 DEBUG_MODE = True
 
 N_ROUNDS = 4
-MAX_TEAM_SCORE = 20
-TEAM_GOAL_SCORE = 12
 MAX_HINT_NUMBER = 5
 BOARD_SIZE = 16
 TARGET_COUNT = 5
@@ -70,3 +68,21 @@ MEDAL_POINTS = {
     "silver": 4,
     "none": 0,
 }
+
+# Behavioural card-selection points -- how many points a guess earns based on
+# what was actually selected, independent of round_medal/MEDAL_POINTS above
+# (an unrelated interaction-count efficiency rating) and of jaccard_alignment
+# (an unrelated intersubjective-alignment measure computed alongside it in
+# record_interaction). See core/game_logic.py's turn_points calculation.
+POINTS_EXACT_INTENDED_TARGET = 2
+POINTS_OTHER_TARGET = 1
+
+# Final, session-level medal -- assigned once, from the cumulative score
+# across all N_ROUNDS rounds (max possible: N_ROUNDS * TARGET_COUNT *
+# POINTS_EXACT_INTENDED_TARGET). Deliberately separate from round_medal
+# (a per-round efficiency rating) and from the per-round star (round
+# completion without a bomb).
+MAX_POSSIBLE_SESSION_SCORE = N_ROUNDS * TARGET_COUNT * POINTS_EXACT_INTENDED_TARGET
+FINAL_MEDAL_GOLD_MIN = 30
+FINAL_MEDAL_SILVER_MIN = 20
+FINAL_MEDAL_BRONZE_MIN = 10

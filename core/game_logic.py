@@ -7,10 +7,15 @@ import streamlit as st
 from core.constants import (
     BOARD_MATERIAL_VERSION,
     BOARD_SIZE,
+    FINAL_MEDAL_BRONZE_MIN,
+    FINAL_MEDAL_GOLD_MIN,
+    FINAL_MEDAL_SILVER_MIN,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
     MEDAL_POINTS,
     N_ROUNDS,
+    POINTS_EXACT_INTENDED_TARGET,
+    POINTS_OTHER_TARGET,
     CLUE_TIMER_SECONDS,
 )
 from core.words import ROUND_BOARDS
@@ -224,16 +229,24 @@ def get_medal_for_round(interactions, success, bomb_hit):
     return "none"
 
 
-def compute_score_change(guesses, target_words, bomb_words, interactions=None):
-    if isinstance(bomb_words, str) or bomb_words is None:
-        bomb_words = [bomb_words] if bomb_words else []
-    bomb_hit = any(guess in bomb_words for guess in guesses)
-    found_targets = {guess for guess in guesses if guess in target_words}
-    success = len(found_targets) == len(target_words)
-    if interactions is None:
-        interactions = st.session_state.get("round_interactions", 0)
-    medal = get_medal_for_round(interactions, success, bomb_hit)
-    return MEDAL_POINTS[medal]
+def compute_round_score(interaction_history=None):
+    """Sum of this round's turn_points (see record_interaction) -- +2 for a
+    guess matching the clue-giver's intended card, +1 for any other valid
+    target, 0 for neutral/bomb/skipped cards. Independent of round_medal/
+    MEDAL_POINTS (an unrelated interaction-count efficiency rating)."""
+    if interaction_history is None:
+        interaction_history = st.session_state.get("interaction_history", [])
+    return sum(item.get("turn_points", 0) for item in interaction_history)
+
+
+def get_final_medal(total_score):
+    if total_score >= FINAL_MEDAL_GOLD_MIN:
+        return "gold"
+    if total_score >= FINAL_MEDAL_SILVER_MIN:
+        return "silver"
+    if total_score >= FINAL_MEDAL_BRONZE_MIN:
+        return "bronze"
+    return "none"
 
 
 def record_interaction(
@@ -290,6 +303,15 @@ def record_interaction(
     bomb_guesses = [guess for guess in guesses if guess in bomb_words]
     bomb_hit = bool(bomb_guesses)
     bomb_guess = ";".join(bomb_guesses) if bomb_guesses else None
+    # Behavioural points for this turn: +2 for a guess that matches one of
+    # the clue-giver's own intended cards, +1 for any other valid target,
+    # 0 for a neutral or bomb guess. Only actual guesses count -- a partial
+    # skip's un-guessed remaining cards never reach `guesses` at all, so
+    # they're never scored here.
+    turn_points = sum(
+        POINTS_EXACT_INTENDED_TARGET if guess in intended_targets else POINTS_OTHER_TARGET
+        for guess in correct_guesses
+    )
     new_targets = [
         guess
         for guess in correct_guesses
@@ -425,6 +447,7 @@ def record_interaction(
             "target_yield": target_yield,
             "jaccard_alignment": jaccard_alignment,
             "turn_score_delta": target_yield,
+            "turn_points": turn_points,
             "turn_start_time": turn_start.isoformat(),
             "turn_end_time": turn_end.isoformat(),
             "turn_duration_seconds": (turn_end - turn_start).total_seconds(),
@@ -610,6 +633,7 @@ def record_skip(
             "target_yield": 0,
             "jaccard_alignment": 0.0,
             "turn_score_delta": 0,
+            "turn_points": 0,
             "turn_start_time": turn_start.isoformat(),
             "turn_end_time": turn_end.isoformat(),
             "turn_duration_seconds": (turn_end - turn_start).total_seconds(),
@@ -686,6 +710,7 @@ def record_forced_timeout_loss(hint, hint_number, intended_targets=None, expecte
             "timeout_timestamp": timeout_timestamp,
             "completed_guesses": 0,
             "skipped_guesses": int(hint_number or 0),
+            "turn_points": 0,
         }
     )
     st.session_state.pending_reflection_turn = None
@@ -771,6 +796,19 @@ def finish_round(forced_loss_reason=None):
         st.session_state.round_bomb_hit,
     )
     st.session_state.last_score_change = MEDAL_POINTS[st.session_state.round_medal]
+    # Round-completion star: all 5 targets found and no bomb selected this
+    # round. A partial/full skip doesn't itself block a star, since it
+    # doesn't change round_success/round_bomb_hit on its own.
+    st.session_state.round_star = bool(
+        st.session_state.round_success and not st.session_state.round_bomb_hit
+    )
+    st.session_state.round_star_awarded_at = (
+        datetime.now(timezone.utc).isoformat() if st.session_state.round_star else ""
+    )
+    if st.session_state.round_star:
+        st.session_state.total_stars_so_far = (
+            st.session_state.get("total_stars_so_far", 0) + 1
+        )
     append_ai_round_summary()
 
 

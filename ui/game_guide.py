@@ -196,17 +196,17 @@ Please answer based on your actual understanding and experience during that inte
 There are no “correct” answers to these reflection questions.""",
     ),
     (
-        "Medals and Performance",
-        """Your goal is to find all 5 target cards as efficiently as possible.
+        "Scoring, Stars, and Medals",
+        """Score points by finding target cards together:
 
-If all targets are found:
+- 2 points when your teammate selects the card you had in mind.
+- 1 point for another valid target card.
+- Neutral cards do not add points.
+- A bomb card ends the round immediately.
 
-- in 1 or 2 completed interactions → Gold Medal
-- in 3 completed interactions → Silver Medal
+Complete all 5 target cards in a round without selecting a bomb to earn a star. You can earn up to one star per round, and up to 4 stars across the whole study.
 
-If the targets are not all found within the available interactions, or if a bomb is selected, the round is not completed successfully.
-
-The medal is simply feedback about your performance in the game.""",
+At the end of the study, your total points across all 4 rounds decide your final medal.""",
     ),
 )
 
@@ -225,6 +225,8 @@ GUIDE_REMINDERS = """
 - You have a maximum of 3 completed interactions per round.
 - You may use Skip up to 2 times per round.
 - Avoid bomb cards — selecting one ends the round immediately.
+- Finding your teammate's exact intended card is worth more than finding any other target card.
+- Complete a round with all 5 targets and no bomb to earn a star.
 - Answer reflection questions based on your genuine experience.
 
 The game will guide you through each step, so you do not need to memorize all of these instructions before starting.

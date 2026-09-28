@@ -18,7 +18,7 @@ from streamlit.testing.v1 import AppTest
 
 
 GENERIC_HERO_MARKER = "hero-title"
-TUTORIAL_MARKER = "TUTORIAL · PRACTICE ROUND"
+TUTORIAL_MARKER = "Practice round"
 
 
 def _fresh_app():

@@ -21,6 +21,15 @@ MEDAL_LABELS = {
     "none": "None",
 }
 
+# The final, session-level medal (see get_final_medal) -- distinct from
+# MEDAL_LABELS above, which labels the per-round efficiency medal.
+FINAL_MEDAL_LABELS = {
+    "gold": "&#129351; Gold",
+    "silver": "&#129352; Silver",
+    "bronze": "&#129353; Bronze",
+    "none": "No medal",
+}
+
 ROLE_CLASS = {
     "target": "word-target",
     "bomb": "word-bomb",
@@ -193,7 +202,8 @@ def render_top_status():
     found = len(st.session_state.get("found_targets", []))
     interactions = st.session_state.get("round_interactions", 0)
     skips = st.session_state.get("round_skips", 0)
-    medals = st.session_state.get("medal_counts", {})
+    stars = st.session_state.get("total_stars_so_far", 0)
+    total_score = st.session_state.get("score", 0)
 
     def _bar(value, total):
         pct = 0 if not total else max(0, min(100, round(100 * value / total)))
@@ -228,8 +238,8 @@ def render_top_status():
                 </div>
             </div>
             <div class="medal-cluster">
-                <span class="medal-chip gold">&#129351; {medals.get("gold", 0)}</span>
-                <span class="medal-chip silver">&#129352; {medals.get("silver", 0)}</span>
+                <span class="medal-chip points">{total_score} pts</span>
+                <span class="medal-chip star">&#11088; {stars} / {N_ROUNDS}</span>
             </div>
             <span class="role-badge {role_variant}"><span class="role-dot"></span>{escape(role_label)}</span>
         </div>

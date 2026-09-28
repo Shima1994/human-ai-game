@@ -793,6 +793,14 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
     background: rgba(109, 106, 99, 0.20);
     color: #403f3b;
 }
+.medal-chip.star {
+    background: rgba(200, 128, 21, 0.22);
+    color: #704400;
+}
+.medal-chip.points {
+    background: var(--color-secondary-soft);
+    color: var(--color-secondary);
+}
 .role-badge {
     display: inline-flex;
     align-items: center;
@@ -1037,7 +1045,11 @@ body:has(.timer-row) .role-badge {
    it behind the Skip pill. */
 .hint-main {
     display: flex;
-    align-items: baseline;
+    /* center, not baseline -- baseline aligned the pill's own text baseline
+       to the big word's, which (since the pill has vertical padding around
+       short text with no descenders) visually dropped it below the word's
+       center instead of sitting level with it. */
+    align-items: center;
     flex-wrap: wrap;
     gap: 0.6rem;
     margin: 0.2rem 0 0 0;

@@ -20,10 +20,9 @@ from core.constants import (
     AI_API_TIMEOUT_SECONDS,
     CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND,
     MAX_INTERACTIONS_PER_ROUND,
+    MAX_POSSIBLE_SESSION_SCORE,
     MAX_SKIPS_PER_ROUND,
-    MAX_TEAM_SCORE,
     N_ROUNDS,
-    TEAM_GOAL_SCORE,
     CLUE_TIMER_SECONDS,
     CLUE_GIVER_TIMER_SECONDS,
     GUESSER_TIMER_SECONDS,
@@ -33,6 +32,8 @@ from core.constants import (
 from core.game_logic import (
     can_skip_current_clue,
     clear_participant_decision_timer,
+    compute_round_score,
+    get_final_medal,
     participant_decision_timer_expired,
     participant_decision_time_remaining,
     record_forced_timeout_loss,
@@ -65,7 +66,7 @@ from core.tutorial import (
 )
 from core.validation import validate_general_link, validate_guess_rationale
 from ui.components import (
-    MEDAL_LABELS,
+    FINAL_MEDAL_LABELS,
     RATING_OPTIONS,
     render_board,
     render_board_legend,
@@ -294,7 +295,10 @@ def screen_welcome():
                     with content_col:
                         st.markdown(f"#### {step_heading}")
                         st.markdown(step_content)
-            st.success(CLUE_GIVER_OUTRO)
+            # Plain text, not st.success() -- the green "success" alert had
+            # no actual success to report at this point (just reading the
+            # guide), it was only ever borrowed for its visual weight.
+            st.markdown(f"*{CLUE_GIVER_OUTRO}*")
 
         section_icons = (
             ":material/smart_toy:",
@@ -357,6 +361,8 @@ def _tutorial_intro_dialog():
 
         The practice board has six cards in a 3 × 2 layout. You will also try the same short
         ratings and explanations used in the real game.
+
+        Nothing in this tutorial is scored or saved to the study data.
         """
     )
     if st.button("Start practice", type="primary", use_container_width=True):
@@ -476,19 +482,13 @@ def _tutorial_round2_result_dialog(ai_guesses):
 def screen_tutorial():
     """Run two isolated deterministic practice rounds before the experiment."""
     step = st.session_state.get("tutorial_step", "introduction")
-    st.markdown(
-        """
-        <section class="information-hero single-column">
-            <div class="information-hero-copy">
-                <div class="information-eyebrow">TUTORIAL · PRACTICE ROUND</div>
-                <h1>Try the game first</h1>
-                <p class="information-study-title">This is the game's tutorial: two short practice
-                rounds so you know what to expect. Nothing here is scored or saved to the study data.</p>
-            </div>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+    # No hero/header card here -- the real game's own screens (screen_human_clue,
+    # screen_human_guesser) never have one above render_top_status() either;
+    # an earlier decorative "TUTORIAL · PRACTICE ROUND / Try the game first"
+    # hero card made the tutorial look like a different, extra-padded screen
+    # instead of the same one the real game uses. A plain round chip (the
+    # same component the real round-summary screen uses) is enough context.
+    render_round_chip("Practice round")
 
     if step == "introduction":
         _tutorial_intro_dialog()
@@ -1795,6 +1795,27 @@ def _guess_outcome_summary(item):
     return "error", f"Wrong: {', '.join(neutral or guesses)} {was_were} not a target."
 
 
+def _turn_points_message(item):
+    """Player-facing points feedback for this turn: 2 points for a guess
+    matching the clue-giver's own intended card, 1 for any other valid
+    target, 0 otherwise -- worded without ever telling a guesser which
+    specific card was intended (an exact match is only named as such after
+    the fact, never predicted for them)."""
+    turn_points = item.get("turn_points", 0)
+    correct = item.get("correct_guesses", [])
+    if item.get("outcome") == "bomb" or not correct:
+        return ""
+    intended = item.get("intended_targets", [])
+    exact_only = len(correct) == 1 and correct[0] in intended
+    other_only = len(correct) == 1 and correct[0] not in intended
+    point_word = "point" if turn_points == 1 else "points"
+    if exact_only:
+        return f"Great match! +{turn_points} {point_word}"
+    if other_only:
+        return f"Valid target found! +{turn_points} {point_word}"
+    return f"+{turn_points} {point_word} this turn"
+
+
 def _render_live_history_sidebar(history, share_explanations, show_ai_intended=False):
     """Clue/guess history (with each turn's rationale/explanation already
     part of render_interaction_history's output) as Streamlit's native
@@ -1862,6 +1883,9 @@ def _render_skip_interpretation_and_rationale(item):
 def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
     outcome_kind, outcome_message = _guess_outcome_summary(item)
     getattr(st, outcome_kind)(outcome_message)
+    points_message = _turn_points_message(item)
+    if points_message:
+        st.caption(f"{points_message} · Round score so far: {compute_round_score()} pts")
     _render_skip_interpretation_and_rationale(item)
     ai_explanation = item.get("ai_explanation_sanitized") or item.get("ai_explanation", "")
     had_guesses = bool(item.get("guesses"))
@@ -2906,7 +2930,9 @@ def screen_round_summary():
             )
 
         guesses_text = ", ".join(st.session_state.guesses) if st.session_state.guesses else "No guesses"
-        medal_label = MEDAL_LABELS.get(st.session_state.round_medal, "None")
+        round_score = compute_round_score()
+        round_star = bool(st.session_state.get("round_star", False))
+        star_label = "&#11088; Star earned!" if round_star else "No star this round"
         timed_out_loss = st.session_state.get("round_end_reason") == "timeout_loss"
         outcome = "Bomb hit" if st.session_state.round_bomb_hit else (
             "Timed out" if timed_out_loss else (
@@ -2915,18 +2941,19 @@ def screen_round_summary():
         )
 
         if st.session_state.round_bomb_hit:
-            st.error("Bomb hit. The round ended immediately and no medal was awarded.")
+            st.error("Bomb hit. The round ended immediately -- points already earned still count, but no star this round.")
         elif timed_out_loss:
             st.error(
                 "Both skips were used and the final 30-second decision window ran out. "
-                "The round ended automatically and no medal was awarded."
+                "The round ended automatically -- no star this round."
             )
 
         st.markdown(
             f"""
             <div class="summary-stat"><strong>Guesses:</strong> {escape(guesses_text)}</div>
             <div class="summary-stat"><strong>Outcome:</strong> {escape(outcome)}</div>
-            <div class="summary-stat"><strong>Medal:</strong> {medal_label}</div>
+            <div class="summary-stat"><strong>Points this round:</strong> {round_score}</div>
+            <div class="summary-stat"><strong>{star_label}</strong></div>
             """,
             unsafe_allow_html=True,
         )
@@ -3034,52 +3061,50 @@ def screen_game_over():
     player_name = _display_player_name()
     player_name_html = escape(player_name)
     total_score = st.session_state.get("score", 0)
+    total_stars = st.session_state.get("total_stars_so_far", 0)
+    final_medal = get_final_medal(total_score)
     if not st.session_state.get("session_completed_logged"):
         if not st.session_state.get("completion_code"):
             st.session_state.completion_code = (
                 str(st.session_state.get("session_id", "")).replace("-", "")[-8:].upper()
             )
-    if total_score >= 16:
-        title = "Elite team!"
+    if final_medal == "gold":
+        title = "Gold team!"
         subtitle = f"Fantastic finish, {player_name_html}! Your team was sharp, fast, and beautifully in sync."
-        tier = "Elite team"
-    elif total_score >= 14:
-        title = "Excellent team!"
+    elif final_medal == "silver":
+        title = "Silver team!"
         subtitle = f"Great work, {player_name_html}! That was a confident run with strong clue-reading."
-        tier = "Excellent team"
-    elif total_score >= TEAM_GOAL_SCORE:
-        title = "Strong team!"
-        subtitle = f"Nice work, {player_name_html}! You cleared the target score and built a solid rhythm."
-        tier = "Strong team"
+    elif final_medal == "bronze":
+        title = "Bronze team!"
+        subtitle = f"Nice work, {player_name_html}! You built a solid rhythm together."
     else:
         title = "Run finished"
-        subtitle = f"{player_name_html}, you were close. A few cleaner clue connections and this team can jump a tier."
-        tier = "Building team"
+        subtitle = f"{player_name_html}, you were close. A few more exact matches and this team can jump a medal."
+    medal_label = FINAL_MEDAL_LABELS.get(final_medal, "No medal")
 
     st.markdown(
         f"""
         <div class="glass-card game-over-card celebration-card">
             <div class="celebration-medals">
-                <span>&#129351;</span><span>&#129352;</span>
+                <span>{medal_label}</span>
             </div>
             <div class="panel-title">Final result</div>
             <h2 style="margin-top:0; margin-bottom:0.45rem;">{title}</h2>
             <p class="subtle-text" style="margin-bottom:0;">{subtitle}</p>
-            <div class="final-score">Total score: {total_score} / {MAX_TEAM_SCORE} &middot; {tier}</div>
-            <div class="score-tiers">12+ Strong team &middot; 14+ Excellent team &middot; 16+ Elite team</div>
+            <div class="final-score">Total score: {total_score} / {MAX_POSSIBLE_SESSION_SCORE}</div>
+            <div class="score-tiers">10+ Bronze &middot; 20+ Silver &middot; 30+ Gold</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     col1, col2 = st.columns(2)
-    medal_counts = st.session_state.medal_counts
     col1.markdown(
-        f"<div class='summary-stat'><strong>&#129351; Gold</strong><br>{medal_counts.get('gold', 0)}</div>",
+        f"<div class='summary-stat'><strong>&#11088; Stars earned</strong><br>{total_stars} / {N_ROUNDS}</div>",
         unsafe_allow_html=True,
     )
     col2.markdown(
-        f"<div class='summary-stat'><strong>&#129352; Silver</strong><br>{medal_counts.get('silver', 0)}</div>",
+        f"<div class='summary-stat'><strong>Final medal</strong><br>{medal_label}</div>",
         unsafe_allow_html=True,
     )
     if not st.session_state.get("post_game_questionnaire_submitted"):
@@ -3175,6 +3200,8 @@ def screen_game_over():
                     "session_completed",
                     {
                         "final_total_score": total_score,
+                        "final_star_count": total_stars,
+                        "final_medal": final_medal,
                         "completion_code": st.session_state.completion_code,
                         "post_game_questionnaire": st.session_state.post_game_questionnaire,
                     },

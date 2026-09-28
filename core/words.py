@@ -10,7 +10,10 @@
 # words, so those few were inferred by whichever value makes that board's
 # count come out to 8+8 (every other word's type was already fixed by the
 # corpus lookup, leaving only one consistent answer). Confirm these read
-# correctly: Silence, Force, Antenna, Risk, Destiny, Lantern, Bottle.
+# correctly: Antenna, Risk, Destiny, Lantern, Bottle. (Silence and Force
+# were in this list too, but have since been swapped out for Boredom and
+# Effort -- both unambiguously abstract, so neither needs the same
+# confirmation.)
 ROUND_BOARDS = {
     1: {
         "id": "B01",
@@ -23,7 +26,7 @@ ROUND_BOARDS = {
             ("Whistle", "concrete"),
         ],
         "neutral": [
-            ("Silence", "abstract"),  # inferred, see module docstring
+            ("Boredom", "abstract"),
             ("Loyalty", "abstract"),
             ("Doubt", "abstract"),
             ("Idea", "abstract"),
@@ -43,7 +46,7 @@ ROUND_BOARDS = {
         "name": "Direction, movement, and decision-making",
         "target": [
             ("Purpose", "abstract"),
-            ("Force", "abstract"),  # inferred, see module docstring
+            ("Effort", "abstract"),
             ("Compass", "concrete"),
             ("Lever", "concrete"),
             ("Antenna", "concrete"),
