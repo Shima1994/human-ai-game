@@ -3,7 +3,6 @@ import unittest
 from pathlib import Path
 
 from ui.study_documents import (
-    INFORMATION_SHEET_CONTACT,
     INFORMATION_SHEET_INTRODUCTION,
     INFORMATION_SHEET_SECTIONS,
     INFORMATION_SHEET_TITLE,
@@ -11,8 +10,12 @@ from ui.study_documents import (
 
 
 class InformationSheetTests(unittest.TestCase):
-    def test_all_ten_approved_sections_are_present(self):
-        self.assertEqual(len(INFORMATION_SHEET_SECTIONS), 10)
+    def test_all_nine_approved_sections_are_present(self):
+        # Section 6 ("No directly identifying personal information...") was
+        # dropped as a near-duplicate of section 8 ("Will my data be kept
+        # confidential and anonymized?" -- "will not contain direct personal
+        # identifiers"), per reviewer feedback.
+        self.assertEqual(len(INFORMATION_SHEET_SECTIONS), 9)
         headings = [heading for heading, _ in INFORMATION_SHEET_SECTIONS]
         self.assertEqual(
             headings,
@@ -22,7 +25,6 @@ class InformationSheetTests(unittest.TestCase):
                 "What will my involvement be?",
                 "Are there different versions of the game?",
                 "What data will be collected?",
-                "",
                 "What will my information be used for?",
                 "Will my data be kept confidential and anonymized?",
                 "How can I withdraw from the study?",
@@ -34,18 +36,16 @@ class InformationSheetTests(unittest.TestCase):
         rendered = " ".join(
             [INFORMATION_SHEET_TITLE, INFORMATION_SHEET_INTRODUCTION]
             + [heading + content for heading, content in INFORMATION_SHEET_SECTIONS]
-            + [INFORMATION_SHEET_CONTACT]
         )
         required_phrases = (
-            "25-30 minutes",
+            "45-60 minutes",
             "game condition and session ID",
             "short rating responses and optional reflection texts",
-            "No directly identifying personal information",
+            "will not contain direct personal identifiers",
             "future research on human–AI collaboration",
             "open data repositories (e.g. zenodo)",
             "closing the browser window",
             "This study is considered low risk",
-            "shima.ghasempoour-ardestani@stud.uni-due.de",
         )
         for phrase in required_phrases:
             self.assertIn(phrase, rendered)
@@ -61,12 +61,19 @@ class InformationSheetTests(unittest.TestCase):
         screen_source = ast.get_source_segment(source, screen)
         self.assertIn("Shima Ghasempour</strong>", screen_source)
         self.assertNotIn("Shima Ghasempour Ardestani", screen_source)
+        self.assertIn("shima.ghasempoour-ardestani@stud.uni-due.de", screen_source)
         self.assertIn("October 2026", screen_source)
         self.assertNotIn("July 2026", screen_source)
         self.assertNotIn("September 2026", screen_source)
         self.assertNotIn("selectbox", screen_source)
         self.assertIn("consent_confirmation", screen_source)
         self.assertIn("st.session_state.consent_given = True", screen_source)
+        # The contact info at the top (information-meta) is now the only
+        # place it appears -- the separate "Contact information" section
+        # further down just repeated the same name/email, per reviewer
+        # feedback that it was redundant.
+        self.assertNotIn("Contact information", screen_source)
+        self.assertEqual(screen_source.count("Shima Ghasempour"), 1)
 
     def test_layout_is_single_column_without_inner_scroll(self):
         styles = Path("static/app.css").read_text(encoding="utf-8-sig")

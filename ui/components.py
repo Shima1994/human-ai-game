@@ -172,6 +172,58 @@ def close_maxed_multiselects():
     )
 
 
+def block_text_paste():
+    """Disable pasting (and dropping) text into every text field in the app,
+    so clues, rationales and reflections have to be typed by the participant
+    rather than pasted in from ChatGPT or another tool -- one of Prolific's
+    recommended measures against AI-generated answers. Same cross-frame,
+    install-once technique as close_maxed_multiselects; mounted app-wide
+    from app.py's main()."""
+    st_components.html(
+        """
+        <script>
+          (function () {
+            const doc = window.parent.document;
+            if (doc.__blockTextPasteInstalled) return;
+            doc.__blockTextPasteInstalled = true;
+            const isTextField = (target) =>
+              target instanceof doc.defaultView.Element &&
+              !!target.closest('input, textarea, [contenteditable="true"]');
+            let noticeTimer = null;
+            const showNotice = () => {
+              let notice = doc.getElementById("paste-blocked-notice");
+              if (!notice) {
+                notice = doc.createElement("div");
+                notice.id = "paste-blocked-notice";
+                notice.setAttribute("role", "status");
+                notice.textContent = "Pasting is disabled in this study. Please type your answer yourself.";
+                notice.style.cssText =
+                  "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);" +
+                  "z-index:100000;padding:10px 16px;border-radius:10px;" +
+                  "background:#1f2933;color:#fff;font:14px/1.4 sans-serif;" +
+                  "box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100vw - 32px);";
+                doc.body.appendChild(notice);
+              }
+              notice.style.display = "block";
+              clearTimeout(noticeTimer);
+              noticeTimer = setTimeout(() => { notice.style.display = "none"; }, 2500);
+            };
+            const block = (event) => {
+              if (!isTextField(event.target)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              showNotice();
+            };
+            doc.addEventListener("paste", block, true);
+            doc.addEventListener("drop", block, true);
+          })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
 def render_app_header():
     st.markdown(
         """

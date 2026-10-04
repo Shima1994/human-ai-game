@@ -1,6 +1,6 @@
 from core.constants import (
-    CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND,
     CLUE_GIVER_TIMER_SECONDS,
+    FINAL_GUESS_TIMER_SECONDS,
     GUESSER_TIMER_SECONDS,
 )
 
@@ -66,9 +66,7 @@ you must select exactly two intended target cards from the board's target cards.
     ),
     (
         "Predict what the AI will choose",
-        """Before the AI makes its guess, select the cards that you expect the AI to choose.
-
-Select exactly the same number of cards as your clue number.""",
+        """Before AI makes its guess, select the cards that you expect the AI to choose. This allows you to highlight other words that AI might mistake from your clue. If you are highly confident that AI will select the exact cards as you have selected, you can select the same cards.""",
     ),
     (
         "Rate your expected shared understanding",
@@ -87,12 +85,6 @@ Write 3–20 words in English and do not mention any words currently shown on th
 )
 
 CLUE_GIVER_OUTRO = "After completing these steps, submit your clue and the AI will respond."
-
-_FREE_TIMEOUT_PHRASE = (
-    "your first timeout"
-    if CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND == 1
-    else f"your first {CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND} timeouts"
-)
 
 GUIDE_SECTIONS = (
     (
@@ -165,23 +157,15 @@ Otherwise, the round ends when the maximum of 3 completed turns has been reached
 
 You may use the Skip option up to 2 times within a round.
 
-If you skip before submitting a card selection, the skip does not use one of the three completed turns.
-
-If you have already submitted a response before using Skip, that turn still counts as a completed turn.
+If you skip before submitting a card selection, the skip does not use one of the three Guesses. If you have already selected at least one card before using Skip, that interaction still counts as a completed interaction and uses one of your Guess.
 
 Skipping is therefore available as a safety mechanism when communication is unclear, but the number of skips is limited.""",
     ),
     (
         "Time Limit",
-        f"""When it is your turn to make a decision, you have a limited amount of time to complete the required actions shown on the screen: {CLUE_GIVER_TIMER_SECONDS} seconds as Clue-Giver, {GUESSER_TIMER_SECONDS} seconds as Guesser.
+        f"""When it is your turn to select a card, you will be given {GUESSER_TIMER_SECONDS} seconds as a Guesser. If you run out of time, it will consume one of your skip and game continues. The time take by AI is not counted. If you have already used both of your skips, you will be given {FINAL_GUESS_TIMER_SECONDS} seconds to make your guess or it will trigger the bomb card event.
 
-The timer applies to your decision time. Time used by the AI to generate its response does not count against it.
-
-If the timer reaches zero before you complete your action, that interaction is used and the game continues.
-
-As Guesser, a timeout uses one of your skips, the same as skipping manually.
-
-As Clue-Giver, {_FREE_TIMEOUT_PHRASE} in a round is free and costs you nothing. Every timeout after that in the same round counts as one of the round's 3 completed interactions instead of a skip.
+As a Clue-Giver, you will be given {CLUE_GIVER_TIMER_SECONDS} seconds to give a clue. If you run out of time (except for the first time when this happens in which case you will be allowed to finish the turn), you will consume one of the AI's three Guess turns until you run out and trigger the bomb card.
 
 Try to answer carefully, but do not wait until the final seconds to submit your response.""",
     ),
@@ -196,6 +180,16 @@ Please answer based on your actual understanding and experience during that inte
 There are no “correct” answers to these reflection questions.""",
     ),
     (
+        "Play on Your Own: No AI Tools",
+        """Please play this game on your own.
+
+Do **not** use ChatGPT, Gemini, translation tools, or any other AI tool or website to think of clues, choose cards, or write your explanations.
+
+We are studying how people themselves communicate with an AI teammate, so answers produced with outside help cannot be used for the research.
+
+Pasting text into the game is disabled. Please type all your answers yourself.""",
+    ),
+    (
         "Scoring, Stars, and Medals",
         """Score points by finding target cards together:
 
@@ -206,7 +200,7 @@ There are no “correct” answers to these reflection questions.""",
 
 Complete all 5 target cards in a round without selecting a bomb to earn a star. You can earn up to one star per round, and up to 4 stars across the whole study.
 
-At the end of the study, your total points across all 4 rounds decide your final medal.""",
+🥇🥈🥉 At the end of the study, your total points across all 4 rounds decide your final medal.""",
     ),
 )
 
@@ -228,6 +222,7 @@ GUIDE_REMINDERS = """
 - Finding your teammate's exact intended card is worth more than finding any other target card.
 - Complete a round with all 5 targets and no bomb to earn a star.
 - Answer reflection questions based on your genuine experience.
+- Play on your own: using AI tools such as ChatGPT is not allowed.
 
 The game will guide you through each step, so you do not need to memorize all of these instructions before starting.
 """

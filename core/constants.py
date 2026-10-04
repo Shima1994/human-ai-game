@@ -27,7 +27,7 @@ MODEL_IDENTIFIER = json.dumps(
     },
     sort_keys=True,
 )
-CONDITION_ASSIGNMENT_VERSION = "alternating-registered-sessions-v1"
+CONDITION_ASSIGNMENT_VERSION = "williams-latin-square-16-cells-least-filled-v1"
 
 # Bump this by hand whenever core/words.py's ROUND_BOARDS word content
 # changes (a swapped word, an abstract/concrete correction, a typo fix,

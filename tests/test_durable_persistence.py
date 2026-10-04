@@ -14,15 +14,19 @@ class State(dict):
 
 
 class FakeCursor:
-    def __init__(self, fetchone_results=None):
+    def __init__(self, fetchone_results=None, fetchall_results=None):
         self.executed = []
         self._fetchone_results = list(fetchone_results or [])
+        self._fetchall_results = list(fetchall_results or [])
 
     def execute(self, sql, params=None):
         self.executed.append((sql, params))
 
     def fetchone(self):
         return self._fetchone_results.pop(0)
+
+    def fetchall(self):
+        return self._fetchall_results.pop(0) if self._fetchall_results else []
 
     def __enter__(self):
         return self

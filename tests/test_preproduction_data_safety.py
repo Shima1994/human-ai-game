@@ -15,15 +15,19 @@ from core.constants import (
 
 
 class FakeCursor:
-    def __init__(self, fetchone_results=None):
+    def __init__(self, fetchone_results=None, fetchall_results=None):
         self.executed = []
         self._fetchone_results = list(fetchone_results or [])
+        self._fetchall_results = list(fetchall_results or [])
 
     def execute(self, sql, params=None):
         self.executed.append((sql, params))
 
     def fetchone(self):
         return self._fetchone_results.pop(0)
+
+    def fetchall(self):
+        return self._fetchall_results.pop(0) if self._fetchall_results else []
 
     def __enter__(self):
         return self
@@ -33,8 +37,8 @@ class FakeCursor:
 
 
 class FakeConnection:
-    def __init__(self, fetchone_results=None):
-        self.cursor_obj = FakeCursor(fetchone_results)
+    def __init__(self, fetchone_results=None, fetchall_results=None):
+        self.cursor_obj = FakeCursor(fetchone_results, fetchall_results)
         self.committed = False
         self.closed = False
 
@@ -138,21 +142,36 @@ class ProvenanceAndLifecycleTests(unittest.TestCase):
         with patch.object(storage, "CODE_COMMIT", ""):
             self.assertEqual(storage._session_row()["code_commit"], "")
 
-    def test_condition_assignment_alternates_atomically_via_db_counter(self):
+    def test_assignment_takes_least_filled_cell_under_a_row_lock(self):
+        from core.assignment import ASSIGNMENT_CELLS
+
         db._schema_ready = True
         try:
-            fake_conn = FakeConnection(fetchone_results=[(1,)])
+            # No existing assignment for this session; cells 0 and 1 already
+            # occupied once, so the next free cell is 2.
+            fake_conn = FakeConnection(fetchall_results=[[], [(0, 1), (1, 1)]])
             with patch.object(db, "get_connection", return_value=fake_conn):
-                condition = db.allocate_condition(
-                    {"adaptive", "baseline"}, "adaptive"
-                )
-            self.assertEqual(condition, "baseline")
-            select_sql = fake_conn.cursor_obj.executed[0][0]
-            self.assertIn("FOR UPDATE", select_sql)
-            update_sql = fake_conn.cursor_obj.executed[1][0]
-            self.assertIn("UPDATE condition_counter", update_sql)
+                cell_index = db.allocate_assignment("s-new", ASSIGNMENT_CELLS, 20)
+            self.assertEqual(cell_index, 2)
+            executed = [sql for sql, _params in fake_conn.cursor_obj.executed]
+            self.assertIn("FOR UPDATE", executed[0])
+            self.assertTrue(any("INSERT INTO assignments" in sql for sql in executed))
             self.assertTrue(fake_conn.committed)
             self.assertTrue(fake_conn.closed)
+        finally:
+            db._schema_ready = False
+
+    def test_assignment_retry_returns_the_existing_cell(self):
+        from core.assignment import ASSIGNMENT_CELLS
+
+        db._schema_ready = True
+        try:
+            fake_conn = FakeConnection(fetchall_results=[[(7,)]])
+            with patch.object(db, "get_connection", return_value=fake_conn):
+                cell_index = db.allocate_assignment("s-existing", ASSIGNMENT_CELLS, 20)
+            self.assertEqual(cell_index, 7)
+            executed = [sql for sql, _params in fake_conn.cursor_obj.executed]
+            self.assertFalse(any("INSERT INTO assignments" in sql for sql in executed))
         finally:
             db._schema_ready = False
 

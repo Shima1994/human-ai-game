@@ -6,6 +6,7 @@ import psycopg2
 import streamlit as st
 
 from core import db
+from core.assignment import ABANDONED_AFTER_MINUTES, ASSIGNMENT_CELLS, board_order_label
 from core.constants import (
     CODE_COMMIT,
     CONDITION_ASSIGNMENT_VERSION,
@@ -17,9 +18,9 @@ from core.constants import (
     MODEL_IDENTIFIER,
     N_ROUNDS,
     SCHEMA_VERSION,
-    VALID_CONDITIONS,
 )
 from core.game_logic import compute_round_score, get_final_medal
+from core.prolific import attention_checks_failed
 
 
 # Field lists are the canonical schema: every key inside a row's JSONB `data`
@@ -28,6 +29,9 @@ from core.game_logic import compute_round_score, get_final_medal
 # thesis's data-collection description (System Description 3.5) refers to.
 SESSIONS_LOG_FIELDS = [
     "participant_id",
+    "prolific_pid",
+    "prolific_study_id",
+    "prolific_session_id",
     "nickname",
     "age_group",
     "gender",
@@ -37,6 +41,8 @@ SESSIONS_LOG_FIELDS = [
     "session_id",
     "condition",
     "starting_role",
+    "assignment_cell",
+    "board_order",
     "start_time",
     "end_time",
     "completed",
@@ -52,6 +58,9 @@ SESSIONS_LOG_FIELDS = [
     "screen_size",
     "browser_language",
     "completion_code",
+    "attention_check_profile_answer",
+    "attention_check_post_game_answer",
+    "attention_checks_failed",
     "post_game_i_understood_ai_clues",
     "post_game_predict_ai_interpretation",
     "post_game_adapted_to_ai_behavior",
@@ -216,6 +225,7 @@ TURNS_LOG_FIELDS = [
     "repair_attempt_number",
     "repair_attempt",
     "repair_same_targets_retried",
+    "repair_targets_included",
     "repair_success",
     "timer_duration_seconds",
     "clue_timer_started_at",
@@ -391,6 +401,7 @@ def clean_interaction_history(history):
                 "repair_attempt_number": item.get("repair_attempt_number", ""),
                 "repair_attempt": bool(item.get("repair_attempt", False)),
                 "repair_same_targets_retried": bool(item.get("repair_same_targets_retried", False)),
+                "repair_targets_included": bool(item.get("repair_targets_included", False)),
                 "repair_success": bool(item.get("repair_success", False)),
                 "timer_duration_seconds": item.get("timer_duration_seconds", ""),
                 "clue_timer_started_at": item.get("clue_timer_started_at", ""),
@@ -509,6 +520,9 @@ def _session_row(completed=False):
         raise ValueError(f"Unknown session end reason: {session_end_reason}")
     return {
         "participant_id": st.session_state.get("participant_id", ""),
+        "prolific_pid": st.session_state.get("prolific_pid", ""),
+        "prolific_study_id": st.session_state.get("prolific_study_id", ""),
+        "prolific_session_id": st.session_state.get("prolific_session_id", ""),
         "nickname": st.session_state.get("nickname", st.session_state.get("participant_id", "")),
         "age_group": st.session_state.get("age_group", ""),
         "gender": st.session_state.get("gender", ""),
@@ -518,6 +532,8 @@ def _session_row(completed=False):
         "session_id": st.session_state.get("session_id", ""),
         "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "starting_role": st.session_state.get("starting_role", ""),
+        "assignment_cell": st.session_state.get("assignment_cell", ""),
+        "board_order": board_order_label(st.session_state.get("round_board_order") or []),
         "start_time": st.session_state.get("session_start_time", ""),
         "end_time": st.session_state.get("session_end_time", "") if completed else "",
         "completed": bool(completed),
@@ -541,6 +557,12 @@ def _session_row(completed=False):
         "screen_size": st.session_state.get("screen_size", "unknown"),
         "browser_language": st.session_state.get("browser_language", "unknown"),
         "completion_code": st.session_state.get("completion_code", ""),
+        "attention_check_profile_answer": st.session_state.get("attention_check_profile_answer", ""),
+        "attention_check_post_game_answer": st.session_state.get("attention_check_post_game_answer", ""),
+        "attention_checks_failed": attention_checks_failed(
+            st.session_state.get("attention_check_profile_answer", ""),
+            st.session_state.get("attention_check_post_game_answer", ""),
+        ),
         "post_game_i_understood_ai_clues": questionnaire.get("i_understood_ai_clues", ""),
         "post_game_predict_ai_interpretation": questionnaire.get("predict_ai_interpretation", ""),
         "post_game_adapted_to_ai_behavior": questionnaire.get("adapted_to_ai_behavior", ""),
@@ -672,24 +694,29 @@ def initialize_session_log(participant_id):
     # giving up, rather than letting it raise into an uncaught exception
     # and strand the participant on a generic error page before they've
     # even started the study.
-    condition = None
+    cell = None
     last_error = None
     for attempt in range(3):
         try:
-            condition = db.allocate_condition(VALID_CONDITIONS, DEFAULT_CONDITION)
+            cell_index = db.allocate_assignment(
+                st.session_state.get("session_id", ""),
+                ASSIGNMENT_CELLS,
+                ABANDONED_AFTER_MINUTES,
+            )
+            cell = ASSIGNMENT_CELLS[cell_index]
             break
         except (psycopg2.Error, RuntimeError) as error:
             last_error = error
             if attempt < 2:
                 time.sleep(min(1.0 * (attempt + 1), 3.0))
-    if condition is None:
+    if cell is None:
         # There is nowhere in the database to log this failure (it's the
         # participant's first contact with it), so print to stdout -- the
         # only place this is visible is Streamlit Cloud's "Manage app" logs
         # panel. Without this, a failure here is a dead end: the
         # participant sees a generic message and nobody can tell whether it
         # was a one-off blip, a bad DATABASE_URL secret, or something else.
-        print(f"initialize_session_log: allocate_condition failed after 3 attempts: {last_error!r}")
+        print(f"initialize_session_log: allocate_assignment failed after 3 attempts: {last_error!r}")
         st.error(
             "We couldn't connect to the study database just now. "
             "Please wait a moment and press Continue again."
@@ -706,8 +733,11 @@ def initialize_session_log(participant_id):
     st.session_state.consent_given = True
     st.session_state.last_activity_at = _iso_now()
     st.session_state.last_completed_stage = "participant_profile"
-    st.session_state.condition = condition
+    st.session_state.condition = cell["condition"]
     st.session_state.condition_assigned = True
+    st.session_state.assignment_cell = cell["cell_index"]
+    st.session_state.starting_role = cell["starting_role"]
+    st.session_state.round_board_order = list(cell["round_board_order"])
     log_session_state(completed=False)
     log_event(
         "session_started",

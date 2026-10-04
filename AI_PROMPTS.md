@@ -69,7 +69,7 @@ Function:
 generate_ai_hint(...)
 ```
 
-Used when the AI is clue-giver and the human is guesser. In round 1 generation starts after the participant presses **Ask AI for a clue**; in later AI-clue rounds it starts automatically. There is no separate reroll function: when the human skips an AI clue (fully or partially), the same `generate_ai_hint(...)` call is reused with a `repair_context` argument that forbids the skipped clue and requires the new clue's targets to exactly match the unresolved targets (see Section 3).
+Used when the AI is clue-giver and the human is guesser. In round 1 generation starts after the participant presses **Ask AI for a clue**; in later AI-clue rounds it starts automatically. There is no separate reroll function: when the human skips an AI clue (fully or partially), the same `generate_ai_hint(...)` call is reused with a `repair_context` argument that forbids the skipped clue and asks the model to strongly consider the unresolved targets; it may add or choose other targets (see Section 3).
 
 ### System behavior
 
@@ -116,7 +116,7 @@ Adaptive additionally receives participant feedback and persistent teammate memo
 - Temperature: `0.55`.
 - JSON mode: enabled.
 - Maximum initial attempts: three.
-- A skip-repair call forbids the skipped clue and uses the same strict validation rules (see Section 1's opening paragraph and Section 4).
+- A skip-repair call forbids the skipped clue and otherwise uses the normal validation rules; its targets are not forced to match the unresolved set (see Section 1's opening paragraph and Section 4).
 - Invalid JSON, schema violations, invalid clues, API errors, and timeouts consume an attempt.
 - After three failed attempts, clue generation raises an error. No clue, intended targets, or expected guesses are fabricated, and the UI asks the participant to try again.
 - The failure event retains the attempt count, last raw response/error, and elapsed response time for debugging.
@@ -244,7 +244,7 @@ generate_ai_turn_explanation(...)
 
 After a human finishes guessing an AI clue—including a full or partial skip—the AI produces a short general explanation of its own clue relationship.
 
-If the human fully or partially skips an AI clue, the next AI clue is a mandatory repair for the unresolved intended targets. The previous clue is forbidden and model output is accepted only if its target set exactly matches the unresolved set. Adaptive prompts may include the stored skip interpretation, guess reasoning, and participant reflection. Baseline prompts include only the skipped turn, old clue, and required unresolved targets; adaptive-only interpretation and reflection are excluded.
+If the human fully or partially skips an AI clue, the next AI clue is invited, not required, to repair the unresolved intended targets: the prompt asks the model to strongly consider them, but it may add other remaining targets or choose different ones. The previous clue is forbidden. Adaptive prompts may include the stored skip interpretation, guess reasoning, and participant reflection. Baseline prompts include only the skipped turn, old clue, and unresolved targets; adaptive-only interpretation and reflection are excluded. Symmetrically, when the AI skips a human clue, the human sees a short reminder naming their own unresolved intended cards and saying they may give a new clue for them but are free to choose any targets. `repair_targets_included` records whether the next clue actually included the skipped targets.
 
 Output schema:
 

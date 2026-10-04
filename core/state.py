@@ -8,6 +8,7 @@ from core.constants import (
     DEFAULT_CONDITION,
     VALID_CONDITIONS,
 )
+from core.prolific import prolific_params_from_url
 from core.words import ROUND_BOARDS
 
 
@@ -31,9 +32,9 @@ def _new_starting_role():
 
 
 def _new_round_board_order():
-    """Which fixed board (see core.words.ROUND_BOARDS) plays in which game
-    round, shuffled once per session -- every board is still used exactly
-    once across the study, only the order participants see them in varies."""
+    """Placeholder board order until registration. The real order (and the
+    starting role) comes from the counterbalanced cell assigned in
+    core.storage.initialize_session_log -- see core.assignment."""
     board_numbers = list(ROUND_BOARDS.keys())
     random.shuffle(board_numbers)
     return board_numbers
@@ -78,7 +79,13 @@ def _client_context_defaults():
 
 def init_session_state():
     client_context = _client_context_defaults()
+    prolific_params = prolific_params_from_url()
     defaults = {
+        "prolific_pid": prolific_params["prolific_pid"],
+        "prolific_study_id": prolific_params["prolific_study_id"],
+        "prolific_session_id": prolific_params["prolific_session_id"],
+        "attention_check_profile_answer": "",
+        "attention_check_post_game_answer": "",
         "session_id": _new_session_id(),
         "condition": _condition_from_query_params(),
         "condition_assigned": False,

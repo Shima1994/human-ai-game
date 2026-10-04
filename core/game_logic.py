@@ -72,9 +72,8 @@ def get_role_for_round(round_number, starting_role=None):
 
 def _board_number_for_round(round_number):
     """Which entry in core.words.ROUND_BOARDS plays as this game round --
-    shuffled once per session (see core.state._new_round_board_order) so
-    the four boards appear in a random order instead of always B01..B04 in
-    round 1..4. Falls back to a direct 1:1 mapping if the shuffled order is
+    the session's counterbalanced Latin-square order (see core.assignment),
+    set at registration. Falls back to a direct 1:1 mapping if the shuffled order is
     ever missing (e.g. an older session_state), rather than crashing."""
     order = st.session_state.get("round_board_order") or list(ROUND_BOARDS.keys())
     index = round_number - 1
@@ -83,7 +82,7 @@ def _board_number_for_round(round_number):
 
 def get_board_template_id(round_number):
     # Each round plays one of the hand-curated, fixed boards (see
-    # core.words.ROUND_BOARDS), assigned via the session's shuffled
+    # core.words.ROUND_BOARDS), assigned via the session's counterbalanced
     # round-to-board order rather than a fixed 1:1 mapping. This returns
     # that board's id (e.g. "B01"). Kept as its own function (rather than
     # inlining the lookup) since callers elsewhere treat "which board
@@ -249,6 +248,21 @@ def get_final_medal(total_score):
     return "none"
 
 
+def skip_invites_repair(clue_giver, skipped_by):
+    """A skip by the guesser invites a repair on the next clue -- in either
+    direction. The repair is a nudge, never a requirement: the next clue is
+    asked to strongly consider the skipped targets (AI clue-giver: prompt;
+    human clue-giver: on-screen reminder) but may target other cards."""
+    return (clue_giver == "ai" and skipped_by == "human") or (
+        clue_giver == "human" and skipped_by == "ai"
+    )
+
+
+def _repair_targets_included(repair_context, intended_targets):
+    targets = set(repair_context.get("unresolved_targets", []))
+    return bool(repair_context and targets and targets.issubset(set(intended_targets)))
+
+
 def record_interaction(
     hint,
     hint_number,
@@ -400,13 +414,13 @@ def record_interaction(
             "skipped_by": (skipped_by or guesser) if partial_skip else "",
             "partial_skip": bool(partial_skip),
             "skip_interpreted_cards": skip_interpreted_cards if partial_skip else [],
-            "repair_required": bool(partial_skip and clue_giver == "ai" and skipped_by == "human"),
+            "repair_required": bool(partial_skip and skip_invites_repair(clue_giver, skipped_by)),
             "repair_source_turn": repair_context.get("skipped_turn", ""),
             "repair_source_targets": list(repair_context.get("unresolved_targets", [])),
             "repair_chain_id": repair_context.get("repair_chain_id", "") or (
                 f"{st.session_state.get('session_id', '')}:r{st.session_state.get('round', '')}:"
                 f"t{interaction_sequence}"
-                if partial_skip and clue_giver == "ai" and skipped_by == "human"
+                if partial_skip and skip_invites_repair(clue_giver, skipped_by)
                 else ""
             ),
             "repair_attempt_number": repair_context.get("repair_attempt_number", ""),
@@ -414,6 +428,7 @@ def record_interaction(
             "repair_same_targets_retried": bool(
                 repair_context and set(intended_targets) == set(repair_context.get("unresolved_targets", []))
             ),
+            "repair_targets_included": _repair_targets_included(repair_context, intended_targets),
             "repair_success": bool(
                 repair_context and set(repair_context.get("unresolved_targets", [])).issubset(set(correct_guesses))
             ),
@@ -582,13 +597,13 @@ def record_skip(
             "skipped_by": "" if timed_out else skipped_by,
             "partial_skip": False,
             "skip_interpreted_cards": skip_interpreted_cards,
-            "repair_required": bool(not timed_out and clue_giver == "ai" and skipped_by == "human"),
+            "repair_required": bool(not timed_out and skip_invites_repair(clue_giver, skipped_by)),
             "repair_source_turn": repair_context.get("skipped_turn", ""),
             "repair_source_targets": list(repair_context.get("unresolved_targets", [])),
             "repair_chain_id": repair_context.get("repair_chain_id", "") or (
                 f"{st.session_state.get('session_id', '')}:r{st.session_state.get('round', '')}:"
                 f"t{interaction_sequence}"
-                if not timed_out and clue_giver == "ai" and skipped_by == "human"
+                if not timed_out and skip_invites_repair(clue_giver, skipped_by)
                 else ""
             ),
             "repair_attempt_number": repair_context.get("repair_attempt_number", ""),
@@ -596,6 +611,7 @@ def record_skip(
             "repair_same_targets_retried": bool(
                 repair_context and set(intended_targets) == set(repair_context.get("unresolved_targets", []))
             ),
+            "repair_targets_included": _repair_targets_included(repair_context, intended_targets),
             "repair_success": False,
             "timer_duration_seconds": timer_duration_seconds if timer_duration_seconds is not None else st.session_state.get("clue_timer_duration_seconds", CLUE_TIMER_SECONDS),
             "clue_timer_started_at": clue_timer_started_at if clue_timer_started_at is not None else st.session_state.get("clue_timer_started_at", ""),

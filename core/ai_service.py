@@ -567,12 +567,13 @@ def build_hint_user_prompt(
     if repair_context:
         repair_targets = repair_context.get("unresolved_targets", [])
         repair_block = (
-            "\n\nMANDATORY SKIP REPAIR:\n"
-            f"Turn {repair_context.get('skipped_turn')} was skipped. Generate a NEW clue for exactly "
-            f"these same unresolved targets: {', '.join(repair_targets)}.\n"
-            f"Do not repeat the skipped clue \"{repair_context.get('skipped_hint', '')}\". "
-            "Do not replace, add, or drop targets. Set number to the target count and return exactly "
-            "this target set in targets.\n"
+            "\n\nSKIP REPAIR (strongly recommended, not mandatory):\n"
+            f"Turn {repair_context.get('skipped_turn')} was skipped, so these targets from it are still "
+            f"unresolved: {', '.join(repair_targets)}.\n"
+            "Strongly consider giving a NEW clue that includes these targets, so the misunderstanding "
+            "can be repaired. You may also add other remaining targets to the clue, or choose different "
+            "targets if you judge that a clearly better and safer clue exists.\n"
+            f"Do not repeat the skipped clue \"{repair_context.get('skipped_hint', '')}\".\n"
         )
         if condition == "adaptive":
             interpretation = repair_context.get("participant_interpretation", [])
@@ -777,7 +778,6 @@ def _generate_hint_with_forbidden(
         for guess in item.get("correct_guesses", [])
     }
     remaining_targets = [word for word in target_words if word not in found_targets]
-    required_targets = list((repair_context or {}).get("unresolved_targets", []))
     already_guessed = {
         guess
         for item in history
@@ -825,8 +825,6 @@ def _generate_hint_with_forbidden(
             and hint not in used_hint_set
             and not is_hint_too_close_to_board(hint, board_words)
             and intended_targets
-            and (not required_targets or set(intended_targets) == set(required_targets))
-            and (not required_targets or hint_number == len(required_targets))
         ):
             return {
                 "hint": hint,

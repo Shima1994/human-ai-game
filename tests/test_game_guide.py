@@ -16,7 +16,7 @@ from ui.game_guide import (
 class GameGuideTests(unittest.TestCase):
     def test_all_eleven_visual_sections_are_present(self):
         self.assertEqual(len(CLUE_GIVER_STEPS), 6)
-        self.assertEqual(len(GUIDE_SECTIONS), 8)
+        self.assertEqual(len(GUIDE_SECTIONS), 9)
         titles = [title for title, _ in GUIDE_SECTIONS]
         self.assertEqual(
             titles,
@@ -28,6 +28,7 @@ class GameGuideTests(unittest.TestCase):
                 "Skipping",
                 "Time Limit",
                 "After an Interaction",
+                "Play on Your Own: No AI Tools",
                 "Scoring, Stars, and Medals",
             ],
         )
@@ -72,9 +73,11 @@ class GameGuideTests(unittest.TestCase):
             "Try to Connect More Than One Target",
             "maximum of 3 completed interactions",
             "Skip option up to 2 times",
-            "120 seconds as Clue-Giver, 90 seconds as Guesser",
-            "a timeout uses one of your skips",
-            "your first timeout in a round is free",
+            "90 seconds as a Guesser",
+            "120 seconds to give a clue",
+            "it will consume one of your skip",
+            "30 seconds to make your guess",
+            "except for the first time when this happens",
             "After an Interaction",
             "2 points when your teammate selects the card you had in mind",
             "1 point for another valid target card",
@@ -115,6 +118,7 @@ class GameGuideTests(unittest.TestCase):
             ":material/skip_next:",
             ":material/schedule:",
             ":material/rate_review:",
+            ":material/block:",
             ":material/emoji_events:",
         )
         for icon in icons:

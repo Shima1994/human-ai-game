@@ -5,7 +5,12 @@ import streamlit as st
 from core.game_logic import BoardGenerationError, setup_new_round
 from core.state import init_session_state
 from core.storage import log_event
-from ui.components import close_maxed_multiselects, render_app_header, scroll_page_to_top
+from ui.components import (
+    block_text_paste,
+    close_maxed_multiselects,
+    render_app_header,
+    scroll_page_to_top,
+)
 from ui.screens import (
     screen_consent,
     screen_game_over,
@@ -64,6 +69,7 @@ def main():
     inject_css()
     _scroll_after_view_change()
     close_maxed_multiselects()
+    block_text_paste()
 
     if not st.session_state.consent_given:
         screen_consent()

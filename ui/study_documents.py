@@ -31,7 +31,7 @@ Before the game, you will be asked to complete a short demographic questionnaire
 
 During the game, you may be asked to provide short ratings and, in some cases, brief explanations about how well a clue was understood. These reflection questions help us understand how shared understanding develops during collaboration.
 
-The study is expected to take approximately 25-30 minutes.
+The study is expected to take approximately 45-60 minutes.
 
 ### 4. Are there different versions of the game?
 
@@ -161,7 +161,7 @@ INFORMATION_SHEET_SECTIONS = (
         "may be asked to provide short ratings and, in some cases, brief explanations "
         "about how well a clue was understood. These reflection questions help us "
         "understand how shared understanding develops during collaboration.</p>"
-        "<p>The study is expected to take approximately 25-30 minutes.</p>",
+        "<p>The study is expected to take approximately 45-60 minutes.</p>",
     ),
     (
         "Are there different versions of the game?",
@@ -187,11 +187,6 @@ INFORMATION_SHEET_SECTIONS = (
         "and previous experience with word association games);</li><li>technical "
         "information needed for the study, such as timestamps and basic device/browser "
         "information.</li></ul>",
-    ),
-    (
-        "",
-        "<p>No directly identifying personal information, such as your name, address, "
-        "or email address, will be collected in the game data.</p>",
     ),
     (
         "What will my information be used for?",
@@ -224,13 +219,6 @@ INFORMATION_SHEET_SECTIONS = (
         "game and answer short reflection questions. You may stop at any time if you "
         "feel uncomfortable.</p>",
     ),
-)
-
-INFORMATION_SHEET_CONTACT = (
-    "If you have any questions about the study, please contact: "
-    "Shima Ghasempour, "
-    "<a href='mailto:shima.ghasempoour-ardestani@stud.uni-due.de'>"
-    "shima.ghasempoour-ardestani@stud.uni-due.de</a>"
 )
 
 
@@ -283,7 +271,7 @@ DEBRIEFING_DOCUMENT = """
 
 <section class="debrief-section debrief-completion-code-section">
     <h2>Your completion code</h2>
-    <p>Enter this code on the platform where you found this study (e.g. Amazon Mechanical Turk) to confirm your participation:</p>
+    <p>Enter this code on Prolific to confirm your participation (or use the Return to Prolific button on the next page):</p>
     <p class="debrief-completion-code">[COMPLETION_CODE]</p>
 </section>
 

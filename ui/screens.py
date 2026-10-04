@@ -65,6 +65,14 @@ from core.tutorial import (
     tutorial_repair_clue,
     tutorial_time_remaining,
 )
+from core.prolific import (
+    ATTENTION_CHECK_POST_GAME_ID,
+    ATTENTION_CHECK_POST_GAME_QUESTION,
+    ATTENTION_CHECK_PROFILE_OPTIONS,
+    ATTENTION_CHECK_PROFILE_QUESTION,
+    prolific_complete_url,
+    prolific_completion_code,
+)
 from core.validation import validate_general_link, validate_guess_rationale
 from ui.components import (
     FINAL_MEDAL_LABELS,
@@ -93,7 +101,6 @@ from ui.game_guide import (
 )
 from ui.study_documents import (
     CONSENT_CHECKLIST_ITEMS,
-    INFORMATION_SHEET_CONTACT,
     INFORMATION_SHEET_INTRODUCTION,
     INFORMATION_SHEET_SECTIONS,
     INFORMATION_SHEET_TITLE,
@@ -191,7 +198,7 @@ def screen_consent():
                     <h1>Information Sheet for<br>Participation in Research</h1>
                     <p class="information-study-title">{INFORMATION_SHEET_TITLE}</p>
                     <div class="information-meta">
-                        <div><strong>Shima Ghasempour</strong><br><a href="mailto:shima.ghasempoour-ardestani@stud.uni-due.de">shima.ghasempoour-ardestani@stud.uni-due.de</a></div>
+                        <div><span class="information-meta-label">Contact</span><strong>Shima Ghasempour</strong><br><a href="mailto:shima.ghasempoour-ardestani@stud.uni-due.de">shima.ghasempoour-ardestani@stud.uni-due.de</a></div>
                         <div><strong>Department of Human-centered Computing and Cognitive Science</strong></div>
                         <div><strong>October 2026</strong></div>
                     </div>
@@ -220,15 +227,6 @@ def screen_consent():
                 """,
                 unsafe_allow_html=True,
             )
-        st.markdown(
-            f"""
-            <section class="information-contact">
-                <h2>Contact information</h2>
-                <p>{INFORMATION_SHEET_CONTACT}</p>
-            </section>
-            """,
-            unsafe_allow_html=True,
-        )
     with st.container(border=True, key="consent_action_panel"):
         st.markdown(
             "<h2>Consent Form</h2>"
@@ -270,7 +268,8 @@ def screen_welcome():
                     <div class="information-eyebrow">RESEARCH STUDY</div>
                     <h1>Game Guide</h1>
                     <h2>Team Up with an AI</h2>
-                    <p>This page explains how the game works and what you need to do.<br>Please read the instructions carefully before starting.</p>
+                    <p>How the game works, in one page.</p>
+                    <p class="game-guide-inspiration">Similar to Codenames &mdash; if you've played it before, you'll get the hang of it right away!</p>
                 </div>
                 <div class="game-guide-word-cards" aria-hidden="true">
                     <span>think</span><span>connect</span><span>play</span>
@@ -324,6 +323,7 @@ def screen_welcome():
             ":material/skip_next:",
             ":material/schedule:",
             ":material/rate_review:",
+            ":material/block:",
             ":material/emoji_events:",
         )
         for section_number, ((title, content), icon) in enumerate(
@@ -1200,6 +1200,14 @@ def screen_name():
                         horizontal=True,
                         key="profile_ai_experience",
                     )
+                with st.container(key="profile_attention_check_group"):
+                    attention_check_answer = st.radio(
+                        ATTENTION_CHECK_PROFILE_QUESTION,
+                        ATTENTION_CHECK_PROFILE_OPTIONS,
+                        index=None,
+                        horizontal=True,
+                        key="profile_attention_check",
+                    )
                 with st.container(key="profile_codenames_group"):
                     codenames_experience = st.radio(
                         "Have you played Codenames before?",
@@ -1243,6 +1251,8 @@ def screen_name():
                     missing.append("AI experience")
                 if codenames_experience is None:
                     missing.append("Codenames experience")
+                if attention_check_answer is None:
+                    missing.append("the reading-check question")
                 if missing:
                     _profile_missing_fields_dialog(missing)
                 else:
@@ -1266,6 +1276,9 @@ def screen_name():
                     st.session_state.english_proficiency = english_proficiency
                     st.session_state.ai_experience = ai_experience
                     st.session_state.codenames_experience = codenames_experience
+                    # Recorded, never used to block: Prolific only allows a
+                    # rejection after two failed checks, decided afterwards.
+                    st.session_state.attention_check_profile_answer = attention_check_answer
                     if initialize_session_log(participant_id):
                         st.rerun()
 
@@ -1417,6 +1430,7 @@ def _consume_human_clue_timeout():
     ).strip()
     clue_giver_timeouts = st.session_state.get("round_clue_giver_timeouts", 0)
     is_free = clue_giver_timeouts < CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND
+    repair_context = _pending_human_clue_repair_context()
     timeout_timestamp = record_timeout(
         hint,
         hint_number,
@@ -1435,6 +1449,7 @@ def _consume_human_clue_timeout():
             "pre_ai_human_clue_form_unsubmitted" if general_link else ""
         ),
         human_explanation_collected_at="",
+        repair_context=repair_context,
         timeout_cost="none" if is_free else "interaction",
     )
     if timeout_timestamp is None:
@@ -1444,7 +1459,7 @@ def _consume_human_clue_timeout():
         _clear_current_clue()
         return True
     st.session_state.round_clue_giver_timeouts = clue_giver_timeouts + 1
-    _log_timeout(timeout_timestamp, None)
+    _log_timeout(timeout_timestamp, repair_context)
     st.session_state.clue_giver_timeout_notice = "free" if is_free else "interaction"
     _clear_current_clue()
     return True
@@ -1452,6 +1467,18 @@ def _consume_human_clue_timeout():
 
 def _pending_ai_clue_repair_context():
     """Return the latest skipped AI-clue target set until a linked retry exists."""
+    return _pending_repair_context("ai")
+
+
+def _pending_human_clue_repair_context():
+    """Same as _pending_ai_clue_repair_context, for a human clue the AI skipped."""
+    return _pending_repair_context("human")
+
+
+def _pending_repair_context(clue_giver):
+    """The latest skipped clue by this clue-giver whose unresolved targets
+    the next clue is invited (never required) to revisit -- offered once,
+    until a turn linked to it as a repair attempt exists."""
     history = st.session_state.get("interaction_history", [])
     repaired_source_turns = {
         item.get("repair_source_turn")
@@ -1459,6 +1486,8 @@ def _pending_ai_clue_repair_context():
         if item.get("repair_attempt")
     }
     for item in reversed(history):
+        if item.get("clue_giver") != clue_giver:
+            continue
         if not item.get("repair_required") or item.get("turn") in repaired_source_turns:
             continue
         unresolved = [
@@ -1486,22 +1515,36 @@ def _pending_ai_clue_repair_context():
     return None
 
 
+def _request_ai_hint(repair_context, extra_forbidden_hints=None):
+    used_hints = list(st.session_state.used_hints) + list(extra_forbidden_hints or [])
+    return generate_ai_hint(
+        st.session_state.target_words,
+        st.session_state.bomb_words,
+        st.session_state.neutral_words,
+        st.session_state.word_type,
+        st.session_state.interaction_history,
+        used_hints,
+        st.session_state.ai_round_summaries,
+        condition=st.session_state.get("condition", DEFAULT_CONDITION),
+        repair_context=repair_context,
+    )
+
+
 def _generate_and_store_ai_hint():
     hint_start_time = _now_iso()
     repair_context = _pending_ai_clue_repair_context()
     try:
         with st.spinner("AI is generating a clue..."):
-            hint_result = generate_ai_hint(
-                st.session_state.target_words,
-                st.session_state.bomb_words,
-                st.session_state.neutral_words,
-                st.session_state.word_type,
-                st.session_state.interaction_history,
-                st.session_state.used_hints,
-                st.session_state.ai_round_summaries,
-                condition=st.session_state.get("condition", DEFAULT_CONDITION),
-                repair_context=repair_context,
-            )
+            hint_result = _request_ai_hint(repair_context)
+            returned_hint = str(hint_result.get("hint", "")).strip().lower()
+            if returned_hint in st.session_state.used_hints:
+                # _generate_hint_with_forbidden already lists every used hint
+                # as forbidden in the prompt and retries internally, but a
+                # model can still ignore that instruction and hand back a
+                # repeat anyway -- one more attempt with this exact word
+                # blocked outright (not just one of many named in a prompt)
+                # rather than letting a repeated clue reach the participant.
+                hint_result = _request_ai_hint(repair_context, [returned_hint])
     except AIClueGenerationError as error:
         st.session_state.current_hint_start_time = ""
         log_event(
@@ -1802,10 +1845,10 @@ def _guess_outcome_summary(item):
         return "success", f"Correct: {', '.join(correct)} {was_were} the target."
     if correct and neutral:
         return "warning", (
-            f"Partly right: {', '.join(correct)} correct, {', '.join(neutral)} not a target."
+            f"Partly right: {', '.join(correct)} correct, {', '.join(neutral)} neutral (not a target)."
         )
     was_were = "was" if len(neutral or guesses) == 1 else "were"
-    return "error", f"Wrong: {', '.join(neutral or guesses)} {was_were} not a target."
+    return "error", f"Wrong: {', '.join(neutral or guesses)} {was_were} a neutral card, not a target."
 
 
 def _turn_points_message(item):
@@ -2121,6 +2164,17 @@ def screen_human_clue():
         )
 
     pending_review = st.session_state.get("pending_ai_guess_review")
+    repair_context = _pending_human_clue_repair_context()
+    if repair_context and not pending_review:
+        # A nudge, never a rule: it names only the participant's own intended
+        # cards (which they already know) and nothing about how the AI read
+        # the skipped clue, so it can't give anything away.
+        unresolved_cards = ", ".join(repair_context["unresolved_targets"])
+        st.info(
+            f"The AI skipped your last clue, so your intended card(s) {unresolved_cards} "
+            "are still hidden. You may want to try a new clue for them, but you are free "
+            "to choose any target cards."
+        )
     with st.container(border=True):
         st.markdown('<div class="panel-title">Your secret board</div>', unsafe_allow_html=True)
         # While reviewing the AI's just-submitted guess there is no active
@@ -2179,6 +2233,7 @@ def screen_human_clue():
                 skip_interpreted_cards=pending_review.get(
                     "skip_interpreted_cards", []
                 ),
+                repair_context=repair_context,
                 clue_timer_started_at=pending_review.get("clue_timer_started_at"),
                 timer_duration_seconds=pending_review.get("timer_duration_seconds"),
                 human_explanation_raw=pending_review.get("human_explanation_raw", ""),
@@ -2539,6 +2594,7 @@ def screen_human_clue():
                     skip_interpreted_cards=guess_result.get(
                         "skip_interpreted_cards", []
                     ),
+                    repair_context=repair_context,
                     guess_raw_response=guess_result.get("raw_response", ""),
                     guess_time_sec=guess_time_sec,
                     guess_response_time_sec=guess_result.get("response_time_sec"),
@@ -3076,6 +3132,14 @@ def screen_round_summary():
             st.rerun()
 
 
+def _study_completion_code():
+    """Prolific's fixed study code when configured; otherwise (local runs,
+    pilots outside Prolific) a per-session code derived from session_id."""
+    return prolific_completion_code() or (
+        str(st.session_state.get("session_id", "")).replace("-", "")[-8:].upper()
+    )
+
+
 def screen_game_over():
     player_name = _display_player_name()
     player_name_html = escape(player_name)
@@ -3084,9 +3148,7 @@ def screen_game_over():
     final_medal = get_final_medal(total_score)
     if not st.session_state.get("session_completed_logged"):
         if not st.session_state.get("completion_code"):
-            st.session_state.completion_code = (
-                str(st.session_state.get("session_id", "")).replace("-", "")[-8:].upper()
-            )
+            st.session_state.completion_code = _study_completion_code()
     if final_medal == "gold":
         title = "Gold team!"
         subtitle = f"Fantastic finish, {player_name_html}! Your team was sharp, fast, and beautifully in sync."
@@ -3136,7 +3198,14 @@ def screen_game_over():
                 unsafe_allow_html=True,
             )
             answers = {}
-            for question_id, question_text in POST_GAME_QUESTIONS:
+            # The attention item sits mid-list so it reads like any other
+            # statement; it is stored separately from the questionnaire.
+            displayed_questions = (
+                POST_GAME_QUESTIONS[:2]
+                + [(ATTENTION_CHECK_POST_GAME_ID, ATTENTION_CHECK_POST_GAME_QUESTION)]
+                + POST_GAME_QUESTIONS[2:]
+            )
+            for question_id, question_text in displayed_questions:
                 answers[question_id] = st.radio(
                     question_text,
                     options=[1, 2, 3, 4, 5],
@@ -3147,7 +3216,7 @@ def screen_game_over():
             if st.button("Submit final answers", type="primary", use_container_width=True):
                 missing = [
                     question_text
-                    for question_id, question_text in POST_GAME_QUESTIONS
+                    for question_id, question_text in displayed_questions
                     if answers.get(question_id) is None
                 ]
                 if missing:
@@ -3157,11 +3226,12 @@ def screen_game_over():
                     question_id: int(answers[question_id])
                     for question_id, _ in POST_GAME_QUESTIONS
                 }
+                st.session_state.attention_check_post_game_answer = int(
+                    answers[ATTENTION_CHECK_POST_GAME_ID]
+                )
                 st.session_state.post_game_questionnaire_submitted = True
                 if not st.session_state.get("completion_code"):
-                    st.session_state.completion_code = (
-                        str(st.session_state.get("session_id", "")).replace("-", "")[-8:].upper()
-                    )
+                    st.session_state.completion_code = _study_completion_code()
                 log_event(
                     "post_game_questionnaire_submitted",
                     st.session_state.post_game_questionnaire,
@@ -3244,7 +3314,7 @@ def screen_game_over():
     # place the completion code appears -- a participant who clicks through
     # without copying it down there had no way to recover it once they
     # reached this final screen, which is the one they're actually looking
-    # at when they go to paste the code into Prolific/MTurk.
+    # at when they go to paste the code into Prolific.
     st.markdown(
         f"""
         <div class="glass-card compact-card section-gap">
@@ -3255,4 +3325,14 @@ def screen_game_over():
         """,
         unsafe_allow_html=True,
     )
-    st.caption("You may now close this browser tab.")
+    complete_url = prolific_complete_url(st.session_state.get("completion_code", ""))
+    if st.session_state.get("prolific_pid") and complete_url:
+        st.link_button(
+            "Return to Prolific to complete your submission",
+            complete_url,
+            type="primary",
+            use_container_width=True,
+        )
+        st.caption("If the button does not work, copy the code above into Prolific.")
+    else:
+        st.caption("You may now close this browser tab.")

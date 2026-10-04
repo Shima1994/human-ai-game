@@ -1,0 +1,385 @@
+% Overall study sequence -- one large single-page PDF.
+% The page is sized to the diagram automatically (standalone class),
+% so nothing is cut off however tall the diagram gets.
+% Compile with pdflatex (e.g. on Overleaf).
+%
+% IMPORTANT: pgf-umlsd turns every message label into a TikZ node name.
+% Message labels must therefore be plain words only: no LaTeX commands,
+% no parentheses, commas, colons, quotes, slashes, plus signs or dots.
+% Block (sdblock) titles are not node names and may use punctuation.
+
+\documentclass[border=25mm]{standalone}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shadows}
+\usepackage[underline=false,roundedcorners=true]{pgf-umlsd}
+
+% One empty sequence level: visual gap between logical sections.
+\newcommand{\sectionspace}{\addtocounter{seqlevel}{1}}
+
+% Message whose label wraps onto two lines: reserves one extra level above
+% the arrow so the label never touches the previous message.
+\newcommand{\lmess}[3]{\addtocounter{seqlevel}{1}\mess{#1}{#2}{#3}}
+
+\begin{document}
+
+\begin{tabular}{@{}c@{}}
+
+{\fontsize{60}{72}\selectfont\bfseries Overall Study Sequence}\\[8mm]
+{\fontsize{26}{32}\selectfont Human--AI cooperative word game, 4 rounds, recruited via Prolific}\\[22mm]
+
+\begin{sequencediagram}
+
+% Vertical distance between messages (1 level = \unitfactor cm).
+\global\def\unitfactor{1.25}
+
+\tikzset{
+    every node/.append style={
+        font=\Large
+    },
+    % Message labels are placed with "midway": let them wrap and centre.
+    midway/.append style={
+        text width=14cm,
+        align=center
+    }
+}
+
+\tikzstyle{inststyle}+=[
+    minimum width=7.2cm,
+    minimum height=1.8cm,
+    fill=blue!4,
+    draw=black!75,
+    line width=1pt,
+    font=\LARGE\bfseries,
+    drop shadow={
+        opacity=0.18,
+        fill=black
+    }
+]
+
+\tikzstyle{blockstyle}+=[
+    font=\LARGE\bfseries
+]
+
+\tikzstyle{blockcommentstyle}+=[
+    font=\LARGE
+]
+
+% Lifelines (horizontal distance to the previous lifeline in cm).
+\newinst{pr}{Prolific}
+\newinst[12.5]{p}{Participant}
+\newinst[12.5]{ui}{Streamlit UI}
+\newinst[13.5]{gc}{Application \& Game Logic}
+\newinst[13.5]{ai}{AI Module}
+\newinst[13.5]{db}{Storage Module}
+
+% =========================================================
+% Entry from Prolific
+% =========================================================
+
+\mess{p}{Start study on Prolific}{pr}
+
+\lmess{pr}{Open study link with Prolific participant study and session IDs}{ui}
+
+\lmess{ui}{Create session ID and read the Prolific IDs from the link}{gc}
+
+\sectionspace
+
+% =========================================================
+% Information sheet and consent
+% =========================================================
+
+\mess{ui}{Show information sheet and consent form}{p}
+
+\begin{sdblock}[red!4]{alt}{Participant does not consent}
+
+    \lmess{p}{Close the browser tab and nothing is stored}{ui}
+
+    \lmess{p}{Return submission with Stop without completing}{pr}
+
+\end{sdblock}
+
+\begin{sdblock}[green!4]{alt}{Participant consents}
+
+    \mess{p}{Tick consent box and press I agree}{ui}
+
+\end{sdblock}
+
+\sectionspace
+
+% =========================================================
+% Game guide
+% =========================================================
+
+\lmess{ui}{Show game guide with rules roles time limits scoring and the no AI tools rule}{p}
+
+\mess{p}{Start}{ui}
+
+\sectionspace
+
+% =========================================================
+% Participant profile and counterbalanced assignment
+% =========================================================
+
+\lmess{ui}{Show profile form with demographics and attention check 1}{p}
+
+\mess{p}{Submit profile}{ui}
+
+\mess{ui}{Register participant}{gc}
+
+\lmess{gc}{Allocate the least filled of 16 counterbalancing cells}{db}
+
+\lmess{db}{Return condition starting role and board order from the Williams Latin square}{gc}
+
+\lmess{gc}{Store session profile consent time and Prolific IDs}{db}
+
+\sectionspace
+
+% =========================================================
+% Tutorial (two practice rounds)
+% =========================================================
+
+\begin{sdblock}[cyan!4]{seq}{Tutorial: two practice rounds on a 6-card board}
+
+    \lmess{ui}{Practice 1 as guesser shows the fixed clue Pet for 2 cards}{p}
+
+    \lmess{p}{Write rationale and select 2 cards or skip to get a repair clue}{ui}
+
+    \mess{ui}{Show practice 1 result}{p}
+
+    \lmess{ui}{Practice 2 as clue-giver requests clue number and intended cards}{p}
+
+    \mess{p}{Submit practice clue}{ui}
+
+    \lmess{ui}{Show simulated AI guesses and practice 2 result}{p}
+
+    \mess{ui}{Store tutorial progress}{db}
+
+\end{sdblock}
+
+\sectionspace
+
+% =========================================================
+% Four-round game loop
+% =========================================================
+
+\begin{sdblock}[blue!3]{loop}{Rounds 1--4; roles alternate every round}
+
+    \lmess{gc}{Set role and load the next fixed board B01 to B04 in Latin square order}{ui}
+
+    \lmess{ui}{Show board with 5 targets 9 neutral 2 bombs and role turns skips points stars}{p}
+
+    \mess{gc}{Log round start}{db}
+
+    \sectionspace
+
+    % =====================================================
+    % Turn loop
+    % =====================================================
+
+    \begin{sdblock}[green!3]{loop}{Until all 5 targets are found, a bomb is selected, 3 turns are completed, or the round is lost on time}
+
+        % =================================================
+        % Human clue-giver, AI guesser
+        % =================================================
+
+        \begin{sdblock}[orange!5]{alt}{Human is clue-giver, AI is guesser}
+
+            \begin{sdblock}[yellow!8]{opt}{AI skipped the previous human clue}
+
+                \lmess{ui}{Remind the human of their own unresolved intended cards as an optional suggestion}{p}
+
+            \end{sdblock}
+
+            \lmess{ui}{Request one word clue number N intended cards expected AI guesses and expected understanding 1 to 5}{p}
+
+            \lmess{ui}{Request a 3 to 20 word link explanation with a 120 second timer}{p}
+
+            \mess{p}{Submit clue-giver inputs}{ui}
+
+            \lmess{ui}{Validate inputs and request the AI guess}{gc}
+
+            \lmess{gc}{Guess prompt with board history and condition context}{ai}
+
+            \lmess{ai}{Return N guesses or a partial or full skip with the cards it thinks were meant}{gc}
+
+            \lmess{gc}{Preview AI guesses in the History panel}{ui}
+
+            \mess{ui}{Show preview}{p}
+
+            \mess{p}{Press Save this turn}{ui}
+
+            \begin{sdblock}[yellow!8]{opt}{AI selected a neutral card and no bomb}
+
+                \lmess{gc}{Ask which other cards the AI would choose instead}{ai}
+
+                \mess{ai}{Return replacement cards}{gc}
+
+            \end{sdblock}
+
+        \end{sdblock}
+
+        \sectionspace
+
+        % =================================================
+        % AI clue-giver, human guesser
+        % =================================================
+
+        \begin{sdblock}[orange!5]{alt}{AI is clue-giver, human is guesser}
+
+            \lmess{p}{Press Ask AI for a clue in round 1 only and automatic later}{ui}
+
+            \mess{ui}{Request AI clue}{gc}
+
+            \begin{sdblock}[yellow!8]{opt}{Human skipped the previous AI clue}
+
+                \lmess{gc}{Repair hint asks the AI to strongly consider the unresolved targets but other targets are allowed}{ai}
+
+            \end{sdblock}
+
+            \lmess{gc}{Clue prompt with board history and condition context}{ai}
+
+            \lmess{ai}{Return clue N intended cards expected guesses and hidden reasoning}{gc}
+
+            \mess{gc}{Send clue and N}{ui}
+
+            \lmess{ui}{Show clue and request a 3 to 30 word rationale then N cards with a 90 second timer}{p}
+
+            \lmess{p}{Submit rationale and selected cards or press Skip}{ui}
+
+            \begin{sdblock}[yellow!8]{opt}{Full or partial skip}
+
+                \lmess{ui}{Ask which remaining cards the AI meant}{p}
+
+                \mess{p}{Submit skip interpretation}{ui}
+
+            \end{sdblock}
+
+            \lmess{gc}{Request a short explanation of the AI clue}{ai}
+
+            \mess{ai}{Return clue explanation}{gc}
+
+        \end{sdblock}
+
+        \sectionspace
+
+        % =================================================
+        % Evaluation, points and storage
+        % =================================================
+
+        \lmess{ui}{Evaluate cards as target neutral or bomb which ends the round or as skip}{gc}
+
+        \lmess{gc}{Log turn with points 2 for the intended card 1 for another target and 0 for neutral or bomb}{db}
+
+        \sectionspace
+
+        % =================================================
+        % Post-turn reflection
+        % =================================================
+
+        \lmess{ui}{Show turn result and points and in the adaptive condition the AI clue explanation}{p}
+
+        \lmess{ui}{Ask understanding rating 1 to 5 and replacement cards if the human chose a neutral card}{p}
+
+        \mess{p}{Submit reflection}{ui}
+
+        \mess{ui}{Log reflection}{db}
+
+        \sectionspace
+
+        % =================================================
+        % Decision timeout
+        % =================================================
+
+        \begin{sdblock}[red!4]{opt}{Decision timer runs out}
+
+            \lmess{gc}{First clue-giver timeout per round is free and later ones use a turn}{ui}
+
+            \lmess{gc}{Guesser timeout uses a skip and with no skips left a final 30 seconds then the round is lost}{ui}
+
+            \mess{gc}{Log timeout}{db}
+
+        \end{sdblock}
+
+        \sectionspace
+
+        % =================================================
+        % Experimental condition (applies to every AI prompt)
+        % =================================================
+
+        \begin{sdblock}[violet!5]{alt}{Condition context in every AI prompt}
+
+            \lmess{gc}{Adaptive adds intentions expected guesses rationales ratings reflections and teammate memory}{ai}
+
+            \lmess{gc}{Baseline uses game facts only such as clues numbers guesses and outcomes}{ai}
+
+        \end{sdblock}
+
+    \end{sdblock}
+
+    \sectionspace
+
+    % =====================================================
+    % End of round
+    % =====================================================
+
+    \lmess{gc}{Store round score star round medal end reason and duration}{db}
+
+    \mess{gc}{Request end of round reflection}{ai}
+
+    \mess{ai}{Return reflection}{gc}
+
+    \lmess{ui}{Show round summary and history with the AI reflection only in the adaptive condition}{p}
+
+    \lmess{ui}{Request end of round feedback as a message to the AI or as own reflection in baseline}{p}
+
+    \mess{p}{Submit feedback}{ui}
+
+    \lmess{ui}{Store round turn and board card records}{db}
+
+\end{sdblock}
+
+\sectionspace
+
+% =========================================================
+% Final result and questionnaire
+% =========================================================
+
+\lmess{ui}{Show total score out of 40 stars out of 4 and final medal Bronze 10 Silver 20 Gold 30}{p}
+
+\lmess{ui}{Show final questionnaire with 5 statements and attention check 2}{p}
+
+\mess{p}{Submit questionnaire}{ui}
+
+\mess{ui}{Store questionnaire}{db}
+
+\lmess{gc}{Request private AI self assessment never shown to the participant}{ai}
+
+\mess{ai}{Return self assessment}{gc}
+
+\mess{gc}{Store self assessment}{db}
+
+\sectionspace
+
+% =========================================================
+% Debriefing and completion
+% =========================================================
+
+\lmess{ui}{Show debriefing revealing the assigned condition and the completion code}{p}
+
+\mess{p}{Press Finish study}{ui}
+
+\mess{ui}{Mark session completed}{db}
+
+\lmess{ui}{Show completion code and Return to Prolific button}{p}
+
+\lmess{p}{Redirect to Prolific with the completion code}{pr}
+
+\end{sequencediagram}
+
+\end{tabular}
+
+\end{document}

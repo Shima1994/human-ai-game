@@ -98,7 +98,7 @@ class ParticipantIdAnonymityTests(unittest.TestCase):
         # Let the real initialize_session_log run (this is what actually
         # decides participant_id), but stub out its Postgres calls so the
         # test exercises the real success path without a network round trip.
-        with patch("core.db.allocate_condition", return_value="baseline"), \
+        with patch("core.db.allocate_assignment", return_value=1), \
                 patch("core.db.upsert_row", return_value=None), \
                 patch("core.db.insert_row", return_value=None):
             buttons = {b.label: b for b in at.button}
@@ -127,7 +127,7 @@ class ParticipantIdAnonymityTests(unittest.TestCase):
             radio.set_value(radio.options[0])
         at.run()
 
-        with patch("core.db.allocate_condition", return_value="baseline"), \
+        with patch("core.db.allocate_assignment", return_value=1), \
                 patch("core.db.upsert_row", return_value=None), \
                 patch("core.db.insert_row", return_value=None):
             buttons = {b.label: b for b in at.button}
@@ -201,6 +201,66 @@ class TurnResultPopupSkipInfoTests(unittest.TestCase):
         text = _all_markdown_text(at)
         self.assertNotIn("Guesser thought", text)
         self.assertNotIn("I thought it meant something else entirely.", text)
+
+
+class HumanClueRepairReminderTests(unittest.TestCase):
+    """After the AI skips a human clue, the next clue-giving turn shows a
+    neutral reminder naming the participant's own unresolved intended
+    cards -- a nudge, not a requirement."""
+
+    def _clue_screen_after_ai_skip(self, intended):
+        at = _fresh_app()
+        at.session_state["consent_given"] = True
+        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
+        at.session_state["started"] = True
+        at.session_state["participant_id"] = "participant_test0005"
+        at.session_state["nickname"] = "Test"
+        at.session_state["tutorial_completed"] = True
+        at.session_state["game_over"] = False
+        at.session_state["condition"] = "baseline"
+        at.session_state["condition_assigned"] = True
+        at.session_state["round"] = 1
+        at.session_state["starting_role"] = "human_clue"
+        at.session_state["board"] = None
+        at.run()
+        targets = list(at.session_state["target_words"])
+        at.session_state["interaction_history"] = [
+            {
+                "turn": 1,
+                "clue_giver": "human",
+                "guesser": "ai",
+                "hint": "test",
+                "hint_number": 1,
+                "intended_targets": [targets[0]] if intended else [],
+                "outcome": "skip",
+                "skipped": True,
+                "skipped_by": "ai",
+                "repair_required": True,
+                "guesses": [],
+                "correct_guesses": [],
+                "neutral_guesses": [],
+                "bomb_guesses": [],
+                "bomb_hit": False,
+                "timed_out": False,
+            }
+        ]
+        with patch("ui.screens.log_event"):
+            at.run()
+        return at, targets
+
+    def test_reminder_names_the_unresolved_intended_card(self):
+        at, targets = self._clue_screen_after_ai_skip(intended=True)
+        self.assertFalse(at.exception)
+        infos = " ".join(info.value for info in at.info)
+        self.assertIn("The AI skipped your last clue", infos)
+        self.assertIn(targets[0], infos)
+        self.assertIn("free to choose any target cards", infos)
+
+    def test_no_reminder_without_unresolved_cards(self):
+        at, _ = self._clue_screen_after_ai_skip(intended=False)
+        self.assertFalse(at.exception)
+        infos = " ".join(info.value for info in at.info)
+        self.assertNotIn("The AI skipped your last clue", infos)
 
 
 class GuesserSkipButtonGatingTests(unittest.TestCase):
@@ -462,7 +522,7 @@ class DebriefingGateOrderingTests(unittest.TestCase):
         "Finish study" moves on to a final thank-you screen. A participant
         who didn't copy the code down on the debriefing page must still be
         able to see it here, since this is the screen they're actually
-        looking at when they go paste it into Prolific/MTurk."""
+        looking at when they go paste it into Prolific."""
         at = _fresh_app()
         self._base_state(at)
         at.session_state["post_game_questionnaire_submitted"] = True
@@ -473,6 +533,26 @@ class DebriefingGateOrderingTests(unittest.TestCase):
         self.assertFalse(at.exception)
         rendered = _all_markdown_text(at)
         self.assertIn("TESTCODE1", rendered)
+
+    def test_prolific_participant_gets_return_to_prolific_link(self):
+        at = _fresh_app()
+        self._base_state(at)
+        at.session_state["prolific_pid"] = "5f1a2b3c4d5e6f7a8b9c0d1e"
+        at.session_state["post_game_questionnaire_submitted"] = True
+        at.session_state["debriefing_acknowledged"] = True
+        at.session_state["remote_log_status"] = ""
+        at.run()
+
+        self.assertFalse(at.exception)
+        link_urls = [
+            element.proto.url
+            for element in at.main
+            if element.type == "link_button"
+        ]
+        self.assertIn(
+            "https://app.prolific.com/submissions/complete?cc=TESTCODE1",
+            link_urls,
+        )
 
 
 if __name__ == "__main__":

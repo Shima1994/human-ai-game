@@ -97,6 +97,19 @@ CREATE INDEX IF NOT EXISTS idx_rounds_session ON rounds (session_id);
 CREATE INDEX IF NOT EXISTS idx_turns_session ON turns (session_id, round_number);
 CREATE INDEX IF NOT EXISTS idx_board_cards_session ON board_cards (session_id, round_number);
 CREATE INDEX IF NOT EXISTS idx_events_session ON events (session_id);
+
+-- One row per registered session: the counterbalancing cell it was given
+-- (see core.assignment). Written inside the same locked transaction that
+-- chooses the cell, so concurrent registrations always see each other.
+CREATE TABLE IF NOT EXISTS assignments (
+    session_id TEXT PRIMARY KEY,
+    cell_index INTEGER NOT NULL,
+    condition TEXT NOT NULL,
+    starting_role TEXT NOT NULL,
+    board_order TEXT NOT NULL,
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_events_session_time ON events (session_id, timestamp);
 """
 
 
@@ -244,29 +257,64 @@ def insert_rows(table, columns, rows, conflict_columns=None):
         conn.close()
 
 
-def allocate_condition(valid_conditions, default_condition):
-    """Atomically alternate condition and return the assigned value.
+_CELL_OCCUPANCY_SQL = """
+SELECT a.cell_index, COUNT(*)
+FROM assignments a
+WHERE EXISTS (
+        SELECT 1 FROM sessions s WHERE s.session_id = a.session_id AND s.completed
+    )
+   OR GREATEST(
+        a.assigned_at,
+        COALESCE(
+            (SELECT MAX(e.timestamp) FROM events e WHERE e.session_id = a.session_id),
+            a.assigned_at
+        )
+    ) > now() - make_interval(mins => %s)
+GROUP BY a.cell_index
+"""
 
-    Uses a single row locked with SELECT ... FOR UPDATE inside a transaction,
-    so concurrent registrations are serialized by Postgres itself rather than
-    racing on a shared file or a process-local lock.
+
+def allocate_assignment(session_id, cells, abandoned_after_minutes):
+    """Give this session the least-occupied counterbalancing cell; return its index.
+
+    A cell is occupied by sessions that completed or are still active (any
+    logged activity within abandoned_after_minutes). Ties go to the lowest
+    cell index, so cells fill in a fixed order. The condition_counter row is
+    locked FOR UPDATE for the whole transaction, which serializes concurrent
+    registrations: each one sees the cells already handed out to the others.
+    Calling again for the same session returns its existing cell.
     """
     ensure_schema()
     conn = get_connection()
     try:
         with conn:
             with conn.cursor() as cur:
+                cur.execute("SELECT id FROM condition_counter WHERE id = 1 FOR UPDATE")
                 cur.execute(
-                    "SELECT assigned_count FROM condition_counter WHERE id = 1 FOR UPDATE"
+                    "SELECT cell_index FROM assignments WHERE session_id = %s",
+                    [session_id],
                 )
-                (count,) = cur.fetchone()
-                ordered_conditions = [default_condition] + sorted(
-                    c for c in valid_conditions if c != default_condition
+                existing = cur.fetchall()
+                if existing:
+                    return int(existing[0][0])
+                cur.execute(_CELL_OCCUPANCY_SQL, [int(abandoned_after_minutes)])
+                occupancy = {int(index): int(count) for index, count in cur.fetchall()}
+                cell = min(cells, key=lambda c: (occupancy.get(c["cell_index"], 0), c["cell_index"]))
+                cur.execute(
+                    "INSERT INTO assignments "
+                    "(session_id, cell_index, condition, starting_role, board_order) "
+                    "VALUES (%s, %s, %s, %s, %s)",
+                    [
+                        session_id,
+                        cell["cell_index"],
+                        cell["condition"],
+                        cell["starting_role"],
+                        json.dumps(cell["round_board_order"]),
+                    ],
                 )
-                condition = ordered_conditions[count % len(ordered_conditions)]
                 cur.execute(
                     "UPDATE condition_counter SET assigned_count = assigned_count + 1 WHERE id = 1"
                 )
-        return condition
+        return cell["cell_index"]
     finally:
         conn.close()
