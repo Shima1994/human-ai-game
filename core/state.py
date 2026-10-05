@@ -159,6 +159,7 @@ def init_session_state():
         "clue_timer_timeout_consumed": False,
         "consent_given": False,
         "consent_timestamp": "",
+        "debug_shortcut_used": False,
         "debriefing_acknowledged": False,
         "debriefing_acknowledged_at": "",
         "completion_code": "",

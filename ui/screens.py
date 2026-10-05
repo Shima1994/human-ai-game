@@ -89,6 +89,7 @@ from ui.components import (
     render_round_chip,
     render_top_status,
     render_tutorial_status,
+    role_badge_html,
 )
 from ui.game_guide import (
     CLUE_GIVER_INTRO,
@@ -290,7 +291,7 @@ def screen_welcome():
         with st.expander(
             "**2**　Your Role", expanded=True, icon=":material/switch_account:"
         ):
-            st.markdown(GUIDE_ROLE)
+            st.markdown(_guide_role_with_badges(), unsafe_allow_html=True)
         with st.expander(
             "**3**　When You Are the Clue-Giver",
             expanded=True,
@@ -352,6 +353,16 @@ def screen_welcome():
             ):
                 st.session_state.started = True
                 st.rerun()
+
+
+def _guide_role_with_badges():
+    """GUIDE_ROLE as written, with each role followed by the badge that marks
+    it in the status bar during the game."""
+    badged = {
+        "- Clue-Giver": f"- Clue-Giver&nbsp;&nbsp;{role_badge_html('clue')}",
+        "- Guesser": f"- Guesser&nbsp;&nbsp;{role_badge_html('guess')}",
+    }
+    return "\n".join(badged.get(line.strip(), line) for line in GUIDE_ROLE.splitlines())
 
 
 def _reset_tutorial_practice():
@@ -1065,6 +1076,7 @@ def render_debug_skip_to_round_one():
     this function is still in the file -- remove it once testing is done,
     or just leave DEBUG_MODE off."""
     if st.button("Skip to Round 1 (debug)", key="debug_skip_to_round_one"):
+        st.session_state.debug_shortcut_used = True
         st.session_state.consent_given = True
         st.session_state.consent_timestamp = _now_iso()
         st.session_state.started = True

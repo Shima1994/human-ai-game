@@ -270,9 +270,26 @@ def render_overview_board_preview():
     )
 
 
+# The role badge text shown in the in-game status bar, reused by the game
+# guide so participants recognise the same badge before they play.
+ROLE_BADGE_LABELS = {
+    "clue": "You're giving the clue",
+    "guess": "AI clues — you guess",
+}
+
+
+def role_badge_html(role):
+    """The status-bar role badge in its fixed in-game colour for that role
+    (amber = clue-giver, teal = guesser), independent of the page accent."""
+    return (
+        f'<span class="role-badge role-{role}"><span class="role-dot"></span>'
+        f"{escape(ROLE_BADGE_LABELS[role])}</span>"
+    )
+
+
 def render_top_status():
     is_clue_giver = st.session_state.role == "human_clue"
-    role_label = "You're giving the clue" if is_clue_giver else "AI clues — you guess"
+    role_label = ROLE_BADGE_LABELS["clue"] if is_clue_giver else ROLE_BADGE_LABELS["guess"]
     role_variant = "human" if is_clue_giver else "ai"
     player_name = (
         st.session_state.get("nickname")

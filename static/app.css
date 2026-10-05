@@ -891,6 +891,18 @@ body:has(.role-marker-clue) .st-key-tutorial_timer_stack .timer-row-inline .time
 body:has(.timer-row) .role-badge {
     display: none;
 }
+/* Fixed-colour variants for the game guide, which has no role accent of
+   its own: the same badge in the colour it has during the game. */
+.role-badge.role-clue {
+    background: var(--role-clue-soft);
+    color: var(--role-clue);
+    border: 1px solid var(--role-clue-soft);
+}
+.role-badge.role-guess {
+    background: var(--role-guess-soft);
+    color: var(--role-guess);
+    border: 1px solid var(--role-guess-soft);
+}
 .role-dot {
     width: 8px;
     height: 8px;

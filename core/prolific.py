@@ -44,7 +44,7 @@ ATTENTION_CHECK_POST_GAME_QUESTION = (
 ATTENTION_CHECK_POST_GAME_ANSWER = 2
 
 
-def _read_setting(name):
+def read_setting(name):
     value = os.getenv(name, "").strip()
     if value:
         return value
@@ -56,7 +56,7 @@ def _read_setting(name):
 
 def prolific_completion_code():
     """The study's 'completed' code from Prolific (blank when not configured)."""
-    return _read_setting("PROLIFIC_COMPLETION_CODE")
+    return read_setting("PROLIFIC_COMPLETION_CODE")
 
 
 def prolific_complete_url(code):
@@ -81,6 +81,30 @@ def prolific_params_from_url():
         "prolific_study_id": _query_param("STUDY_ID"),
         "prolific_session_id": _query_param("SESSION_ID"),
     }
+
+
+RUN_TYPES = ("participant", "pilot", "test")
+
+
+def resolve_run_type(prolific_pid, debug_shortcut_used=False):
+    """Which kind of session this is, so test and pilot data never mix with
+    real participant data. Set RUN_TYPE ("pilot" or "test") as a secret or
+    environment variable to label a whole deployment; otherwise a session
+    is a participant session only when it arrived from Prolific with a PID.
+    The debug shortcut always marks a session as a test."""
+    if debug_shortcut_used:
+        return "test"
+    configured = read_setting("RUN_TYPE").lower()
+    if configured in ("pilot", "test"):
+        return configured
+    return "participant" if prolific_pid else "test"
+
+
+def provisional_analysis_eligible(run_type, completed, attention_failures):
+    """A first, automatic eligibility flag. The final inclusion decision is
+    made at analysis time (attention checks, exceptionally fast completion,
+    technical problems), so analysis may override it."""
+    return bool(run_type == "participant" and completed and attention_failures < 2)
 
 
 def attention_checks_failed(profile_answer, post_game_answer):

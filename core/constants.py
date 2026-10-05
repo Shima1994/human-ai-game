@@ -9,7 +9,7 @@ REFLECTION_MODEL_NAME = "gpt-4o"
 # values to their platform's exact identifiers; blank means unavailable and is
 # preferable to fabricated provenance.
 EXPERIMENT_VERSION = os.getenv("EXPERIMENT_VERSION", "pilot-v1")
-SCHEMA_VERSION = "2.0.0"
+SCHEMA_VERSION = "2.1.0"
 CODE_COMMIT = next(
     (
         os.getenv(name, "").strip()

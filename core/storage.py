@@ -20,7 +20,11 @@ from core.constants import (
     SCHEMA_VERSION,
 )
 from core.game_logic import compute_round_score, get_final_medal
-from core.prolific import attention_checks_failed
+from core.prolific import (
+    attention_checks_failed,
+    provisional_analysis_eligible,
+    resolve_run_type,
+)
 
 
 # Field lists are the canonical schema: every key inside a row's JSONB `data`
@@ -47,6 +51,9 @@ SESSIONS_LOG_FIELDS = [
     "end_time",
     "completed",
     "consent_given",
+    "consent_timestamp",
+    "run_type",
+    "analysis_eligible",
     "total_rounds_planned",
     "total_rounds_completed",
     "total_turns_completed",
@@ -518,6 +525,14 @@ def _session_row(completed=False):
         raise ValueError(f"Unknown completed session stage: {last_completed_stage}")
     if session_end_reason and session_end_reason not in SESSION_END_REASONS:
         raise ValueError(f"Unknown session end reason: {session_end_reason}")
+    run_type = resolve_run_type(
+        st.session_state.get("prolific_pid", ""),
+        st.session_state.get("debug_shortcut_used", False),
+    )
+    attention_failures = attention_checks_failed(
+        st.session_state.get("attention_check_profile_answer", ""),
+        st.session_state.get("attention_check_post_game_answer", ""),
+    )
     return {
         "participant_id": st.session_state.get("participant_id", ""),
         "prolific_pid": st.session_state.get("prolific_pid", ""),
@@ -538,6 +553,11 @@ def _session_row(completed=False):
         "end_time": st.session_state.get("session_end_time", "") if completed else "",
         "completed": bool(completed),
         "consent_given": bool(st.session_state.get("consent_given", False)),
+        "consent_timestamp": st.session_state.get("consent_timestamp", ""),
+        "run_type": run_type,
+        "analysis_eligible": provisional_analysis_eligible(
+            run_type, completed, attention_failures
+        ),
         "total_rounds_planned": N_ROUNDS,
         "total_rounds_completed": total_completed,
         "total_turns_completed": sum(
@@ -559,10 +579,7 @@ def _session_row(completed=False):
         "completion_code": st.session_state.get("completion_code", ""),
         "attention_check_profile_answer": st.session_state.get("attention_check_profile_answer", ""),
         "attention_check_post_game_answer": st.session_state.get("attention_check_post_game_answer", ""),
-        "attention_checks_failed": attention_checks_failed(
-            st.session_state.get("attention_check_profile_answer", ""),
-            st.session_state.get("attention_check_post_game_answer", ""),
-        ),
+        "attention_checks_failed": attention_failures,
         "post_game_i_understood_ai_clues": questionnaire.get("i_understood_ai_clues", ""),
         "post_game_predict_ai_interpretation": questionnaire.get("predict_ai_interpretation", ""),
         "post_game_adapted_to_ai_behavior": questionnaire.get("adapted_to_ai_behavior", ""),
@@ -976,7 +993,14 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "guess_time_sec": _format_optional_float(item.get("guess_time_sec")),
         "hit_rate": _format_optional_float(item.get("hit_rate")),
         "target_yield": item.get("target_yield", ""),
-        "jaccard_alignment": _format_optional_float(item.get("jaccard_alignment")),
+        # No card was selected on a timeout or full skip, so selection
+        # alignment is undefined there: stored empty, never as 0.0, which
+        # would read as "no overlap" in alignment averages.
+        "jaccard_alignment": (
+            ""
+            if action_type in ("timeout", "full_skip")
+            else _format_optional_float(item.get("jaccard_alignment"))
+        ),
         "alignment_status": item.get("alignment_status", ""),
         "error_type": item.get("error_type", "none"),
         "turn_score_delta": item.get("turn_score_delta", ""),

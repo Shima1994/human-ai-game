@@ -105,6 +105,19 @@ class GameGuideTests(unittest.TestCase):
         self.assertIn("expanded=False", screen_source)
         self.assertIn("st.session_state.started = True", screen_source)
 
+    def test_role_section_shows_the_in_game_role_badges(self):
+        from ui.components import ROLE_BADGE_LABELS
+        from ui.screens import _guide_role_with_badges
+
+        rendered = _guide_role_with_badges()
+        self.assertIn('role-badge role-clue', rendered)
+        self.assertIn('role-badge role-guess', rendered)
+        self.assertIn("You&#x27;re giving the clue", rendered)
+        self.assertIn(ROLE_BADGE_LABELS["guess"], rendered)
+        # The guide text itself is unchanged; badges are added only on render.
+        self.assertIn("- Clue-Giver\n", GUIDE_ROLE)
+        self.assertIn("The AI takes the other role.", rendered)
+
     def test_each_guide_section_has_a_distinct_material_icon(self):
         source = Path("ui/screens.py").read_text(encoding="utf-8-sig")
         icons = (
