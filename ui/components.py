@@ -9,9 +9,18 @@ from streamlit_autorefresh import st_autorefresh
 from core.constants import (
     BOARD_SIZE,
     BOMB_COUNT,
+    CLUE_GIVER_TIMER_SECONDS,
+    FINAL_GUESS_TIMER_SECONDS,
+    FINAL_MEDAL_BRONZE_MIN,
+    FINAL_MEDAL_GOLD_MIN,
+    FINAL_MEDAL_SILVER_MIN,
+    GUESSER_TIMER_SECONDS,
     MAX_INTERACTIONS_PER_ROUND,
+    MAX_POSSIBLE_SESSION_SCORE,
     MAX_SKIPS_PER_ROUND,
     N_ROUNDS,
+    POINTS_EXACT_INTENDED_TARGET,
+    POINTS_OTHER_TARGET,
     TARGET_COUNT,
 )
 
@@ -285,6 +294,248 @@ def role_badge_html(role):
         f'<span class="role-badge role-{role}"><span class="role-dot"></span>'
         f"{escape(ROLE_BADGE_LABELS[role])}</span>"
     )
+
+
+# --- Game guide figures -------------------------------------------------
+# Small, static pictures of the real in-game elements (status bar, timer
+# ring, cards, chips), shown next to the guide's unchanged text. They reuse
+# the game's own CSS classes so they always look like the actual game, and
+# every number comes from core.constants. Example words are deliberately not
+# on any real board (see tests/test_game_guide.py). Each figure is built as a
+# single line of HTML: an indented blank line inside st.markdown would start
+# a Markdown code block and print the rest as text.
+
+GUIDE_FIGURE_EXAMPLE_WORDS = (
+    "Apple", "Bread", "Lamp", "Storm", "Guitar", "Kite", "Horse", "Rabbit",
+)
+
+
+def _mmss(seconds):
+    return f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+
+def _guide_figure(body, caption):
+    return (
+        f'<figure class="guide-figure">{body}'
+        f'<figcaption>{escape(caption)}</figcaption></figure>'
+    )
+
+
+def _stat_block(label, value, total, bar_class=""):
+    pct = 0 if not total else round(100 * value / total)
+    return (
+        f'<div class="stat-block"><div class="stat-label">{escape(label)}</div>'
+        f'<div class="stat-value-row"><span class="big">{value}</span><span class="of">/ {total}</span></div>'
+        f'<div class="mini-bar {bar_class}"><span style="width:{pct}%"></span></div></div>'
+    )
+
+
+def guide_status_bar_figure():
+    """The status bar above the board, with example values mid-round."""
+    bar = (
+        '<div class="status-bar guide-status-bar">'
+        '<div class="status-id"><div class="status-avatar">P</div><div>'
+        '<div class="status-name">Player</div>'
+        f'<div class="status-round">Round 2 of {N_ROUNDS}</div></div></div>'
+        '<div class="status-sep"></div><div class="status-stats">'
+        + _stat_block("Targets found", 2, TARGET_COUNT)
+        + _stat_block("Turns used", 1, MAX_INTERACTIONS_PER_ROUND)
+        + _stat_block("Skips left", MAX_SKIPS_PER_ROUND - 1, MAX_SKIPS_PER_ROUND, "warn")
+        + '</div><div class="status-side">'
+        + role_badge_html("guess")
+        + '<div class="medal-cluster"><span class="medal-chip points">6 pts</span>'
+        f'<span class="medal-chip star">&#11088; 1 / {N_ROUNDS}</span></div></div></div>'
+    )
+    return _guide_figure(bar, "During the game, this bar above the board shows your progress in the round.")
+
+
+def guide_skips_figure():
+    """The 'Skips left' counter before and after using one skip."""
+    body = (
+        '<div class="guide-before-after">'
+        + _stat_block("Skips left", MAX_SKIPS_PER_ROUND, MAX_SKIPS_PER_ROUND, "warn")
+        + '<span class="guide-arrow" aria-hidden="true">&#8594;</span>'
+        + _stat_block("Skips left", MAX_SKIPS_PER_ROUND - 1, MAX_SKIPS_PER_ROUND, "warn")
+        + "</div>"
+    )
+    return _guide_figure(body, "Each skip lowers the “Skips left” counter for the round.")
+
+
+def guide_timers_figure():
+    """The countdown ring for each role, plus the final short window."""
+    rings = (
+        ("guess", "", GUESSER_TIMER_SECONDS, "Guesser"),
+        ("clue", "", CLUE_GIVER_TIMER_SECONDS, "Clue-Giver"),
+        ("guess", " final", FINAL_GUESS_TIMER_SECONDS, "Both skips used"),
+    )
+    items = "".join(
+        f'<div class="guide-timer"><span class="timer-pill{extra}" '
+        f'style="--ring-progress: 360deg; --color-primary-strong: var(--role-{role}-strong);">'
+        f'<span class="timer-ring-label">{_mmss(seconds)}</span></span>'
+        f'<span class="guide-timer-label">{escape(label)}</span></div>'
+        for role, extra, seconds, label in rings
+    )
+    return _guide_figure(
+        f'<div class="guide-timers">{items}</div>',
+        "The timer next to the board counts down your time for each decision.",
+    )
+
+
+def guide_scoring_figure():
+    """Points per selected card, the round star, and the final medal scale."""
+    apple, bread, lamp, storm = GUIDE_FIGURE_EXAMPLE_WORDS[:4]
+    cards = (
+        ("word-found", "target", apple, f"+{POINTS_EXACT_INTENDED_TARGET}", "The clue-giver's intended card"),
+        ("word-target", "target", bread, f"+{POINTS_OTHER_TARGET}", "Another target"),
+        ("word-neutral-miss", "neutral", lamp, "0", "Neutral"),
+        ("word-bomb", "bomb", storm, "Round ends", "Bomb"),
+    )
+    card_html = "".join(
+        f'<div class="guide-score-card"><div class="word-card {css}"><div>{word}</div>'
+        f"<div class='card-mark'>{ROLE_MARK[role]}</div></div>"
+        f'<span class="guide-points">{points}</span><span class="guide-score-label">{label}</span></div>'
+        for css, role, word, points, label in cards
+    )
+    star = (
+        '<div class="guide-star-row"><span class="medal-chip star">&#11088; +1</span>'
+        f'<span class="guide-score-label">All {TARGET_COUNT} targets found in a round, no bomb</span></div>'
+    )
+    marks = (
+        ("bronze", "&#129353;", "Bronze", FINAL_MEDAL_BRONZE_MIN),
+        ("silver", "&#129352;", "Silver", FINAL_MEDAL_SILVER_MIN),
+        ("gold", "&#129351;", "Gold", FINAL_MEDAL_GOLD_MIN),
+    )
+    # Icon and name in separate spans so narrow screens can drop the name
+    # and keep the three chips from colliding (see app.css).
+    ticks = "".join(
+        f'<span class="guide-medal-tick" style="left:{100 * score / MAX_POSSIBLE_SESSION_SCORE:.1f}%">'
+        f'<span class="medal-chip {medal}">{icon}<span class="guide-medal-name"> {name}</span></span>'
+        f'<span class="guide-medal-score">{score}+</span></span>'
+        for medal, icon, name, score in marks
+    )
+    scale = (
+        '<div class="guide-medal-scale"><div class="guide-medal-track">'
+        f"{ticks}</div>"
+        f'<div class="guide-medal-ends"><span>0</span><span>{MAX_POSSIBLE_SESSION_SCORE} points</span></div></div>'
+    )
+    return _guide_figure(
+        f'<div class="guide-score-cards">{card_html}</div>{star}{scale}',
+        "Points come from each card your teammate selects; the star and the final medal come from the totals.",
+    )
+
+
+def _guide_card(word, role, css=None, selected=False):
+    """One board card as it looks in the game (role colour and glyph)."""
+    css = css or ROLE_CLASS[role]
+    mark = f"<div class='card-mark'>{ROLE_MARK[role]}</div>" if role else ""
+    ring = " word-selected" if selected else ""
+    return f'<div class="word-card {css}{ring}"><div>{escape(word)}</div>{mark}</div>'
+
+
+def _guide_clue_panel(label, clue, number, role):
+    """The clue panel as shown above the board, in that role's colours."""
+    return (
+        f'<div class="guide-clue-panel" style="--color-primary-soft: var(--role-{role}-soft); '
+        f'--color-primary-strong: var(--role-{role}-strong);">'
+        f'<div class="hint-card"><div class="hint-copy"><div class="hint-label">{escape(label)}</div>'
+        f'<div class="hint-main"><span class="hint-word">{escape(clue.upper())} - {number}</span>'
+        "</div></div></div></div>"
+    )
+
+
+def guide_clue_example_figure():
+    """The guide's own "food - 2" example: one clue pointing at two targets."""
+    apple, bread, lamp, storm, guitar, kite = GUIDE_FIGURE_EXAMPLE_WORDS[:6]
+    cards = (
+        _guide_card(apple, "target", selected=True)
+        + _guide_card(bread, "target", selected=True)
+        + _guide_card(lamp, "neutral")
+        + _guide_card(guitar, "neutral")
+        + _guide_card(kite, "neutral")
+        + _guide_card(storm, "bomb")
+    )
+    return _guide_figure(
+        _guide_clue_panel("Your clue", "food", 2, "clue")
+        + f'<div class="guide-card-row">{cards}</div>',
+        "The clue “food - 2” refers to the two outlined target cards.",
+    )
+
+
+def guide_card_types_figure():
+    """The three card types, each with its in-game colour and glyph."""
+    apple, _bread, lamp, storm = GUIDE_FIGURE_EXAMPLE_WORDS[:4]
+    items = "".join(
+        f'<div class="guide-score-card">{_guide_card(word, role)}'
+        f'<span class="guide-points">{label}</span></div>'
+        for word, role, label in (
+            (apple, "target", "Target"),
+            (lamp, "neutral", "Neutral"),
+            (storm, "bomb", "Bomb"),
+        )
+    )
+    return _guide_figure(
+        f'<div class="guide-score-cards guide-three-cards">{items}</div>',
+        "How each card type looks once it is revealed on the board.",
+    )
+
+
+def guide_ai_clue_figure():
+    """An AI clue as the guesser sees it, with two cards selected."""
+    horse, rabbit = GUIDE_FIGURE_EXAMPLE_WORDS[6:8]
+    lamp, guitar = GUIDE_FIGURE_EXAMPLE_WORDS[2], GUIDE_FIGURE_EXAMPLE_WORDS[4]
+    cards = (
+        _guide_card(horse, "", css="word-hidden", selected=True)
+        + _guide_card(rabbit, "", css="word-hidden", selected=True)
+        + _guide_card(lamp, "", css="word-hidden")
+        + _guide_card(guitar, "", css="word-hidden")
+    )
+    return _guide_figure(
+        _guide_clue_panel("AI clue", "animal", 2, "guess")
+        + f'<div class="guide-card-row guide-card-row-4">{cards}</div>',
+        "The AI’s clue appears above the board; you then select that many cards.",
+    )
+
+
+def guide_history_figure():
+    """One History card, showing only the rows every condition shows (clue,
+    guesses, result) -- the adaptive-only rows are deliberately left out."""
+    horse, rabbit = GUIDE_FIGURE_EXAMPLE_WORDS[6:8]
+    card = (
+        "<div class='history-panel'><div class='history-row history-outcome-correct'>"
+        "<div class='history-row-head'><span class='history-index'>Turn 1</span>"
+        "<span class='history-outcome-badge history-outcome-correct'>Correct</span></div>"
+        "<div class='history-meta'><span>Ai clue</span><span>Human guesser</span></div>"
+        "<div class='history-hint-line'><span class='history-hint'>ANIMAL</span>"
+        "<span class='history-number'>x2</span></div>"
+        "<div class='history-detail'><span class='history-detail-label'>Guesses</span>"
+        "<span class='history-chip-row'>"
+        f"<span class='history-chip correct'>{horse}</span>"
+        f"<span class='history-chip correct'>{rabbit}</span>"
+        "</span></div></div></div>"
+    )
+    return _guide_figure(
+        f'<div class="guide-history">{card}</div>',
+        "Each earlier turn of the round appears as a card like this in the History panel.",
+    )
+
+
+def guide_round_progress_figures():
+    return guide_status_bar_figure() + guide_history_figure()
+
+
+# Figures for the clue-giver steps, keyed by step heading.
+GUIDE_STEP_FIGURES = {
+    "Choose the clue number": guide_clue_example_figure,
+}
+
+GUIDE_SECTION_FIGURES = {
+    "When the AI Is the Clue-Giver": guide_ai_clue_figure,
+    "Targets, Neutral Cards, and Bombs": guide_card_types_figure,
+    "Interactions and Round Limit": guide_round_progress_figures,
+    "Skipping": guide_skips_figure,
+    "Time Limit": guide_timers_figure,
+    "Scoring, Stars, and Medals": guide_scoring_figure,
+}
 
 
 def render_top_status():

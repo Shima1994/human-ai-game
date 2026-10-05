@@ -177,13 +177,6 @@ class RunTypeAndEligibilityTests(unittest.TestCase):
         self.assertEqual(row["run_type"], "test")
         self.assertFalse(row["analysis_eligible"])
 
-    def test_debug_shortcut_session_is_a_test(self):
-        self.state.prolific_pid = "5f1a2b3c4d5e6f7a8b9c0d1e"
-        self.state.debug_shortcut_used = True
-        row = self.row()
-        self.assertEqual(row["run_type"], "test")
-        self.assertFalse(row["analysis_eligible"])
-
     def test_completed_prolific_participant_is_provisionally_eligible(self):
         self.state.prolific_pid = "5f1a2b3c4d5e6f7a8b9c0d1e"
         row = self.row()

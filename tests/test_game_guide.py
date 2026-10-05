@@ -79,11 +79,12 @@ class GameGuideTests(unittest.TestCase):
             "30 seconds to make your guess",
             "except for the first time when this happens",
             "After an Interaction",
-            "2 points when your teammate selects the card you had in mind",
+            "2 points when the guesser selects the card the clue-giver had in mind",
             "1 point for another valid target card",
             "earn a star",
             "final medal",
             "MOST IMPORTANT THINGS TO REMEMBER",
+            "the History panel on the left shows the clues, guesses and results",
         )
         content += "\nMOST IMPORTANT THINGS TO REMEMBER"
         for phrase in required_phrases:
@@ -117,6 +118,80 @@ class GameGuideTests(unittest.TestCase):
         # The guide text itself is unchanged; badges are added only on render.
         self.assertIn("- Clue-Giver\n", GUIDE_ROLE)
         self.assertIn("The AI takes the other role.", rendered)
+
+    def test_every_guide_figure_belongs_to_an_existing_section(self):
+        from ui.components import GUIDE_SECTION_FIGURES
+
+        titles = {title for title, _ in GUIDE_SECTIONS}
+        from ui.components import GUIDE_STEP_FIGURES
+
+        self.assertEqual(
+            set(GUIDE_SECTION_FIGURES),
+            {
+                "When the AI Is the Clue-Giver",
+                "Targets, Neutral Cards, and Bombs",
+                "Interactions and Round Limit",
+                "Skipping",
+                "Time Limit",
+                "Scoring, Stars, and Medals",
+            },
+        )
+        self.assertTrue(set(GUIDE_SECTION_FIGURES) <= titles)
+        step_headings = {heading for heading, _ in CLUE_GIVER_STEPS}
+        self.assertTrue(set(GUIDE_STEP_FIGURES) <= step_headings)
+        for figure in list(GUIDE_SECTION_FIGURES.values()) + list(GUIDE_STEP_FIGURES.values()):
+            html = figure()
+            self.assertTrue(html.startswith('<figure class="guide-figure">'))
+            # One line: an indented blank line would turn the rest into a
+            # Markdown code block.
+            self.assertNotIn("\n", html)
+
+    def test_guide_figure_numbers_match_the_game_rules(self):
+        from core.constants import (
+            CLUE_GIVER_TIMER_SECONDS,
+            FINAL_GUESS_TIMER_SECONDS,
+            GUESSER_TIMER_SECONDS,
+            MAX_POSSIBLE_SESSION_SCORE,
+        )
+        from ui.components import guide_scoring_figure, guide_timers_figure
+
+        def mmss(seconds):
+            return f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+        timers = guide_timers_figure()
+        for seconds in (GUESSER_TIMER_SECONDS, CLUE_GIVER_TIMER_SECONDS, FINAL_GUESS_TIMER_SECONDS):
+            self.assertIn(mmss(seconds), timers)
+        scoring = guide_scoring_figure()
+        for text in ("+2", "+1", "10+", "20+", "30+", f"{MAX_POSSIBLE_SESSION_SCORE} points"):
+            self.assertIn(text, scoring)
+
+    def test_guide_figures_never_show_a_real_board_word(self):
+        """No word anywhere in a guide figure (cards, clues, labels or
+        captions) may be a card on one of the real boards, so the guide
+        can't hint at any real target, neutral or bomb."""
+        import html
+        import re
+
+        from core.words import ROUND_BOARDS
+        from ui.components import GUIDE_SECTION_FIGURES, GUIDE_STEP_FIGURES
+        from ui.screens import _guide_role_with_badges
+
+        board_words = {
+            word.lower()
+            for board in ROUND_BOARDS.values()
+            for role in ("target", "neutral", "bomb")
+            for word, _ in board[role]
+        }
+        figures = [
+            figure()
+            for figure in list(GUIDE_SECTION_FIGURES.values()) + list(GUIDE_STEP_FIGURES.values())
+        ] + [_guide_role_with_badges()]
+        shown = {
+            word.lower()
+            for figure in figures
+            for word in re.findall(r"[A-Za-z]+", html.unescape(re.sub(r"<[^>]+>", " ", figure)))
+        }
+        self.assertEqual(shown & board_words, set())
 
     def test_each_guide_section_has_a_distinct_material_icon(self):
         source = Path("ui/screens.py").read_text(encoding="utf-8-sig")

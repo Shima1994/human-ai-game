@@ -19,7 +19,6 @@ from core.ai_service import (
 from core.constants import (
     AI_API_TIMEOUT_SECONDS,
     CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND,
-    DEBUG_MODE,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_POSSIBLE_SESSION_SCORE,
     MAX_SKIPS_PER_ROUND,
@@ -76,6 +75,8 @@ from core.prolific import (
 from core.validation import validate_general_link, validate_guess_rationale
 from ui.components import (
     FINAL_MEDAL_LABELS,
+    GUIDE_SECTION_FIGURES,
+    GUIDE_STEP_FIGURES,
     RATING_OPTIONS,
     render_board,
     render_board_legend,
@@ -167,22 +168,10 @@ ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
 def _render_logo_row():
     """The university/COLAPS logo pair shown at the top of the consent,
-    game guide, and participant profile pages -- with the DEBUG_MODE-only
-    "Skip to Round 1" shortcut tucked between them (see
-    render_debug_skip_to_round_one) instead of its own separate row, which
-    left a whole extra band of empty space above the page's real content."""
-    show_debug = DEBUG_MODE and not st.session_state.get("tutorial_completed")
-    if show_debug:
-        university_col, debug_col, colaps_col = st.columns(
-            [1, 0.6, 1], gap="large", vertical_alignment="center"
-        )
-    else:
-        university_col, colaps_col = st.columns(2, gap="large", vertical_alignment="center")
+    game guide, and participant profile pages."""
+    university_col, colaps_col = st.columns(2, gap="large", vertical_alignment="center")
     with university_col:
         st.image(str(ASSETS_DIR / "university_duisburg_essen.png"), width=190)
-    if show_debug:
-        with debug_col:
-            render_debug_skip_to_round_one()
     with colaps_col:
         st.image(str(ASSETS_DIR / "colaps.png"), width=180)
 
@@ -311,6 +300,9 @@ def screen_welcome():
                     with content_col:
                         st.markdown(f"#### {step_heading}")
                         st.markdown(step_content)
+                        step_figure = GUIDE_STEP_FIGURES.get(step_heading)
+                        if step_figure:
+                            st.markdown(step_figure(), unsafe_allow_html=True)
             # Plain text, not st.success() -- the green "success" alert had
             # no actual success to report at this point (just reading the
             # guide), it was only ever borrowed for its visual weight.
@@ -336,6 +328,9 @@ def screen_welcome():
                 icon=icon,
             ):
                 st.markdown(content)
+                figure = GUIDE_SECTION_FIGURES.get(title)
+                if figure:
+                    st.markdown(figure(), unsafe_allow_html=True)
 
         with st.container(key="guide_reminders"):
             st.markdown(
@@ -1066,25 +1061,6 @@ def _anonymous_participant_id():
     session_id = str(st.session_state.get("session_id", "")).replace("-", "")
     suffix = session_id[-8:] if session_id else "unknown"
     return f"participant_{suffix}"
-
-
-def render_debug_skip_to_round_one():
-    """DEBUG_MODE-only shortcut for repeated local testing: one click past
-    consent, the profile form, and both tutorial rounds, straight into
-    round 1 of the real game. DEBUG_MODE is False for the actual study, so
-    this is never reachable by a real participant regardless of whether
-    this function is still in the file -- remove it once testing is done,
-    or just leave DEBUG_MODE off."""
-    if st.button("Skip to Round 1 (debug)", key="debug_skip_to_round_one"):
-        st.session_state.debug_shortcut_used = True
-        st.session_state.consent_given = True
-        st.session_state.consent_timestamp = _now_iso()
-        st.session_state.started = True
-        if not st.session_state.get("participant_id"):
-            if not initialize_session_log(_anonymous_participant_id()):
-                return
-        st.session_state.tutorial_completed = True
-        st.rerun()
 
 
 def _display_player_name():

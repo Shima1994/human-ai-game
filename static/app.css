@@ -3475,3 +3475,185 @@ div[data-testid="stAlert"] {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 }
+
+/* ---------------------------------------------------------------------
+   Game guide figures (see GUIDE_SECTION_FIGURES in ui/components.py):
+   small static copies of in-game elements shown under the guide text.
+   --------------------------------------------------------------------- */
+.guide-figure {
+    margin: 0.9rem 0 0.2rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--card-surface);
+}
+.guide-figure figcaption {
+    margin-top: 0.65rem;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+}
+.guide-figure .status-bar.guide-status-bar {
+    margin: 0;
+}
+.guide-before-after {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+}
+.guide-before-after .stat-block {
+    min-width: 120px;
+}
+.guide-arrow {
+    font-size: 1.4rem;
+    color: var(--color-text-muted);
+}
+.guide-timers {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 2rem;
+}
+.guide-timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+.guide-timer .timer-pill {
+    width: 92px;
+    height: 92px;
+}
+/* The real final window pulses; a still picture is enough here. */
+.guide-timer .timer-pill.final {
+    animation: none;
+}
+.guide-timer-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+.guide-score-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+.guide-score-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    text-align: center;
+}
+.guide-score-card .word-card {
+    width: 100%;
+    height: 64px;
+    min-height: 64px;
+    margin-bottom: 0.1rem;
+}
+.guide-points {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--color-heading);
+}
+.guide-score-label {
+    font-size: 0.76rem;
+    color: var(--color-text-muted);
+}
+.guide-star-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
+.guide-medal-scale {
+    margin-top: 0.4rem;
+    padding: 0 1.6rem;
+}
+.guide-medal-track {
+    position: relative;
+    height: 8px;
+    margin-top: 2.6rem;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, var(--color-border-strong), rgba(200, 128, 21, 0.45));
+}
+.guide-medal-tick {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    background: var(--color-text-muted);
+}
+.guide-medal-tick .medal-chip {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+.guide-medal-score {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+}
+.guide-medal-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+}
+.medal-chip.bronze {
+    background: rgba(166, 96, 43, 0.18);
+    color: #6b3a14;
+}
+.guide-history {
+    max-width: 300px;
+}
+.guide-clue-panel {
+    margin-bottom: 0.75rem;
+}
+.guide-clue-panel .hint-card {
+    margin: 0;
+}
+.guide-card-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+.guide-card-row-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.guide-three-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 640px;
+}
+.guide-card-row .word-card {
+    height: 64px;
+    min-height: 64px;
+    margin-bottom: 0;
+}
+@media (max-width: 640px) {
+    .guide-score-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .guide-three-cards {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .guide-card-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .guide-card-row-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .guide-timers {
+        gap: 1rem;
+    }
+    .guide-medal-name {
+        display: none;
+    }
+}

@@ -149,7 +149,9 @@ A round can end earlier if:
 - all 5 target cards are found, or
 - a bomb card is selected.
 
-Otherwise, the round ends when the maximum of 3 completed turns has been reached.""",
+Otherwise, the round ends when the maximum of 3 completed turns has been reached.
+
+During each round, the History panel on the left shows the clues, guesses and results of the earlier turns in that round.""",
     ),
     (
         "Skipping",
@@ -193,7 +195,7 @@ Pasting text into the game is disabled. Please type all your answers yourself.""
         "Scoring, Stars, and Medals",
         """Score points by finding target cards together:
 
-- 2 points when your teammate selects the card you had in mind.
+- 2 points when the guesser selects the card the clue-giver had in mind.
 - 1 point for another valid target card.
 - Neutral cards do not add points.
 - A bomb card ends the round immediately.
@@ -219,7 +221,7 @@ GUIDE_REMINDERS = """
 - You have a maximum of 3 completed interactions per round.
 - You may use Skip up to 2 times per round.
 - Avoid bomb cards — selecting one ends the round immediately.
-- Finding your teammate's exact intended card is worth more than finding any other target card.
+- Finding the clue-giver's intended card is worth more than finding any other target card.
 - Complete a round with all 5 targets and no bomb to earn a star.
 - Answer reflection questions based on your genuine experience.
 - Play on your own: using AI tools such as ChatGPT is not allowed.

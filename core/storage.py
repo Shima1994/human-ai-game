@@ -525,10 +525,7 @@ def _session_row(completed=False):
         raise ValueError(f"Unknown completed session stage: {last_completed_stage}")
     if session_end_reason and session_end_reason not in SESSION_END_REASONS:
         raise ValueError(f"Unknown session end reason: {session_end_reason}")
-    run_type = resolve_run_type(
-        st.session_state.get("prolific_pid", ""),
-        st.session_state.get("debug_shortcut_used", False),
-    )
+    run_type = resolve_run_type(st.session_state.get("prolific_pid", ""))
     attention_failures = attention_checks_failed(
         st.session_state.get("attention_check_profile_answer", ""),
         st.session_state.get("attention_check_post_game_answer", ""),

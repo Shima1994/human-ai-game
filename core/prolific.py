@@ -86,14 +86,11 @@ def prolific_params_from_url():
 RUN_TYPES = ("participant", "pilot", "test")
 
 
-def resolve_run_type(prolific_pid, debug_shortcut_used=False):
+def resolve_run_type(prolific_pid):
     """Which kind of session this is, so test and pilot data never mix with
     real participant data. Set RUN_TYPE ("pilot" or "test") as a secret or
     environment variable to label a whole deployment; otherwise a session
-    is a participant session only when it arrived from Prolific with a PID.
-    The debug shortcut always marks a session as a test."""
-    if debug_shortcut_used:
-        return "test"
+    is a participant session only when it arrived from Prolific with a PID."""
     configured = read_setting("RUN_TYPE").lower()
     if configured in ("pilot", "test"):
         return configured
