@@ -22,12 +22,23 @@ def _token_variants(token):
     return variants
 
 
+# Everyday words that merely start with a short board word ("Car", "Idea")
+# but name a different thing. "card"/"cards" matter most: the game itself
+# calls the board items cards, so participants use the word naturally.
+NOT_BOARD_WORD_MENTIONS = frozenset({
+    "card", "cards",
+    "care", "cares", "cared", "caring", "careful", "carefully",
+    "carry", "carries", "career", "careers",
+    "ideal", "ideally", "ideals",
+})
+
+
 def mentions_board_word(text, board_words):
     if not str(text or "").strip():
         return False
 
     explanation_tokens = normalize_words(text)
-    explanation_token_set = set(explanation_tokens)
+    explanation_token_set = set(explanation_tokens) - NOT_BOARD_WORD_MENTIONS
     explanation_phrase = " ".join(explanation_tokens)
 
     for board_word in board_words or []:

@@ -51,7 +51,7 @@ Baseline prompt construction uses dedicated fact-only history formatters. Intend
 
 ### AI clue-giver / human guesser
 
-- In round 1, the participant presses **Ask AI for a clue**, giving them time to inspect the initial board.
+- On the first turn of every AI-clue round, the participant presses **Ask AI for a clue**, giving them time to inspect the new board before the timer starts; later turns of the round get their clue automatically.
 - In later rounds, AI clues are generated automatically when the screen loads.
 - Before the board unlocks, the participant rates how well they understand the AI's clue and writes a 3–30 word English rationale.
 - After the turn, the participant rates the shared understanding in both directions: how well they understood the AI, and how well they think the AI understood them.

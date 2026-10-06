@@ -41,6 +41,27 @@ class GuessRationaleValidationTests(unittest.TestCase):
             (True, ""),
         )
 
+    def test_allows_the_word_card_when_car_is_on_the_board(self):
+        # Reported in testing: "card is hard" was rejected as naming "Car".
+        board = ["Car", "Idea", "Dog", "Apple"]
+        for text in (
+            "i dont know my hint is good or not but card is hard",
+            "These cards need careful thought",
+            "An ideal match for daily life",
+        ):
+            self.assertEqual(validate_guess_rationale(text, board), (True, ""), text)
+
+    def test_still_rejects_car_itself_and_its_plural(self):
+        board = ["Car", "Dog", "Apple"]
+        self.assertEqual(
+            validate_guess_rationale("The car fits with the road", board),
+            (False, "board_word"),
+        )
+        self.assertEqual(
+            validate_guess_rationale("Both cars go on the road", board),
+            (False, "board_word"),
+        )
+
     def test_rejects_word_count_and_language_violations(self):
         self.assertEqual(
             validate_guess_rationale("household pets", self.BOARD),

@@ -229,6 +229,40 @@ class DurablePersistenceTests(unittest.TestCase):
             storage.log_round("p1")  # must not raise despite the DB error
         self.assertEqual(self.state.remote_log_status, "db_failed")
 
+    def test_failed_round_save_is_kept_and_written_on_a_later_retry(self):
+        """A round's turns are written only once, at the end of the round; a
+        failed write used to lose them for good. Now the rows wait in the
+        session until a retry succeeds."""
+        self.state.update(
+            guesses=[],
+            target_words=["Alpha"],
+            bomb_words=["Bomb"],
+            round_interactions=1,
+            round_medal="none",
+            round_bomb_hit=False,
+            score=0,
+            last_score_change=0,
+            interaction_history=[],
+            pending_round_saves=[],
+        )
+        round_row = {"session_id": "s1", "round_number": 1, "condition": "adaptive"}
+        down = FakeConnection(raise_on_execute=psycopg2.OperationalError("db down"))
+        with patch.object(db, "get_connection", return_value=down), patch.object(
+            storage, "_round_analysis_row", return_value=round_row
+        ), patch.object(storage, "_board_card_rows", return_value=[]), patch.object(
+            db.time, "sleep"
+        ):
+            storage.log_round("p1")
+        self.assertEqual(len(self.state.pending_round_saves), 1)
+
+        up = FakeConnection()
+        with patch.object(db, "get_connection", return_value=up):
+            self.assertEqual(storage.flush_pending_round_saves(), 0)
+        self.assertEqual(self.state.pending_round_saves, [])
+        written = " ".join(sql for sql, _params in up.cursor_obj.executed)
+        self.assertIn("INSERT INTO rounds", written)
+        self.assertEqual(self.state.remote_log_status, "db_saved")
+
     def test_initialize_session_log_retries_then_succeeds_after_transient_failures(self):
         del self.state["participant_id"]
         self.state.condition_assigned = False

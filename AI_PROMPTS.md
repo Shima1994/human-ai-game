@@ -69,7 +69,7 @@ Function:
 generate_ai_hint(...)
 ```
 
-Used when the AI is clue-giver and the human is guesser. In round 1 generation starts after the participant presses **Ask AI for a clue**; in later AI-clue rounds it starts automatically. There is no separate reroll function: when the human skips an AI clue (fully or partially), the same `generate_ai_hint(...)` call is reused with a `repair_context` argument that forbids the skipped clue and asks the model to strongly consider the unresolved targets; it may add or choose other targets (see Section 3).
+Used when the AI is clue-giver and the human is guesser. On the first turn of every AI-clue round (a new board) generation starts after the participant presses **Ask AI for a clue**; later turns of the round start it automatically after the previous turn's result. There is no separate reroll function: when the human skips an AI clue (fully or partially), the same `generate_ai_hint(...)` call is reused with a `repair_context` argument that forbids the skipped clue and asks the model to strongly consider the unresolved targets; it may add or choose other targets (see Section 3).
 
 ### System behavior
 

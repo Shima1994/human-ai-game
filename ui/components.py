@@ -6,6 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as st_components
 from streamlit_autorefresh import st_autorefresh
 
+from core.game_logic import compute_round_score
 from core.constants import (
     BOARD_SIZE,
     BOMB_COUNT,
@@ -125,11 +126,14 @@ def close_maxed_multiselects():
         <script>
           (function () {
             const doc = window.parent.document;
-            if (doc.__closeMaxedMultiselectsInstalled) return;
-            doc.__closeMaxedMultiselectsInstalled = true;
-            doc.addEventListener(
-              "click",
-              (event) => {
+            // Replace, never skip: this iframe is rebuilt when the page
+            // changes, and a listener created by a discarded iframe stops
+            // running -- an "already installed" flag left the page with a
+            // dead listener and nothing to replace it.
+            if (doc.__closeMaxedMultiselectsHandler) {
+              doc.removeEventListener("click", doc.__closeMaxedMultiselectsHandler, true);
+            }
+            const onClick = (event) => {
                 doc.body.setAttribute("data-debug-option-click-seen", "yes");
                 if (!event.target.closest('[role="option"]')) return;
                 doc.body.setAttribute("data-debug-option-click-matched", "yes");
@@ -170,9 +174,69 @@ def close_maxed_multiselects():
                   }
                   if (attempts >= 20) clearInterval(poll);
                 }, 100);
-              },
-              true
-            );
+            };
+            doc.__closeMaxedMultiselectsHandler = onClick;
+            doc.addEventListener("click", onClick, true);
+          })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def lock_buttons_until_rerun_finishes():
+    """After a button click, ignore further button clicks until the run that
+    click started has finished. While the server is busy (waiting for the AI
+    or the database) the page still shows the old, clickable buttons, and an
+    impatient second click submitted the same clue to the AI twice or could
+    select the same card twice. The first click always goes through; only the
+    clicks after it are held back, and only until the page has updated.
+
+    Keyed off Streamlit's own run state attribute: the lock lifts when a run
+    that started after the click has finished, or after 2 s if the click
+    started no run at all (e.g. a disabled button), with a 90 s ceiling as a
+    last resort. Same re-install-on-every-render pattern as block_text_paste.
+    Mounted app-wide from app.py's main()."""
+    st_components.html(
+        """
+        <script>
+          (function () {
+            const doc = window.parent.document;
+            const win = doc.defaultView;
+            if (doc.__clickLockHandler) {
+              doc.removeEventListener("click", doc.__clickLockHandler, true);
+            }
+            if (doc.__clickLockTimer) win.clearInterval(doc.__clickLockTimer);
+            const lock = doc.__clickLock || (doc.__clickLock = { busy: false });
+            const runState = () => {
+              const el = doc.querySelector("[data-test-script-state]");
+              return el ? el.getAttribute("data-test-script-state") : "";
+            };
+            const onClick = (event) => {
+              const button = event.target.closest("button");
+              // The page header (Streamlit's own menu) and the sidebar toggle
+              // never start a run; leave them alone.
+              if (!button || button.closest("header") || button.closest("[data-testid='stSidebarCollapseButton']")) return;
+              if (lock.busy) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                return;
+              }
+              lock.busy = true;
+              lock.since = Date.now();
+              lock.sawRunning = false;
+            };
+            doc.__clickLockHandler = onClick;
+            doc.addEventListener("click", onClick, true);
+            doc.__clickLockTimer = win.setInterval(() => {
+              if (!lock.busy) return;
+              const state = runState();
+              const age = Date.now() - lock.since;
+              if (state === "running") lock.sawRunning = true;
+              const finished = lock.sawRunning && state !== "running";
+              if (finished || (!lock.sawRunning && age > 2000) || age > 90000) lock.busy = false;
+            }, 100);
           })();
         </script>
         """,
@@ -185,20 +249,23 @@ def block_text_paste():
     """Disable pasting (and dropping) text into every text field in the app,
     so clues, rationales and reflections have to be typed by the participant
     rather than pasted in from ChatGPT or another tool -- one of Prolific's
-    recommended measures against AI-generated answers. Same cross-frame,
-    install-once technique as close_maxed_multiselects; mounted app-wide
-    from app.py's main()."""
+    recommended measures against AI-generated answers. Same cross-frame
+    technique as close_maxed_multiselects (re-installed on every render);
+    mounted app-wide from app.py's main()."""
     st_components.html(
         """
         <script>
           (function () {
             const doc = window.parent.document;
-            if (doc.__blockTextPasteInstalled) return;
-            doc.__blockTextPasteInstalled = true;
+            // Replace, never skip -- see close_maxed_multiselects: a listener
+            // left behind by a discarded iframe silently stops working.
+            if (doc.__blockTextPasteHandler) {
+              doc.removeEventListener("paste", doc.__blockTextPasteHandler, true);
+              doc.removeEventListener("drop", doc.__blockTextPasteHandler, true);
+            }
             const isTextField = (target) =>
               target instanceof doc.defaultView.Element &&
               !!target.closest('input, textarea, [contenteditable="true"]');
-            let noticeTimer = null;
             const showNotice = () => {
               let notice = doc.getElementById("paste-blocked-notice");
               if (!notice) {
@@ -210,12 +277,15 @@ def block_text_paste():
                   "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);" +
                   "z-index:100000;padding:10px 16px;border-radius:10px;" +
                   "background:#1f2933;color:#fff;font:14px/1.4 sans-serif;" +
-                  "box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100vw - 32px);";
+                  "box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100vw - 32px);" +
+                  "pointer-events:none;opacity:0;";
                 doc.body.appendChild(notice);
               }
-              notice.style.display = "block";
-              clearTimeout(noticeTimer);
-              noticeTimer = setTimeout(() => { notice.style.display = "none"; }, 2500);
+              notice.getAnimations().forEach((animation) => animation.cancel());
+              notice.animate(
+                [{ opacity: 1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }],
+                { duration: 2800, fill: "forwards" }
+              );
             };
             const block = (event) => {
               if (!isTextField(event.target)) return;
@@ -223,6 +293,7 @@ def block_text_paste():
               event.stopPropagation();
               showNotice();
             };
+            doc.__blockTextPasteHandler = block;
             doc.addEventListener("paste", block, true);
             doc.addEventListener("drop", block, true);
           })();
@@ -552,7 +623,13 @@ def render_top_status():
     interactions = st.session_state.get("round_interactions", 0)
     skips = st.session_state.get("round_skips", 0)
     stars = st.session_state.get("total_stars_so_far", 0)
-    total_score = st.session_state.get("score", 0)
+    # score only absorbs a round's points when the round is saved
+    # (log_round); add the current round's points so the bar updates
+    # turn by turn. The next round starts with an empty history, so a saved
+    # round is never counted twice.
+    total_score = st.session_state.get("score", 0) + compute_round_score(
+        st.session_state.get("interaction_history", [])
+    )
 
     def _bar(value, total):
         pct = 0 if not total else max(0, min(100, round(100 * value / total)))
@@ -725,10 +802,9 @@ def render_clue_timer(remaining_seconds, pinned=True):
         else f'<span class="timer-clock" data-deadline-ms="{deadline_ms}">{clock}</span>'
     )
     # The ring's filled arc, computed server-side from remaining/total so it
-    # already shows the right angle on first paint -- it only advances again
-    # on the next autorefresh (same cadence the pill's color states always
-    # updated at), not smoothly every second like the clock digits (those
-    # still tick client-side every second via the cross-frame script below).
+    # already shows the right angle on first paint; after that the
+    # cross-frame script below advances it (and the warning state) every
+    # second, together with the clock digits.
     total = st.session_state.get("clue_timer_duration_seconds") or remaining or 1
     # The filled arc represents time REMAINING (starts as a full circle,
     # empties out as the deadline approaches) -- the more familiar
@@ -745,7 +821,8 @@ def render_clue_timer(remaining_seconds, pinned=True):
     # text instead of being parsed (same trap noted elsewhere in this file).
     st.markdown(
         f'<div class="{row_class}">{caption_html}'
-        f'<span class="timer-pill{state_class}" style="--ring-progress: {progress_deg}deg;" aria-live="polite">'
+        f'<span class="timer-pill{state_class}" style="--ring-progress: {progress_deg}deg;" '
+        f'data-deadline-ms="{deadline_ms}" data-total-ms="{int(total * 1000)}" aria-live="polite">'
         f'<span class="timer-ring-label">{clock_html}</span></span></div>',
         unsafe_allow_html=True,
     )
@@ -764,6 +841,29 @@ def render_clue_timer(remaining_seconds, pinned=True):
         <script>
           function tickClueTimer() {
             const parentDoc = window.parent.document;
+            // The ring and the last-15-seconds warning advance every second
+            // too, not only when the page reruns (which now happens just
+            // once, at the deadline).
+            parentDoc.querySelectorAll(".timer-pill[data-deadline-ms]").forEach((pill) => {
+              const deadline = parseInt(pill.dataset.deadlineMs, 10);
+              const total = parseInt(pill.dataset.totalMs, 10);
+              if (!deadline || !total) return;
+              const left = Math.max(0, deadline - Date.now());
+              const degrees = Math.max(0, Math.min(360, (360 * left) / total));
+              pill.style.setProperty("--ring-progress", degrees + "deg");
+              const seconds = Math.round(left / 1000);
+              if (seconds > 0 && seconds <= 15 && !pill.classList.contains("final")
+                  && !pill.classList.contains("warn")) {
+                pill.classList.add("warn");
+                const row = pill.parentElement;
+                if (row && !row.querySelector(".timer-caption")) {
+                  const caption = parentDoc.createElement("div");
+                  caption.className = "timer-caption";
+                  caption.textContent = "Hurry";
+                  row.insertBefore(caption, pill);
+                }
+              }
+            });
             parentDoc.querySelectorAll(".timer-clock").forEach((el) => {
               const deadline = parseInt(el.dataset.deadlineMs, 10);
               if (!deadline) return;
@@ -780,39 +880,31 @@ def render_clue_timer(remaining_seconds, pinned=True):
         height=0,
         width=0,
     )
-    # Trigger a normal Streamlit rerun (preserves st.session_state) every few
-    # seconds so the server-side timeout check in screens.py gets a chance to
-    # fire once the deadline passes. A full browser reload was used here
-    # previously, which wiped the participant's entire session on every
-    # timeout instead of just consuming the current turn.
-    #
-    # This must keep firing even once remaining hits 0 (previously gated on
-    # remaining > 0): the *next* rerun is what actually calls
-    # _consume_human_clue_timeout()/_consume_human_guess_timeout() and clears
-    # the expired turn. Stopping autorefresh exactly at 0 meant the app never
-    # rendered again on its own once time ran out -- the participant's next
-    # click was the one that silently triggered the timeout instead of
-    # submitting what they clicked, which looked exactly like "the button
-    # doesn't work." Once the timeout is actually consumed, the screen moves
-    # on to a fresh timer (or away from this one), so this keeps working
-    # correctly rather than looping.
-    #
-    # Interval is a tradeoff: Streamlit aborts an in-flight script run (and
-    # discards that run's not-yet-applied widget state) whenever a new rerun
-    # is triggered before it finishes, including one from this autorefresh --
-    # so a shorter interval means more chances for a real click's rerun to
-    # get interrupted and silently dropped, which is exactly what showed up
-    # as "the board card I clicked didn't register" and "the screen randomly
-    # refreshes itself," and (further downstream) the AI-guess response
-    # itself getting silently discarded if a real OpenAI call -- often
-    # 3-10+ seconds -- is still in flight when a tick lands. 10s keeps
-    # timeout detection close enough (a 90-120s decision timer noticing a
-    # few seconds late is harmless) while meaningfully cutting how often
-    # this collides with either a participant click or a slow AI response.
-    st_autorefresh(interval=10000, key="clue_timer_autorefresh")
+    # One rerun at the deadline, not a tick every few seconds. The rerun is
+    # what lets _consume_human_clue_timeout()/_consume_human_guess_timeout()
+    # record an expired turn. A periodic tick also landed while a click was
+    # being processed -- Streamlit then cut that run short, which dropped
+    # clicks and once left an already-recorded clue and its timer running
+    # until it was recorded again as a timeout. st_autorefresh restarts its
+    # countdown whenever the interval changes, and the remaining time is
+    # different on every render, so this always fires just after the
+    # deadline; once expired it repeats every second until the timeout is
+    # consumed and the timer (and this component) disappear.
+    remaining_ms = int(max(0.0, float(remaining_seconds or 0)) * 1000)
+    st_autorefresh(interval=max(1000, remaining_ms + 800), key="clue_timer_autorefresh")
 
 
-def _render_static_card(word, role, revealed, guessed=False):
+def _render_static_card(word, role, revealed, guessed=False, blurred=False):
+    if blurred:
+        # Neither the role nor the word (not even in the page source): the
+        # card keeps its place in the grid but gives nothing to plan the next
+        # clue with (see render_board). Same placeholder for every card, so
+        # word length doesn't show through either.
+        st.markdown(
+            "<div class='word-card word-hidden word-blurred' aria-hidden='true'><div>&#9679;&#9679;&#9679;&#9679;&#9679;</div></div>",
+            unsafe_allow_html=True,
+        )
+        return
     css_class = ROLE_CLASS.get(role, "word-neutral") if revealed else "word-hidden"
     if guessed and role == "target":
         css_class = "word-found"
@@ -838,7 +930,12 @@ def render_board(
     max_clicks=0,
     column_count=None,
     key_prefix="board_button",
+    blur_unguessed=False,
 ):
+    """blur_unguessed: show only the cards already selected this round and
+    blur every other card (role and word), used behind the clue-giver's
+    "Turn result" dialog so that untimed step can't be used to plan the
+    next clue with the full board in view."""
     guesses = guesses or []
     column_count = column_count or (
         4 if len(board) == BOARD_SIZE else min(4, max(1, len(board)))
@@ -861,7 +958,9 @@ def render_board(
             revealed = reveal_all or is_guessed or st.session_state.round_finished
 
             with cols[index % column_count]:
-                if clickable and not revealed:
+                if blur_unguessed and not is_guessed:
+                    _render_static_card(word, role, False, blurred=True)
+                elif clickable and not revealed:
                     is_disabled = len(guesses) >= max_clicks or is_guessed
                     if st.button(
                         word,

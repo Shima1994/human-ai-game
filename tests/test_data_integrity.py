@@ -109,6 +109,31 @@ class RoundContextTests(_GameAndStorageState):
         self.assertEqual(json.loads(row["word_type_per_card"]), WORD_TYPES)
 
 
+class TurnRowCompletenessTests(_GameAndStorageState):
+    def test_every_turn_type_fills_every_logged_field(self):
+        """Every field in TURNS_LOG_FIELDS must reach the stored turn row for
+        every kind of turn -- a field computed during the game but missing
+        here is silently empty in the database."""
+        role_patch = patch.object(game_logic, "finish_round", lambda *a, **k: None)
+        with role_patch:
+            game_logic.start_participant_decision_timer()
+            game_logic.record_interaction("one", 2, ["Alpha", "Neutral"], ["Alpha", "Beta"])
+            game_logic.start_participant_decision_timer()
+            game_logic.record_interaction(
+                "two", 2, ["Beta"], ["Beta", "Alpha"], partial_skip=True,
+                skipped_by="ai", skip_interpreted_cards=["Alpha"],
+            )
+            game_logic.start_participant_decision_timer()
+            game_logic.record_skip("three", 1, ["Alpha"], skipped_by="ai", skip_interpreted_cards=["Beta"])
+            game_logic.start_participant_decision_timer()
+            game_logic.record_timeout("four", 1, ["Alpha"])
+        for item in self.state.interaction_history:
+            row = storage._turn_analysis_row("p1", item, self.state.word_type_per_card)
+            with self.subTest(turn=item["turn"]):
+                self.assertEqual([f for f in storage.TURNS_LOG_FIELDS if f not in row], [])
+                self.assertEqual([k for k in row if k not in storage.TURNS_LOG_FIELDS], [])
+
+
 class TimeoutContextTests(_GameAndStorageState):
     def test_timeout_row_preserves_required_context(self):
         game_logic.record_timeout("letters", 1, ["Alpha"], ["Alpha"])
@@ -165,8 +190,9 @@ class RunTypeAndEligibilityTests(unittest.TestCase):
     def tearDown(self):
         storage.st = self.original_st
 
-    def row(self, completed=True):
-        with patch.dict(os.environ, {"RUN_TYPE": ""}):
+    def row(self, completed=True, run_type_setting=""):
+        # Never read the developer's own secrets (which may say "pilot").
+        with patch("core.prolific.read_setting", lambda name: run_type_setting if name == "RUN_TYPE" else ""):
             return storage._session_row(completed=completed)
 
     def test_consent_timestamp_is_persisted(self):
@@ -192,8 +218,7 @@ class RunTypeAndEligibilityTests(unittest.TestCase):
 
     def test_pilot_deployment_is_labelled_pilot_and_not_eligible(self):
         self.state.prolific_pid = "5f1a2b3c4d5e6f7a8b9c0d1e"
-        with patch.dict(os.environ, {"RUN_TYPE": "pilot"}):
-            row = storage._session_row(completed=True)
+        row = self.row(run_type_setting="pilot")
         self.assertEqual(row["run_type"], "pilot")
         self.assertFalse(row["analysis_eligible"])
 

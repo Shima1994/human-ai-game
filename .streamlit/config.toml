@@ -28,3 +28,13 @@ backgroundColor = "#f6f4ef"
 secondaryBackgroundColor = "#ffffff"
 textColor = "#1f2d3d"
 font = "sans serif"
+
+[runner]
+# Never run two script runs of the same session at once. With fast reruns on
+# (Streamlit's default), a click that arrived while a run was still busy --
+# e.g. waiting for the AI or the database -- started a second run right away
+# while the first was still finishing, and the two then changed the same
+# session state: a clue was submitted to the AI twice, and a recorded turn
+# was once recorded again as a timeout. With this off, the new run starts
+# only once the earlier one has stopped, and the click is not lost.
+fastReruns = false

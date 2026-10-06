@@ -1075,6 +1075,7 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "repair_attempt_number": item.get("repair_attempt_number", ""),
         "repair_attempt": bool(item.get("repair_attempt", False)),
         "repair_same_targets_retried": bool(item.get("repair_same_targets_retried", False)),
+        "repair_targets_included": bool(item.get("repair_targets_included", False)),
         "repair_success": bool(item.get("repair_success", False)),
         "timer_duration_seconds": item.get("timer_duration_seconds", ""),
         "clue_timer_started_at": item.get("clue_timer_started_at", ""),
@@ -1110,8 +1111,26 @@ def _board_card_rows():
     return rows
 
 
-def append_analysis_logs(participant_id, timestamp, score_change, clean_history):
+def _build_round_rows(participant_id, timestamp, score_change, clean_history):
+    """All rows one finished round produces, built from the session state
+    right away (it moves on to the next round straight after this)."""
     round_row = _round_analysis_row(participant_id, timestamp, score_change)
+    word_type_per_card = st.session_state.get("word_type_per_card", {})
+    turn_rows = [
+        _turn_analysis_row(participant_id, item, word_type_per_card)
+        for item in clean_history
+    ]
+    return {
+        "round_row": round_row,
+        "turn_rows": turn_rows,
+        "board_card_rows": _board_card_rows(),
+    }
+
+
+def _write_round_rows(rows):
+    """Write one round's rows. Every write is an upsert or an ON CONFLICT
+    insert, so writing the same round again is harmless."""
+    round_row = rows["round_row"]
     db.upsert_row(
         "rounds",
         key_columns=["session_id", "round_number"],
@@ -1122,11 +1141,7 @@ def append_analysis_logs(participant_id, timestamp, score_change, clean_history)
         },
         data=round_row,
     )
-
-    word_type_per_card = st.session_state.get("word_type_per_card", {})
-    turn_rows = []
-    for item in clean_history:
-        turn_row = _turn_analysis_row(participant_id, item, word_type_per_card)
+    for turn_row in rows["turn_rows"]:
         db.upsert_row(
             "turns",
             key_columns=["session_id", "round_number", "turn_number"],
@@ -1140,21 +1155,41 @@ def append_analysis_logs(participant_id, timestamp, score_change, clean_history)
             },
             data=turn_row,
         )
-        turn_rows.append(turn_row)
-
-    board_card_rows = _board_card_rows()
-    if board_card_rows:
+    if rows["board_card_rows"]:
         db.insert_rows(
             "board_cards",
             columns=["session_id", "round_number", "board_instance_id", "card_word", "card_role", "word_type"],
-            rows=board_card_rows,
-            # Re-running the same round (e.g. a Streamlit rerun interrupting
-            # this save before the round actually advances) must not raise
-            # on the primary key -- a card's row is identical either way.
+            rows=rows["board_card_rows"],
             conflict_columns=["session_id", "round_number", "card_word"],
         )
 
-    return round_row, turn_rows
+
+def append_analysis_logs(participant_id, timestamp, score_change, clean_history):
+    rows = _build_round_rows(participant_id, timestamp, score_change, clean_history)
+    _write_round_rows(rows)
+    return rows["round_row"], rows["turn_rows"]
+
+
+def flush_pending_round_saves():
+    """Retry round saves that failed earlier. A round's turns are written
+    only once, when the round ends, so a failed write used to lose them for
+    good; failed rounds now wait in the session and are retried on every
+    run until the database accepts them. Returns how many are still waiting."""
+    pending = st.session_state.get("pending_round_saves") or []
+    if not pending:
+        return 0
+    still_pending = []
+    for rows in pending:
+        try:
+            _write_round_rows(rows)
+        except (psycopg2.Error, RuntimeError) as error:
+            _set_remote_failure(error)
+            still_pending.append(rows)
+    st.session_state.pending_round_saves = still_pending
+    if not still_pending and st.session_state.get("remote_log_status") == "db_failed":
+        st.session_state.remote_log_status = "db_saved"
+        st.session_state.remote_log_error = ""
+    return len(still_pending)
 
 
 def log_round(participant_id):
@@ -1166,17 +1201,18 @@ def log_round(participant_id):
     st.session_state.last_score_change = score_change
     st.session_state.score += score_change
 
+    rows = _build_round_rows(participant_id, timestamp, score_change, clean_history)
+    normalized_round_row, normalized_turn_rows = rows["round_row"], rows["turn_rows"]
     try:
-        normalized_round_row, normalized_turn_rows = append_analysis_logs(
-            participant_id,
-            timestamp,
-            score_change,
-            clean_history,
-        )
+        _write_round_rows(rows)
         _set_remote_saved()
     except (psycopg2.Error, RuntimeError) as error:
         _set_remote_failure(error)
-        normalized_round_row, normalized_turn_rows = None, None
+        # Kept in the session and retried later (flush_pending_round_saves)
+        # instead of being lost.
+        st.session_state.pending_round_saves = list(
+            st.session_state.get("pending_round_saves") or []
+        ) + [rows]
 
     log_event(
         "round_completed",

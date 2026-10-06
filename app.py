@@ -4,10 +4,11 @@ import streamlit as st
 
 from core.game_logic import BoardGenerationError, setup_new_round
 from core.state import init_session_state
-from core.storage import log_event
+from core.storage import flush_pending_round_saves, log_event
 from ui.components import (
     block_text_paste,
     close_maxed_multiselects,
+    lock_buttons_until_rerun_finishes,
     render_app_header,
     scroll_page_to_top,
 )
@@ -70,6 +71,11 @@ def main():
     _scroll_after_view_change()
     close_maxed_multiselects()
     block_text_paste()
+    lock_buttons_until_rerun_finishes()
+    # A round whose save failed (e.g. a database timeout) waits in the
+    # session; retry it on every run until it is stored.
+    if st.session_state.get("pending_round_saves"):
+        flush_pending_round_saves()
 
     if not st.session_state.consent_given:
         screen_consent()

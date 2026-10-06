@@ -38,7 +38,9 @@ BOARD_MATERIAL_VERSION = "v2026-09-26"
 
 VALID_CONDITIONS = frozenset({"baseline", "adaptive"})
 DEFAULT_CONDITION = "adaptive"
-DEBUG_MODE = True
+# Must stay False for pilots and the study: when True, the assigned condition
+# (baseline/adaptive) is shown in a corner of every page.
+DEBUG_MODE = False
 
 N_ROUNDS = 4
 MAX_HINT_NUMBER = 5

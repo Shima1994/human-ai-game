@@ -198,7 +198,6 @@ def setup_new_round():
     st.session_state.last_ai_hint = ""
     st.session_state.perception_rating = None
     st.session_state.human_expected_ai_understanding_rating = None
-    st.session_state.pending_ai_guess_review = None
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.now(timezone.utc)
     st.session_state.round_start_time = st.session_state.start_time.isoformat()
@@ -261,6 +260,15 @@ def skip_invites_repair(clue_giver, skipped_by):
 def _repair_targets_included(repair_context, intended_targets):
     targets = set(repair_context.get("unresolved_targets", []))
     return bool(repair_context and targets and targets.issubset(set(intended_targets)))
+
+
+def _close_decision_window():
+    """Stop the participant's decision timer the instant a turn is recorded,
+    in the same step as the recording itself -- before any database write or
+    AI call that a rerun could interrupt. A turn recorded while its timer
+    kept running could later be recorded a second time as a timeout."""
+    clear_participant_decision_timer()
+    st.session_state.clue_timer_timeout_consumed = True
 
 
 def record_interaction(
@@ -493,6 +501,7 @@ def record_interaction(
         }
     )
     st.session_state.pending_reflection_turn = interaction_sequence
+    _close_decision_window()
 
     if (
         bomb_hit
@@ -680,6 +689,7 @@ def record_skip(
         }
     )
     st.session_state.pending_reflection_turn = None if timed_out else interaction_sequence
+    _close_decision_window()
 
     if st.session_state.round_interactions >= MAX_INTERACTIONS_PER_ROUND:
         finish_round()

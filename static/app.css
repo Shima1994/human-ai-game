@@ -1080,6 +1080,14 @@ body:has(.timer-row) .role-badge {
     line-height: 1;
     opacity: 0.95;
 }
+/* Cards hidden behind the clue-giver's "Turn result" dialog (see
+   render_board's blur_unguessed): neutral idle colours, word unreadable. */
+.word-card.word-blurred {
+    filter: blur(8px);
+    opacity: 0.7;
+    user-select: none;
+    pointer-events: none;
+}
 .word-selected {
     /* Added alongside a role class (.word-target, .word-bomb, ...), not
        instead of it -- the role color already shows through immediately on

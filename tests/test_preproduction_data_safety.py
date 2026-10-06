@@ -311,8 +311,22 @@ class ActionAndRoundClassificationTests(unittest.TestCase):
                 "partial", 1, ["Alpha"], ["Alpha"], partial_skip=True, skipped_by="ai"
             )
             self.assertEqual((self.state.round_interactions, self.state.round_skips), (1, 2))
+            # A recorded turn closes its decision timer; the next clue starts
+            # a new one, and only that one can time out.
+            game_logic.start_participant_decision_timer()
             game_logic.record_timeout("timeout", 1, ["Beta"])
             self.assertEqual((self.state.round_interactions, self.state.round_skips), (1, 3))
+
+    def test_a_recorded_turn_cannot_also_time_out(self):
+        """The bug this guards against: a turn was recorded, its timer kept
+        running, and when it expired the same clue was recorded again as a
+        timeout."""
+        with patch.object(game_logic, "finish_round", lambda *a, **k: None):
+            game_logic.start_participant_decision_timer()
+            game_logic.record_interaction("jewelry", 2, ["Alpha", "Beta"], ["Alpha", "Beta"])
+            self.assertEqual(self.state.clue_timer_started_at, "")
+            self.assertIsNone(game_logic.record_timeout("jewelry", 2, ["Alpha", "Beta"]))
+            self.assertEqual(len(self.state.interaction_history), 1)
 
     def test_clue_giver_timeout_cost_is_independent_of_the_skip_budget(self):
         """The clue-giver's own timeout no longer always costs a skip: a

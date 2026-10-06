@@ -21,6 +21,38 @@ GENERIC_HERO_MARKER = "hero-title"
 TUTORIAL_MARKER = "Practice round"
 
 
+_SAFE_AI_EXPLANATION = {
+    "ai_relationship_type": "Other",
+    "ai_explanation_raw": "",
+    "ai_explanation_sanitized": "",
+    "ai_explanation_is_valid": False,
+    "ai_explanation_blocked_reason": "test",
+}
+_module_patchers = []
+
+
+def setUpModule():
+    """No test in this module may reach the real AI. The "Turn result" step
+    fetches the AI's clue explanation and replacement cards itself, and a
+    later turn of an AI-clue round fetches its clue itself, so tests that
+    prepare such states would otherwise call OpenAI.
+    Tests that care about these calls patch them again themselves."""
+    for target, value in (
+        ("ui.screens.generate_ai_turn_explanation", _SAFE_AI_EXPLANATION),
+        ("ui.screens.generate_ai_wrong_guess_replacements", {"cards": [], "raw_response": ""}),
+        # Later turns of an AI-clue round fetch the next clue on their own.
+        ("ui.screens._generate_and_store_ai_hint", False),
+    ):
+        patcher = patch(target, return_value=value)
+        patcher.start()
+        _module_patchers.append(patcher)
+
+
+def tearDownModule():
+    for patcher in _module_patchers:
+        patcher.stop()
+
+
 def _fresh_app():
     at = AppTest.from_file("app.py", default_timeout=30)
     at.run()
@@ -263,6 +295,281 @@ class HumanClueRepairReminderTests(unittest.TestCase):
         self.assertNotIn("The AI skipped your last clue", infos)
 
 
+class ClueGiverTurnResultTests(unittest.TestCase):
+    """The AI's guess on a human clue is saved immediately (no separate,
+    untimed "Save this turn" step), and behind the "Turn result" dialog only
+    the cards selected so far are visible -- every other card is blurred."""
+
+    def _clue_giver_turn_result(self):
+        at = _fresh_app()
+        at.session_state["consent_given"] = True
+        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
+        at.session_state["started"] = True
+        at.session_state["participant_id"] = "participant_test0006"
+        at.session_state["nickname"] = "Test"
+        at.session_state["tutorial_completed"] = True
+        at.session_state["game_over"] = False
+        at.session_state["condition"] = "baseline"
+        at.session_state["condition_assigned"] = True
+        at.session_state["round"] = 1
+        at.session_state["starting_role"] = "human_clue"
+        at.session_state["board"] = None
+        at.run()
+        targets = list(at.session_state["target_words"])
+        neutrals = list(at.session_state["neutral_words"])
+        guesses = [targets[0], neutrals[0]]
+        at.session_state["guesses"] = guesses
+        at.session_state["found_targets"] = [targets[0]]
+        at.session_state["interaction_history"] = [
+            {
+                "turn": 1,
+                "clue_giver": "human",
+                "guesser": "ai",
+                "hint": "test",
+                "hint_number": 2,
+                "intended_targets": [targets[0], targets[1]],
+                "guesses": guesses,
+                "correct_guesses": [targets[0]],
+                "neutral_guesses": [neutrals[0]],
+                "incorrect_guesses": [neutrals[0]],
+                "bomb_guesses": [],
+                "bomb_hit": False,
+                "outcome": "partial_correct",
+                "correct": True,
+                "turn_points": 2,
+            }
+        ]
+        at.session_state["pending_reflection_turn"] = 1
+        with patch("ui.screens.log_event"):
+            at.run()
+        return at, guesses
+
+    def test_unselected_cards_are_blurred_behind_the_turn_result(self):
+        at, guesses = self._clue_giver_turn_result()
+        self.assertFalse(at.exception)
+        board_html = _all_markdown_text(at)
+        blurred = board_html.count("word-blurred")
+        self.assertEqual(blurred, 16 - len(guesses))
+        for word in guesses:
+            self.assertIn(f"<div>{word}</div>", board_html)
+
+    def test_status_bar_includes_the_current_rounds_points(self):
+        at, _ = self._clue_giver_turn_result()
+        # score (earlier rounds) is 0 here; the turn just played earned 2.
+        self.assertIn('<span class="medal-chip points">2 pts</span>', _all_markdown_text(at))
+
+    def test_there_is_no_save_this_turn_step(self):
+        at, _ = self._clue_giver_turn_result()
+        self.assertNotIn("Save this turn", [button.label for button in at.button])
+
+
+class SaveAiGuessTurnTests(unittest.TestCase):
+    def test_ai_guess_is_recorded_immediately_with_repair_context(self):
+        from types import SimpleNamespace
+
+        from ui import screens
+
+        state = SimpleNamespace(
+            interaction_history=[{"turn": 1}],
+            round_finished=False,
+            hint="letters",
+            hint_number=2,
+            hint_targets=["A"],
+            hint_expected_guesses=["A"],
+            hint_explanation="x",
+            current_hint_start_time="t",
+            current_guess_start_time="t",
+            current_reflection_start_time="t",
+            previous_hint="",
+            last_ai_guesses=[],
+        )
+        review = {"hint": "letters", "hint_number": 2, "guesses": ["A", "B"], "intended_targets": ["A"]}
+        repair = {"skipped_turn": 0, "unresolved_targets": ["A"]}
+        with patch.object(screens, "st", SimpleNamespace(session_state=state)), \
+                patch.object(screens, "record_interaction") as record, \
+                patch.object(screens, "log_event"), \
+                patch.object(screens, "_attach_ai_wrong_guess_replacements") as replacements:
+            screens._save_ai_guess_turn(review, repair)
+        record.assert_called_once()
+        self.assertEqual(record.call_args.args[2], ["A", "B"])
+        self.assertIs(record.call_args.kwargs["repair_context"], repair)
+        # The slow AI call is deferred to the result step, never run here.
+        replacements.assert_not_called()
+        self.assertEqual(state.last_ai_guesses, ["A", "B"])
+        self.assertEqual(state.hint, "")
+        self.assertEqual(state.previous_hint, "letters")
+
+
+class TurnRecordingRaceTests(unittest.TestCase):
+    """Regression tests for a recorded clue that stayed active (a refresh cut
+    the recording run short) and was then recorded again as a timeout."""
+
+    def _guesser_round(self):
+        at = _fresh_app()
+        at.session_state["consent_given"] = True
+        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
+        at.session_state["started"] = True
+        at.session_state["participant_id"] = "participant_test0007"
+        at.session_state["nickname"] = "Test"
+        at.session_state["tutorial_completed"] = True
+        at.session_state["game_over"] = False
+        at.session_state["condition"] = "adaptive"
+        at.session_state["condition_assigned"] = True
+        at.session_state["round"] = 1
+        at.session_state["starting_role"] = "ai_clue"
+        at.session_state["board"] = None
+        at.run()
+        return at
+
+    def test_stale_recorded_clue_with_expired_timer_is_not_recorded_again(self):
+        at = self._guesser_round()
+        targets = list(at.session_state["target_words"])
+        resolved = {
+            "turn": 1,
+            "clue_giver": "ai",
+            "guesser": "human",
+            "hint": "jewelry",
+            "hint_number": 2,
+            "intended_targets": targets[:2],
+            "guesses": targets[:2],
+            "correct_guesses": targets[:2],
+            "neutral_guesses": [],
+            "bomb_guesses": [],
+            "bomb_hit": False,
+            "outcome": "correct",
+            "correct": True,
+            "ai_explanation_attempted": True,
+        }
+        at.session_state["interaction_history"] = [resolved]
+        at.session_state["found_targets"] = targets[:2]
+        at.session_state["guesses"] = targets[:2]
+        # The left-over state from the cut-short run: same clue, timer expired.
+        at.session_state["hint"] = "jewelry"
+        at.session_state["hint_number"] = 2
+        at.session_state["current_guess_rationale"] = "not sure but"
+        at.session_state["clue_timer_started_at"] = "2026-01-01T00:00:00+00:00"
+        at.session_state["clue_timer_duration_seconds"] = 90
+        at.session_state["clue_timer_timeout_consumed"] = False
+        at.session_state["pending_reflection_turn"] = None
+        with patch("ui.screens.log_event"):
+            at.run()
+        self.assertFalse(at.exception)
+        self.assertEqual(len(at.session_state["interaction_history"]), 1)
+        self.assertEqual(at.session_state["hint"], "")
+        self.assertEqual(at.session_state["clue_timer_started_at"], "")
+
+    def test_ai_explanation_is_fetched_once_on_the_result_step(self):
+        at = self._guesser_round()
+        targets = list(at.session_state["target_words"])
+        at.session_state["interaction_history"] = [
+            {
+                "turn": 1,
+                "clue_giver": "ai",
+                "guesser": "human",
+                "hint": "jewelry",
+                "hint_number": 1,
+                "intended_targets": targets[:1],
+                "guesses": targets[:1],
+                "correct_guesses": targets[:1],
+                "neutral_guesses": [],
+                "bomb_guesses": [],
+                "bomb_hit": False,
+                "outcome": "correct",
+                "correct": True,
+            }
+        ]
+        at.session_state["pending_reflection_turn"] = 1
+        explanation = {
+            "ai_relationship_type": "Other",
+            "ai_explanation_raw": "shared idea",
+            "ai_explanation_sanitized": "shared idea",
+            "ai_explanation_is_valid": True,
+            "ai_explanation_blocked_reason": "",
+        }
+        with patch("ui.screens.log_event"), patch(
+            "ui.screens.generate_ai_turn_explanation", return_value=explanation
+        ) as explain:
+            at.run()
+            at.run()
+        self.assertFalse(at.exception)
+        explain.assert_called_once()
+        self.assertEqual(at.session_state["interaction_history"][0]["ai_explanation"], "shared idea")
+
+
+class TimerRefreshTests(unittest.TestCase):
+    def test_timer_refreshes_at_the_deadline_not_every_few_seconds(self):
+        from ui import components
+
+        with patch.object(components, "st_autorefresh") as refresh,                 patch.object(components, "st_components"),                 patch.object(components, "st"):
+            components.st.session_state = {"clue_timer_duration_seconds": 90}
+            components.render_clue_timer(42.5, pinned=False)
+            self.assertEqual(refresh.call_args.kwargs["interval"], 42500 + 800)
+            components.render_clue_timer(0, pinned=False)
+            self.assertEqual(refresh.call_args.kwargs["interval"], 1000)
+
+    def test_ring_carries_what_the_browser_needs_to_animate_it(self):
+        """With only one rerun per decision, the ring and the last-15-seconds
+        warning are advanced in the browser every second, from the deadline
+        and total duration written on the ring itself."""
+        from ui import components
+
+        with patch.object(components, "st_autorefresh"),                 patch.object(components, "st_components") as frames,                 patch.object(components, "st") as st_mock:
+            st_mock.session_state = {"clue_timer_duration_seconds": 90}
+            components.render_clue_timer(42.5, pinned=False)
+        ring_html = st_mock.markdown.call_args.args[0]
+        self.assertIn('data-total-ms="90000"', ring_html)
+        self.assertIn("data-deadline-ms=", ring_html)
+        script = frames.html.call_args.args[0]
+        self.assertIn("--ring-progress", script)
+        self.assertIn('classList.add("warn")', script)
+
+
+class AskAiForClueTests(unittest.TestCase):
+    """The first turn of every AI-clue round waits for "Ask AI for a clue"
+    (time to study the new board before the timer starts); later turns of
+    the round get their clue automatically."""
+
+    def _ai_clue_round(self, history):
+        at = _fresh_app()
+        at.session_state["consent_given"] = True
+        at.session_state["consent_timestamp"] = "2026-01-01T00:00:00"
+        at.session_state["started"] = True
+        at.session_state["participant_id"] = "participant_test0008"
+        at.session_state["nickname"] = "Test"
+        at.session_state["tutorial_completed"] = True
+        at.session_state["game_over"] = False
+        at.session_state["condition"] = "baseline"
+        at.session_state["condition_assigned"] = True
+        # Started as clue-giver, so round 2 is their first AI-clue round.
+        at.session_state["round"] = 2
+        at.session_state["starting_role"] = "human_clue"
+        at.session_state["board"] = None
+        at.run()
+        at.session_state["interaction_history"] = history
+        with patch("ui.screens.log_event"), patch(
+            "ui.screens._generate_and_store_ai_hint", return_value=False
+        ) as generate:
+            at.run()
+        return at, generate
+
+    def test_first_ai_clue_round_waits_for_the_button_even_in_round_2(self):
+        at, generate = self._ai_clue_round([])
+        self.assertFalse(at.exception)
+        self.assertIn("Ask AI for a clue", [b.label for b in at.button])
+        generate.assert_not_called()
+
+    def test_later_turns_of_the_round_get_the_clue_automatically(self):
+        done = {
+            "turn": 1, "clue_giver": "ai", "guesser": "human", "hint": "first",
+            "hint_number": 1, "guesses": [], "correct_guesses": [], "neutral_guesses": [],
+            "bomb_guesses": [], "bomb_hit": False, "outcome": "skip", "skipped": True,
+        }
+        at, generate = self._ai_clue_round([done])
+        self.assertFalse(at.exception)
+        self.assertNotIn("Ask AI for a clue", [b.label for b in at.button])
+        generate.assert_called()
+
+
 class GuesserSkipButtonGatingTests(unittest.TestCase):
     """The "Stop guessing and use 1 skip" button intentionally requires the
     same reasoning text as clicking a board card (the study needs that
@@ -296,26 +603,45 @@ class GuesserSkipButtonGatingTests(unittest.TestCase):
         at.run()
         return at
 
-    def test_skip_button_disabled_until_reasoning_is_set(self):
+    def test_skip_without_reasoning_explains_instead_of_skipping(self):
         at = self._reach_guesser_with_hint(_fresh_app())
 
         def skip_button():
-            return next(b for b in at.button if "skip" in b.label.lower())
+            return next(b for b in at.button if b.label.lower() == "skip")
 
-        # Only the skip-interpretation chips filled, nothing else: skip must
-        # still be disabled, and the reason must be visible on the page.
-        board_words = list(at.session_state["board"])
-        if at.multiselect:
-            at.multiselect[-1].set_value(board_words[:2]).run()
-        self.assertTrue(skip_button().disabled)
-        self.assertIn(
-            "before you can skip too",
-            " ".join(el.value for el in at.caption),
-        )
-
-        # A valid reasoning alone: now it unlocks.
-        at.text_area[0].set_value("This connects to trust between two people").run()
+        # The button is always enabled (a disabled one cost an extra click
+        # once the reasoning was typed); without reasoning, clicking it says
+        # why and does not open the skip dialog.
         self.assertFalse(skip_button().disabled)
+        self.assertIn("before you can skip too", " ".join(el.value for el in at.caption))
+        with patch("ui.screens.log_event"):
+            skip_button().click().run()
+        self.assertFalse(at.session_state["guesser_skip_dialog_open"] if "guesser_skip_dialog_open" in at.session_state else False)
+        self.assertTrue(at.error)
+
+    def test_skip_works_with_one_click_once_reasoning_is_typed(self):
+        at = self._reach_guesser_with_hint(_fresh_app())
+        at.text_area[0].set_value("This connects to trust between two people")
+        with patch("ui.screens.log_event"):
+            next(b for b in at.button if b.label.lower() == "skip").click().run()
+        self.assertTrue(at.session_state["guesser_skip_dialog_open"])
+
+    def test_card_is_selected_with_one_click_once_reasoning_is_typed(self):
+        """The reasoning is saved and the card selected in the same click --
+        the cards are buttons from the start, not only after the reasoning
+        has been saved."""
+        at = self._reach_guesser_with_hint(_fresh_app())
+        neutral = list(at.session_state["neutral_words"])[0]
+        card = next(b for b in at.button if b.label == neutral)
+        self.assertFalse(card.disabled)
+        at.text_area[0].set_value("This connects to trust between two people")
+        with patch("ui.screens.log_event"):
+            card.click().run()
+        self.assertEqual(at.session_state["pending_guesses"], [neutral])
+        # ...and it is shown as selected straight after that one click, not
+        # only after the next one.
+        self.assertIn(f"word-selected'><div>{neutral}</div>", _all_markdown_text(at))
+        self.assertNotIn(neutral, [b.label for b in at.button])
 
 
 class ClueTimerLabelingTests(unittest.TestCase):
