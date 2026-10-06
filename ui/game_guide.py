@@ -88,25 +88,6 @@ CLUE_GIVER_OUTRO = "After completing these steps, submit your clue and the AI wi
 
 GUIDE_SECTIONS = (
     (
-        "When the AI Is the Clue-Giver",
-        """When the AI is the Clue-Giver, it will give you:
-
-- a one-word clue
-- a number
-
-Your task is to interpret the clue and select the cards that you believe the AI intended.
-
-For example:
-
-**animal - 2**
-
-means that the AI is trying to communicate two cards that it believes are related to “animal”.
-
-Select the number of cards indicated by the clue number.
-
-Think about the relationship between the clue and the words on the board, but remember that some apparently related cards may be neutral cards or bombs.""",
-    ),
-    (
         "Targets, Neutral Cards, and Bombs",
         """The safest way to score well is to identify the intended target cards while avoiding incorrect cards.
 
@@ -125,6 +106,25 @@ These are the most dangerous cards. Selecting a bomb immediately ends the round.
 When you are the Clue-Giver, try to choose clues that strongly connect your intended targets while being clearly different from the bomb cards and unrelated cards.
 
 When you are the Guesser, consider the clue carefully before making your selections.""",
+    ),
+    (
+        "When the AI Is the Clue-Giver",
+        """When the AI is the Clue-Giver, it will give you:
+
+- a one-word clue
+- a number
+
+Your task is to interpret the clue and select the cards that you believe the AI intended.
+
+For example:
+
+**animal - 2**
+
+means that the AI is trying to communicate two cards that it believes are related to “animal”.
+
+Select the number of cards indicated by the clue number.
+
+Think about the relationship between the clue and the words on the board, but remember that some apparently related cards may be neutral cards or bombs.""",
     ),
     (
         "Try to Connect More Than One Target",
@@ -182,16 +182,6 @@ Please answer based on your actual understanding and experience during that inte
 There are no “correct” answers to these reflection questions.""",
     ),
     (
-        "Play on Your Own: No AI Tools",
-        """Please play this game on your own.
-
-Do **not** use ChatGPT, Gemini, translation tools, or any other AI tool or website to think of clues, choose cards, or write your explanations.
-
-We are studying how people themselves communicate with an AI teammate, so answers produced with outside help cannot be used for the research.
-
-Pasting text into the game is disabled. Please type all your answers yourself.""",
-    ),
-    (
         "Scoring, Stars, and Medals",
         """Score points by finding target cards together:
 
@@ -204,6 +194,19 @@ Complete all 5 target cards in a round without selecting a bomb to earn a star. 
 
 🥇🥈🥉 At the end of the study, your total points across all 4 rounds decide your final medal.""",
     ),
+)
+
+# Shown as a highlighted notice at the top of the guide, before section 1,
+# so participants cannot miss it.
+GUIDE_NO_AI_TOOLS = (
+    "Play on Your Own: No AI Tools",
+    """Please play this game on your own.
+
+Do **not** use ChatGPT, Gemini, translation tools, or any other AI tool or website to think of clues, choose cards, or write your explanations.
+
+We are studying how people themselves communicate with an AI teammate, so answers produced with outside help cannot be used for the research.
+
+Pasting text into the game is disabled. Please type all your answers yourself.""",
 )
 
 GUIDE_REMINDERS = """

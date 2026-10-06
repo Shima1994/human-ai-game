@@ -97,6 +97,7 @@ from ui.game_guide import (
     CLUE_GIVER_INTRO,
     CLUE_GIVER_OUTRO,
     CLUE_GIVER_STEPS,
+    GUIDE_NO_AI_TOOLS,
     GUIDE_OVERVIEW,
     GUIDE_REMINDERS,
     GUIDE_ROLE,
@@ -270,6 +271,12 @@ def screen_welcome():
             unsafe_allow_html=True,
         )
 
+        # Placed above section 1 so that participants cannot miss it.
+        no_ai_title, no_ai_content = GUIDE_NO_AI_TOOLS
+        with st.container(key="guide_no_ai_notice"):
+            st.markdown(f"#### :material/block: {no_ai_title}")
+            st.markdown(no_ai_content)
+
         with st.expander(
             "**1**　Overview", expanded=True, icon=":material/groups:"
         ):
@@ -282,8 +289,35 @@ def screen_welcome():
             "**2**　Your Role", expanded=True, icon=":material/switch_account:"
         ):
             st.markdown(_guide_role_with_badges(), unsafe_allow_html=True)
+
+        def render_guide_section(section_number, title, content, icon, expanded=False):
+            with st.expander(
+                f"**{section_number}**　{title}",
+                expanded=expanded,
+                icon=icon,
+            ):
+                st.markdown(content)
+                figure = GUIDE_SECTION_FIGURES.get(title)
+                if figure:
+                    st.markdown(figure(), unsafe_allow_html=True)
+
+        section_icons = (
+            ":material/target:",
+            ":material/smart_toy:",
+            ":material/style:",
+            ":material/sync:",
+            ":material/skip_next:",
+            ":material/schedule:",
+            ":material/rate_review:",
+            ":material/emoji_events:",
+        )
+        # Targets, neutral cards and bombs come first (section 3): the
+        # clue-giver section below already uses these terms.
+        (cards_title, cards_content), *later_sections = GUIDE_SECTIONS
+        render_guide_section(3, cards_title, cards_content, section_icons[0], expanded=True)
+
         with st.expander(
-            "**3**　When You Are the Clue-Giver",
+            "**4**　When You Are the Clue-Giver",
             expanded=True,
             icon=":material/lightbulb:",
         ):
@@ -309,29 +343,10 @@ def screen_welcome():
             # guide), it was only ever borrowed for its visual weight.
             st.markdown(f"*{CLUE_GIVER_OUTRO}*")
 
-        section_icons = (
-            ":material/smart_toy:",
-            ":material/target:",
-            ":material/style:",
-            ":material/sync:",
-            ":material/skip_next:",
-            ":material/schedule:",
-            ":material/rate_review:",
-            ":material/block:",
-            ":material/emoji_events:",
-        )
         for section_number, ((title, content), icon) in enumerate(
-            zip(GUIDE_SECTIONS, section_icons), start=4
+            zip(later_sections, section_icons[1:]), start=5
         ):
-            with st.expander(
-                f"**{section_number}**　{title}",
-                expanded=False,
-                icon=icon,
-            ):
-                st.markdown(content)
-                figure = GUIDE_SECTION_FIGURES.get(title)
-                if figure:
-                    st.markdown(figure(), unsafe_allow_html=True)
+            render_guide_section(section_number, title, content, icon)
 
         with st.container(key="guide_reminders"):
             st.markdown(
@@ -2494,7 +2509,10 @@ def screen_human_clue():
             log_event("ai_guess_started", {"clue": st.session_state.hint}, turn_number=_next_action_number())
             guess_start_time = _now_iso()
             st.session_state.current_guess_start_time = guess_start_time
-            with st.spinner("AI is thinking..."):
+            # The button sits at the bottom of a long form, so a spinner shown
+            # in place was often below the fold; this container is styled
+            # (static/app.css) to show it in the middle of the screen instead.
+            with st.container(key="ai_guess_thinking"), st.spinner("AI is thinking..."):
                 guess_result = ai_guess(
                     st.session_state.board,
                     st.session_state.hint,

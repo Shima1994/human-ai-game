@@ -6,6 +6,7 @@ from ui.game_guide import (
     CLUE_GIVER_INTRO,
     CLUE_GIVER_OUTRO,
     CLUE_GIVER_STEPS,
+    GUIDE_NO_AI_TOOLS,
     GUIDE_OVERVIEW,
     GUIDE_REMINDERS,
     GUIDE_ROLE,
@@ -16,22 +17,23 @@ from ui.game_guide import (
 class GameGuideTests(unittest.TestCase):
     def test_all_eleven_visual_sections_are_present(self):
         self.assertEqual(len(CLUE_GIVER_STEPS), 6)
-        self.assertEqual(len(GUIDE_SECTIONS), 9)
+        self.assertEqual(len(GUIDE_SECTIONS), 8)
         titles = [title for title, _ in GUIDE_SECTIONS]
         self.assertEqual(
             titles,
             [
-                "When the AI Is the Clue-Giver",
                 "Targets, Neutral Cards, and Bombs",
+                "When the AI Is the Clue-Giver",
                 "Try to Connect More Than One Target",
                 "Interactions and Round Limit",
                 "Skipping",
                 "Time Limit",
                 "After an Interaction",
-                "Play on Your Own: No AI Tools",
                 "Scoring, Stars, and Medals",
             ],
         )
+        # Shown on its own above section 1 instead (see screen_welcome).
+        self.assertEqual(GUIDE_NO_AI_TOOLS[0], "Play on Your Own: No AI Tools")
         # Communicative Repair was deliberately removed -- purely theoretical
         # framing that shouldn't be surfaced to participants (should come
         # naturally rather than being explained up front).
@@ -56,6 +58,7 @@ class GameGuideTests(unittest.TestCase):
             + [heading + "\n" + body for heading, body in CLUE_GIVER_STEPS]
             + [CLUE_GIVER_OUTRO]
             + [heading + "\n" + body for heading, body in GUIDE_SECTIONS]
+            + ["\n".join(GUIDE_NO_AI_TOOLS)]
             + [GUIDE_REMINDERS]
         )
         required_phrases = (
@@ -85,6 +88,8 @@ class GameGuideTests(unittest.TestCase):
             "final medal",
             "MOST IMPORTANT THINGS TO REMEMBER",
             "the History panel on the left shows the clues, guesses and results",
+            "Please play this game on your own.",
+            "Pasting text into the game is disabled.",
         )
         content += "\nMOST IMPORTANT THINGS TO REMEMBER"
         for phrase in required_phrases:
@@ -101,8 +106,13 @@ class GameGuideTests(unittest.TestCase):
         screen_source = ast.get_source_segment(source, function)
         self.assertIn('"**1**　Overview", expanded=True', screen_source)
         self.assertIn('"**2**　Your Role", expanded=True', screen_source)
-        self.assertIn('"**3**　When You Are the Clue-Giver"', screen_source)
-        self.assertIn("zip(GUIDE_SECTIONS, section_icons)", screen_source)
+        self.assertIn('"**4**　When You Are the Clue-Giver"', screen_source)
+        self.assertLess(
+            screen_source.index('key="guide_no_ai_notice"'),
+            screen_source.index('"**1**　Overview"'),
+        )
+        self.assertIn("render_guide_section(3, cards_title", screen_source)
+        self.assertIn("zip(later_sections, section_icons[1:]), start=5", screen_source)
         self.assertIn("expanded=False", screen_source)
         self.assertIn("st.session_state.started = True", screen_source)
 

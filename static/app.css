@@ -1456,6 +1456,49 @@ div[class*="st-key-guide_clue_step_"] [data-testid="stMarkdownContainer"] p {
 .st-key-game_guide_action {
     margin-top: 0.85rem;
 }
+/* "Play on your own: no AI tools" notice, above guide section 1. */
+.st-key-guide_no_ai_notice {
+    margin: 0.8rem 0;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--color-warn);
+    border-left-width: 6px;
+    border-radius: 15px;
+    background: var(--color-warn-soft);
+    color: var(--color-text);
+}
+.st-key-guide_no_ai_notice h4 {
+    margin: 0 0 0.35rem;
+    padding: 0;
+    color: var(--color-warn);
+    font-size: 1.05rem;
+}
+.st-key-guide_no_ai_notice p {
+    margin-bottom: 0.35rem;
+}
+
+/* "AI is thinking..." after Let AI Guess: shown in the middle of the
+   screen over a light veil, since the button is at the bottom of a long
+   form and the spinner used to appear below the visible area. */
+.st-key-ai_guess_thinking:has([data-testid="stSpinner"])::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgba(33, 28, 23, 0.18);
+}
+.st-key-ai_guess_thinking [data-testid="stSpinner"] {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    padding: 1rem 1.6rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 15px;
+    background: var(--color-card-soft);
+    box-shadow: var(--color-shadow-strong);
+    font-weight: 700;
+}
 
 /* Research documents */
 .st-key-consent_document,
