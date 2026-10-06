@@ -142,6 +142,8 @@ ai_guess(...)
 
 The AI sees only available card labels, the human clue, `N`, skip availability, and condition-appropriate history. It never receives the current hidden roles while acting as guesser.
 
+The current round's history is passed through `hide_unfound_intended_cards(...)` first: the human's intended cards and expected guesses from earlier turns list only cards already revealed on the board. An intended card the AI has not picked yet is an unfound target, so naming it would reveal where the remaining targets are. Earlier rounds use different boards and are shown in full (adaptive only). The stored history itself is not changed.
+
 ### Normal and skip JSON
 
 ```json

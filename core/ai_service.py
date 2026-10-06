@@ -1163,6 +1163,25 @@ def generate_ai_wrong_guess_replacements(
     return meta
 
 
+def hide_unfound_intended_cards(history, previous_guesses):
+    """Copy of this round's history for the AI guesser in which the human's
+    intended cards and expected guesses list only cards already revealed on
+    the board. An intended card the AI has not picked yet is an unfound
+    target, so showing it would tell the guesser where the remaining
+    targets are. Revealed cards are public anyway. The stored history is
+    not changed."""
+    revealed = set(previous_guesses or [])
+    for item in history or []:
+        revealed.update(item.get("guesses", []) or [])
+    visible = []
+    for item in history or []:
+        copy = dict(item)
+        for key in ("intended_targets", "expected_guesses"):
+            copy[key] = [card for card in item.get(key, []) or [] if card in revealed]
+        visible.append(copy)
+    return visible
+
+
 def ai_guess(
     board,
     hint,
@@ -1174,8 +1193,8 @@ def ai_guess(
     can_skip=False,
     condition=DEFAULT_CONDITION,
 ):
-    history = history or []
     previous_guesses = previous_guesses or []
+    history = hide_unfound_intended_cards(history or [], previous_guesses)
     available_board = [word for word in board if word not in previous_guesses]
 
     meta = _empty_ai_call_meta()
