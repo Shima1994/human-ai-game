@@ -49,6 +49,32 @@ class AiRoundReflectionFallbackTests(unittest.TestCase):
         result = self._call()
         self.assertEqual(result, "A genuine reflection about the round.")
 
+    @patch("core.ai_service.call_openai_chat")
+    def test_markdown_is_removed_because_the_page_shows_plain_text(self, mock_call):
+        # Real gpt-5.4 output style: bold markers, bullets and line breaks.
+        mock_call.return_value = (
+            "I was aiming directly.\n\n**Engagement (2)** was for **Promise + Ring**.\n"
+            "- **Ring**: engagement ring.\n- *Promise*: a vow to marry.\n### Next time\n1. Be clearer.",
+            0.05,
+        )
+        result = self._call()
+        self.assertEqual(
+            result,
+            "I was aiming directly.\nEngagement (2) was for Promise + Ring.\n"
+            "Ring: engagement ring.\nPromise: a vow to marry.\nNext time\nBe clearer.",
+        )
+        self.assertNotIn("*", result)
+        self.assertNotIn("#", result)
+
+    @patch("core.ai_service.call_openai_chat")
+    def test_word_cap_keeps_one_point_per_line(self, mock_call):
+        mock_call.return_value = ("\n".join(["one two three four five"] * 60), 0.05)
+        result = self._call()
+        lines = result.splitlines()
+        self.assertEqual(len(result.split()), 260)
+        self.assertEqual(len(lines), 52)
+        self.assertTrue(all(line == "one two three four five" for line in lines))
+
 
 if __name__ == "__main__":
     unittest.main()

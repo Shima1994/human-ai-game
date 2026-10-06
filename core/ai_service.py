@@ -94,6 +94,32 @@ def limit_words(text, max_words=200):
     return " ".join(words[:max_words])
 
 
+def strip_markdown(text):
+    """Plain text for model output shown as HTML, where Markdown is not
+    rendered: drop bold/italic/code markers, heading hashes and bullet
+    markers and blank lines, but keep one point per line."""
+    lines = []
+    for line in str(text or "").splitlines():
+        line = re.sub(r"^\s*(#{1,6}\s+|[-*•]\s+|\d+[.)]\s+)", "", line)
+        line = re.sub(r"(\*\*|__|`)", "", line)
+        line = re.sub(r"(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)", r"\1", line)
+        if line.strip():
+            lines.append(line.strip())
+    return "\n".join(lines)
+
+
+def limit_words_keep_lines(text, max_words=200):
+    """limit_words, but without merging the text's lines into one."""
+    kept, remaining = [], max_words
+    for line in str(text or "").splitlines():
+        words = line.split()
+        if remaining <= 0:
+            break
+        kept.append(" ".join(words[:remaining]))
+        remaining -= len(words)
+    return "\n".join(kept)
+
+
 def normalize_token(value):
     return re.sub(r"[^a-z]", "", value.lower())
 
@@ -1374,6 +1400,7 @@ Your reflection should:
 3. Mention any skips and what made the clue feel risky.
 4. End with one specific, actionable suggestion the team can apply in the next round.
 5. Be warm, plain, and concrete. No empty praise. Maximum 180 words.
+6. Format: plain text, no Markdown. Start each clue's explanation, the note about skips, and the final suggestion on a new line.
 """
 
 
@@ -1421,7 +1448,7 @@ def generate_ai_round_reflection(
         # to the participant as a real (if terse) one, indistinguishable from
         # an actual API failure -- same silent-empty-value class of bug as
         # ai_guess's forced-random-guess fix above.
-        limited = limit_words(text, 200)
+        limited = limit_words_keep_lines(strip_markdown(text), 260)
         return limited if limited.strip() else fallback_text
     except Exception:
         return fallback_text

@@ -8,9 +8,9 @@ Models are configured in `core/constants.py`:
 
 | Constant | Current default | Purpose |
 | --- | --- | --- |
-| `HINT_MODEL_NAME` | `gpt-4o` | AI clue generation, including skip-repair clues |
-| `GUESS_MODEL_NAME` | `gpt-4o` | AI card selection, partial-skip decision, and post-hoc wrong-guess replacement suggestions |
-| `REFLECTION_MODEL_NAME` | `gpt-4o` | AI turn explanations, round reflections, and the end-of-game self-report |
+| `HINT_MODEL_NAME` | `gpt-5.4-2026-03-05` | AI clue generation, including skip-repair clues |
+| `GUESS_MODEL_NAME` | `gpt-5.4-2026-03-05` | AI card selection, partial-skip decision, and post-hoc wrong-guess replacement suggestions |
+| `REFLECTION_MODEL_NAME` | `gpt-5.4-2026-03-05` | AI turn explanations, round reflections, and the end-of-game self-report |
 
 All requests pass through:
 
@@ -269,7 +269,9 @@ Function:
 generate_ai_round_reflection(...)
 ```
 
-The model summarizes clue interpretation, successes, errors, skips, and one actionable improvement. Maximum requested length is 180 words; returned text is capped at 200 words.
+The model summarizes clue interpretation, successes, errors, skips, and one actionable improvement. Maximum requested length is 180 words; returned text is capped at 260 words (newer models run slightly over the requested length, and a tighter cap cut off the final suggestion).
+
+The prompt asks for plain text with each clue's explanation, the skip note, and the final suggestion on a new line. Any Markdown markers are removed before the text is stored, and each line is shown as its own paragraph.
 
 - Temperature: `0.4`.
 - Adaptive context may contain full interaction history.

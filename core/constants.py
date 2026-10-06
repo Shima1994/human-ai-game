@@ -1,9 +1,9 @@
 import json
 import os
 
-HINT_MODEL_NAME = "gpt-4o"
-GUESS_MODEL_NAME = "gpt-4o"
-REFLECTION_MODEL_NAME = "gpt-4o"
+HINT_MODEL_NAME = "gpt-5.4-2026-03-05"
+GUESS_MODEL_NAME = "gpt-5.4-2026-03-05"
+REFLECTION_MODEL_NAME = "gpt-5.4-2026-03-05"
 
 # Canonical build metadata. Deployments should set the environment-backed
 # values to their platform's exact identifiers; blank means unavailable and is

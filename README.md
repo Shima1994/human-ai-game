@@ -211,7 +211,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Set `OPENAI_API_KEY` and `DATABASE_URL` in `.streamlit/secrets.toml` (see Storage above). The default models are configured in `core/constants.py` and currently use `gpt-4o` for clue generation, guessing, turn explanation, and round reflection.
+Set `OPENAI_API_KEY` and `DATABASE_URL` in `.streamlit/secrets.toml` (see Storage above). The default models are configured in `core/constants.py` and currently use the pinned snapshot `gpt-5.4-2026-03-05` for clue generation, guessing, turn explanation, and round reflection.
 
 ## Verification
 

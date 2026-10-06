@@ -3038,11 +3038,18 @@ def screen_round_summary():
                 _generate_round_reflection()
 
         if _share_explanations():
+            # One paragraph per line: the reflection puts each clue, the
+            # skip note and the suggestion on its own line.
+            reflection_html = "".join(
+                f'<p class="subtle-text" style="margin:0 0 0.45rem 0;">{escape(line)}</p>'
+                for line in st.session_state.ai_round_reflection.splitlines()
+                if line.strip()
+            )
             st.markdown(
                 f"""
                     <div class="glass-card compact-card">
                     <div class="panel-title">AI reflection</div>
-                    <p class="subtle-text" style="margin:0;">{escape(st.session_state.ai_round_reflection)}</p>
+                    {reflection_html}
                 </div>
                 """,
                 unsafe_allow_html=True,
