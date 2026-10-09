@@ -61,7 +61,7 @@ class InformationSheetTests(unittest.TestCase):
         screen_source = ast.get_source_segment(source, screen)
         self.assertIn("Shima Ghasempour</strong>", screen_source)
         self.assertNotIn("Shima Ghasempour Ardestani", screen_source)
-        self.assertIn("shima.ghasempoour-ardestani@stud.uni-due.de", screen_source)
+        self.assertIn("shima.ghasempour-ardestani@stud.uni-due.de", screen_source)
         self.assertIn("October 2026", screen_source)
         self.assertNotIn("July 2026", screen_source)
         self.assertNotIn("September 2026", screen_source)

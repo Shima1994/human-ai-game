@@ -3708,3 +3708,292 @@ div[data-testid="stAlert"] {
         display: none;
     }
 }
+
+/* ---------------------------------------------------------------------
+   Game guide visual walkthrough (see ui/guide_walkthrough.py): one step
+   at a time, each with a small static copy of the real game screen.
+   --------------------------------------------------------------------- */
+.st-key-guide_walkthrough {
+    padding: 0.9rem 1.05rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-card);
+    box-shadow: var(--color-shadow);
+}
+.guide-walk-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.guide-walk-step {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+.guide-walk-title {
+    margin: 0.3rem 0 0.1rem;
+    color: var(--color-heading);
+    font: 750 1.2rem/1.25 var(--font-sans);
+}
+.guide-walk-figure {
+    margin-top: 0.4rem;
+}
+.guide-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
+    max-width: 560px;
+}
+.guide-board .word-card {
+    height: 46px;
+    min-height: 46px;
+    margin-bottom: 0;
+    padding: 0.3rem 0.35rem;
+    font-size: 0.82rem;
+}
+.guide-board .word-card .card-mark {
+    font-size: 0.7rem;
+}
+.guide-walk-panel {
+    margin-bottom: 0.7rem;
+}
+.guide-walk-label {
+    margin: 0.7rem 0 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-heading);
+}
+.guide-walk-input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--card-surface);
+    color: var(--color-text);
+    font-size: 0.88rem;
+}
+.guide-walk-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.7rem;
+}
+.guide-walk-grow {
+    flex: 1;
+}
+.guide-walk-select {
+    min-width: 64px;
+    text-align: center;
+}
+.guide-walk-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.guide-walk-chip {
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    background: var(--card-surface);
+    color: var(--color-heading);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.guide-walk-chip.on {
+    border-color: var(--role-clue);
+    background: var(--role-clue);
+    color: #fff;
+}
+.guide-walk-rating {
+    display: flex;
+    gap: 0.4rem;
+}
+.guide-walk-rate {
+    display: grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--card-surface);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+.guide-walk-rate.on {
+    border-color: var(--color-heading);
+    box-shadow: inset 0 0 0 2px var(--color-heading);
+}
+.guide-walk-ends {
+    display: flex;
+    justify-content: space-between;
+    max-width: 11.6rem;
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+}
+.guide-walk-button {
+    padding: 0.4rem 1.2rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--card-surface);
+    color: var(--color-heading);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+.guide-walk-button.primary {
+    border-color: var(--role-clue-strong);
+    background: var(--role-clue-strong);
+    color: #fff;
+}
+.guide-walk-points {
+    font-size: 0.82rem;
+}
+.guide-walk-dots {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.guide-walk-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-border-strong);
+}
+.guide-walk-dot.on {
+    background: var(--color-primary-strong);
+}
+.guide-walk-figure .guide-walk-row:first-child {
+    margin-top: 0;
+}
+/* Numbered heading, as the clue-giver form numbers its own steps. */
+.guide-walk-formstep {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+.guide-walk-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--role-clue-soft);
+    color: var(--role-clue-strong);
+    font-size: 0.78rem;
+    letter-spacing: 0;
+}
+/* The prediction is a drop-down with tags in the game, unlike the target
+   buttons of step 2 -- the picture keeps that difference visible. */
+.guide-walk-multiselect {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    max-width: 560px;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: #ffffff;
+}
+.guide-walk-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.guide-walk-tag-x {
+    opacity: 0.8;
+}
+.guide-walk-caret {
+    margin-left: auto;
+    color: var(--color-text-muted);
+}
+.guide-walk-roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.4rem;
+}
+.guide-walk-role {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+}
+.guide-walk-role-text {
+    font-size: 0.82rem;
+    color: var(--color-text);
+}
+.guide-walk-compare {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.guide-walk-ok,
+.guide-walk-bad {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: var(--radius-md);
+    font-size: 0.86rem;
+}
+.guide-walk-ok {
+    background: var(--card-success-bg);
+    color: var(--card-success-text);
+}
+.guide-walk-bad {
+    background: var(--card-danger-bg);
+    color: var(--card-danger-text);
+}
+.guide-walk-mark {
+    font-weight: 800;
+}
+.guide-walk-note {
+    margin-left: auto;
+    font-size: 0.74rem;
+    opacity: 0.85;
+}
+/* Every step gets the same height (that of the tallest step), so the box
+   and the Back/Next buttons stay in place while stepping through. */
+.st-key-guide_walk_body {
+    min-height: 530px;
+}
+.guide-walk-split {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+}
+.guide-walk-split .guide-figure {
+    margin: 0.4rem 0 0;
+}
+@media (max-width: 640px) {
+    .guide-board .word-card {
+        font-size: 0.7rem;
+    }
+    /* Phones: the tallest step is much taller than the rest, so only a
+       smaller floor -- most steps still keep the buttons in one place. */
+    .st-key-guide_walk_body {
+        min-height: 720px;
+    }
+    .guide-walk-split {
+        grid-template-columns: 1fr;
+    }
+}

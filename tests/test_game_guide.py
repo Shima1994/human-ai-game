@@ -98,23 +98,35 @@ class GameGuideTests(unittest.TestCase):
     def test_screen_uses_expected_progressive_disclosure_and_navigation(self):
         source = Path("ui/screens.py").read_text(encoding="utf-8-sig")
         tree = ast.parse(source)
-        function = next(
-            node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == "screen_welcome"
-        )
-        screen_source = ast.get_source_segment(source, function)
-        self.assertIn('"**1**　Overview", expanded=True', screen_source)
-        self.assertIn('"**2**　Your Role", expanded=True', screen_source)
-        self.assertIn('"**4**　When You Are the Clue-Giver"', screen_source)
+
+        def function_source(name):
+            node = next(
+                node
+                for node in tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == name
+            )
+            return ast.get_source_segment(source, node)
+
+        screen_source = function_source("screen_welcome")
+        rules_source = function_source("_render_written_guide")
+        # The no-AI notice comes first, then the visual walkthrough and the
+        # full written rules as two tabs; Continue only unlocks once the
+        # walkthrough's last step has been reached.
         self.assertLess(
             screen_source.index('key="guide_no_ai_notice"'),
-            screen_source.index('"**1**　Overview"'),
+            screen_source.index("st.tabs("),
         )
-        self.assertIn("render_guide_section(3, cards_title", screen_source)
-        self.assertIn("zip(later_sections, section_icons[1:]), start=5", screen_source)
-        self.assertIn("expanded=False", screen_source)
+        self.assertIn("render_guide_walkthrough()", screen_source)
+        self.assertIn("_render_written_guide()", screen_source)
+        self.assertIn("disabled=not walkthrough_done", screen_source)
         self.assertIn("st.session_state.started = True", screen_source)
+
+        self.assertIn('"**1**　Overview", expanded=True', rules_source)
+        self.assertIn('"**2**　Your Role", expanded=True', rules_source)
+        self.assertIn('"**4**　When You Are the Clue-Giver"', rules_source)
+        self.assertIn("render_guide_section(3, cards_title", rules_source)
+        self.assertIn("zip(later_sections, section_icons[1:]), start=5", rules_source)
+        self.assertIn("expanded=False", rules_source)
 
     def test_role_section_shows_the_in_game_role_badges(self):
         from ui.components import ROLE_BADGE_LABELS
