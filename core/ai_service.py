@@ -916,7 +916,7 @@ GUESS_SYSTEM_PROMPT = """You are an expert semantic guesser in a cooperative Cod
 GAME RULES
 - The board has 16 words. Some are good targets, some are neutral (safe but wrong), two are bombs (round-ending).
 - You only see the clue and the words — never the hidden roles.
-- Hitting either bomb ends the round with zero points.
+- Hitting either bomb ends the round immediately; points already earned this round still count, but the remaining targets can no longer be found.
 
 HOW TO PICK GREAT GUESSES
 1. First translate the clue into its most ordinary meaning, including common non-English clues if obvious. For example, Persian "دزد دریایی" means pirate.

@@ -161,7 +161,7 @@ Round-level fields additionally include `ai_round_reflection` and `human_round_f
 
 Until schema 2.1.0 these ratings were asked once at the end of the game and stored on the session row (`post_game_*`, `ai_post_game_*`); those sessions keep them in their `data` JSON.
 
-Turn metrics use the live game outcome: `hit_rate` is target guesses divided by all submitted guesses, `target_yield` and `turn_score_delta` are newly found targets, and `jaccard_alignment` compares intended and guessed-card sets. Skip/timeout rows have zero outcome metrics because no guesses were finalized; unavailable legacy/incomplete metrics remain blank.
+Turn metrics use the live game outcome: `hit_rate` is target guesses divided by all submitted guesses, `target_yield` is the number of newly found targets, and `jaccard_alignment` compares intended and guessed-card sets. Skip/timeout rows have zero outcome metrics because no guesses were finalized; unavailable legacy/incomplete metrics remain blank.
 
 Rating fields represent different stages and directions, not one mutual score. Each field holds the answer to exactly one question and is blank on turns where that question is not asked:
 
@@ -170,6 +170,8 @@ Rating fields represent different stages and directions, not one mutual score. E
 - `human_rating_i_understood_ai_clue` — turns where the AI gives the clue, after the human's guesses (or skip): "How well do you think you understood the AI's clue?"
 
 Until schema 2.1.0 a single field, `human_perceived_understanding_rating`, held the post-turn answer to different questions depending on the role and on whether guesses were made; those sessions keep it in their `data` JSON.
+
+Schema 2.3.0 stores missing values as an empty string everywhere (never null) and drops five columns that always repeated another one: `remaining_targets_start` (= `target_words`), `bomb_selected` (= `round_terminated_by_bomb`), `ai_explanation` (= `ai_explanation_sanitized`), `human_timed_out` (= `timed_out`) and `turn_score_delta` (= `target_yield`). Older rows keep them in their `data` JSON.
 - `human_explanation_*` is the canonical pre-AI General Link, with `human_explanation_source=pre_ai_human_clue_form` and `human_explanation_collected_at` marking its origin and submission time.
 - `human_round_feedback` is the qualitative end-of-round response. The five `round_questionnaire_*` round fields are the human's per-round questionnaire items (1 = strongly disagree, 5 = strongly agree); the `ai_round_questionnaire_*` fields are the AI's mirrored self-report for the same round. `attention_check_mid_game_answer` (session) is the second attention check, shown among the round 2 questions; the first is `attention_check_profile_answer` on the profile page. A submission counts as failed only when both are failed.
 

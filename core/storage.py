@@ -103,7 +103,6 @@ ROUNDS_LOG_FIELDS = [
     "neutral_word_types",
     "bomb_words",
     "bomb_word_types",
-    "remaining_targets_start",
     "remaining_targets_end",
     "number_of_turns",
     "round_score",
@@ -113,7 +112,6 @@ ROUNDS_LOG_FIELDS = [
     "total_stars_so_far",
     "round_completed",
     "round_terminated_by_bomb",
-    "bomb_selected",
     "selected_bomb_words",
     "round_start_time",
     "round_end_time",
@@ -187,7 +185,6 @@ TURNS_LOG_FIELDS = [
     "jaccard_alignment",
     "alignment_status",
     "error_type",
-    "turn_score_delta",
     "turn_points",
     "turn_start_time",
     "turn_end_time",
@@ -225,7 +222,6 @@ TURNS_LOG_FIELDS = [
     "ai_explanation_sanitized",
     "ai_explanation_is_valid",
     "ai_explanation_blocked_reason",
-    "ai_explanation",
     "repair_applied_to_next_prompt",
     "repair_context_used",
     "repair_required",
@@ -240,7 +236,6 @@ TURNS_LOG_FIELDS = [
     "timer_duration_seconds",
     "clue_timer_started_at",
     "clue_extra_time_used",
-    "human_timed_out",
     "timeout_timestamp",
     "timed_out",
     "timeout_repair_attempt",
@@ -328,6 +323,11 @@ def ensure_flat_views():
         ]
     )
     _flat_views_ready = True
+
+
+def _blank_if_none(value):
+    """Missing values are stored as "" everywhere (never JSON null)."""
+    return "" if value is None else value
 
 
 def _json(value):
@@ -818,7 +818,6 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "neutral_word_types": _json(_types_for_words(st.session_state.neutral_words, word_type_per_card)),
         "bomb_words": _json(bomb_words),
         "bomb_word_types": _json(_types_for_words(bomb_words, word_type_per_card)),
-        "remaining_targets_start": _json(st.session_state.target_words),
         "remaining_targets_end": _json(
             [word for word in st.session_state.target_words if word not in st.session_state.found_targets]
         ),
@@ -830,7 +829,6 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "total_stars_so_far": st.session_state.get("total_stars_so_far", 0),
         "round_completed": bool(st.session_state.round_finished),
         "round_terminated_by_bomb": bool(st.session_state.round_bomb_hit),
-        "bomb_selected": bool(selected_bombs),
         "selected_bomb_words": _json(selected_bombs),
         "round_start_time": round_start or "",
         "round_end_time": round_end,
@@ -896,8 +894,10 @@ def _llm_fields_for_turn(item):
         }
         model = HINT_MODEL_NAME
         temperature = "0.55"
-        prompt_version = "hint_v2_condition_memory"
-        system_version = f"hint_system_v2_{condition}"
+        # v3 (schema 2.3.0): role-labelled human ratings in the adaptive
+        # memory, corrected bomb rule in the guess prompt.
+        prompt_version = "hint_v3_condition_memory"
+        system_version = f"hint_system_v3_{condition}"
     else:
         raw = item.get("guess_raw_response", "")
         latency = item.get("guess_response_time_sec")
@@ -915,8 +915,8 @@ def _llm_fields_for_turn(item):
         }
         model = GUESS_MODEL_NAME
         temperature = "0.2"
-        prompt_version = "guess_v2_partial_skip"
-        system_version = f"guess_system_v2_{condition}"
+        prompt_version = "guess_v3_partial_skip"
+        system_version = f"guess_system_v3_{condition}"
     error = raw if str(raw).startswith("<api_error:") else ""
     return {
         "llm_model": model,
@@ -963,7 +963,7 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "clue": item.get("hint", ""),
         "clue_number": item.get("hint_number", ""),
         "hint_explanation": item.get("hint_explanation", ""),
-        "hint_attempts": item.get("hint_attempts"),
+        "hint_attempts": _blank_if_none(item.get("hint_attempts")),
         "board_template_id": st.session_state.get("board_template_id", ""),
         "board_material_version": st.session_state.get("board_material_version", ""),
         "board_instance_id": st.session_state.get("board_instance_id", ""),
@@ -1012,7 +1012,6 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         ),
         "alignment_status": item.get("alignment_status", ""),
         "error_type": item.get("error_type", "none"),
-        "turn_score_delta": item.get("turn_score_delta", ""),
         "turn_points": item.get("turn_points", ""),
         "turn_start_time": item.get("turn_start_time", ""),
         "turn_end_time": item.get("turn_end_time", ""),
@@ -1053,7 +1052,9 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "reflection_end_time": item.get("reflection_end_time", ""),
         "reflection_time_sec": _format_optional_float(item.get("reflection_time_sec")),
         "reflection_source": item.get("reflection_source", ""),
-        "human_expected_ai_understanding_rating": item.get("human_expected_ai_understanding_rating"),
+        "human_expected_ai_understanding_rating": _blank_if_none(
+            item.get("human_expected_ai_understanding_rating")
+        ),
         "human_rating_ai_understood_my_clue": item.get("human_rating_ai_understood_my_clue", ""),
         "human_rating_i_understood_ai_clue": item.get("human_rating_i_understood_ai_clue", ""),
         "human_relationship_type": item.get("human_relationship_type", ""),
@@ -1068,7 +1069,6 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "ai_explanation_sanitized": ai_sanitized,
         "ai_explanation_is_valid": bool(ai_valid),
         "ai_explanation_blocked_reason": item.get("ai_explanation_blocked_reason", ""),
-        "ai_explanation": ai_sanitized,
         "repair_applied_to_next_prompt": bool(item.get("repair_attempt")),
         "repair_context_used": _json_obj(
             {
@@ -1093,7 +1093,6 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "timer_duration_seconds": item.get("timer_duration_seconds", ""),
         "clue_timer_started_at": item.get("clue_timer_started_at", ""),
         "clue_extra_time_used": bool(item.get("clue_extra_time_used", False)),
-        "human_timed_out": bool(item.get("human_timed_out", False)),
         "timeout_timestamp": item.get("timeout_timestamp", ""),
         "timed_out": bool(item.get("timed_out", False)),
         "timeout_repair_attempt": bool(item.get("timeout_repair_attempt", False)),
