@@ -9,7 +9,7 @@ class PageNavigationTests(unittest.TestCase):
         self.assertIn("previous_view != current_view", app_source)
         self.assertIn("scroll_page_to_top(should_scroll)", app_source)
         self.assertIn("tutorial_step", app_source)
-        self.assertIn("post_study_questionnaire", app_source)
+        self.assertNotIn("post_study_questionnaire", app_source)
         self.assertIn("debriefing", app_source)
         self.assertIn("completion", app_source)
         self.assertIn("round_finished", app_source)

@@ -803,8 +803,8 @@ class GuesserTurnStateClearedBeforeAiExplanationTests(unittest.TestCase):
 
 
 class DebriefingGateOrderingTests(unittest.TestCase):
-    """The debriefing document (with the real completion code) must not
-    render before the post-game questionnaire is submitted."""
+    """The questionnaire is asked after every round, so the game-over screen
+    goes straight from the final result to the debriefing."""
 
     def _base_state(self, at):
         at.session_state["consent_given"] = True
@@ -820,38 +820,32 @@ class DebriefingGateOrderingTests(unittest.TestCase):
         at.session_state["completion_code"] = "TESTCODE1"
         at.session_state["session_completed_logged"] = True
 
-    def test_debriefing_hidden_until_questionnaire_submitted(self):
+    def test_no_end_of_game_questionnaire_before_the_debriefing(self):
         at = _fresh_app()
         self._base_state(at)
-        at.session_state["post_game_questionnaire_submitted"] = False
         at.run()
 
         self.assertFalse(at.exception)
         rendered = _all_markdown_text(at)
-        self.assertNotIn("TESTCODE1", rendered)
-        self.assertIn("Final questions", rendered)
+        self.assertNotIn("Final questions", rendered)
+        self.assertEqual(len(at.radio), 0)
 
-    def test_debriefing_shown_with_completion_code_after_questionnaire(self):
+    def test_debriefing_does_not_show_the_completion_code(self):
         at = _fresh_app()
         self._base_state(at)
-        at.session_state["post_game_questionnaire_submitted"] = True
         at.session_state["debriefing_acknowledged"] = False
         at.run()
 
         self.assertFalse(at.exception)
         rendered = _all_markdown_text(at)
-        self.assertIn("TESTCODE1", rendered)
-        self.assertIn("Your completion code", rendered)
+        self.assertNotIn("TESTCODE1", rendered)
+        self.assertNotIn("Your completion code", rendered)
 
-    def test_completion_code_still_visible_on_the_final_thank_you_screen(self):
-        """The debriefing page is not the participant's last stop -- clicking
-        "Finish study" moves on to a final thank-you screen. A participant
-        who didn't copy the code down on the debriefing page must still be
-        able to see it here, since this is the screen they're actually
-        looking at when they go paste it into Prolific."""
+    def test_completion_code_shown_on_the_final_screen_after_finish(self):
+        """The code appears only after Finish study, on the final screen the
+        participant looks at when they paste it into Prolific."""
         at = _fresh_app()
         self._base_state(at)
-        at.session_state["post_game_questionnaire_submitted"] = True
         at.session_state["debriefing_acknowledged"] = True
         at.session_state["remote_log_status"] = ""
         at.run()
@@ -859,12 +853,12 @@ class DebriefingGateOrderingTests(unittest.TestCase):
         self.assertFalse(at.exception)
         rendered = _all_markdown_text(at)
         self.assertIn("TESTCODE1", rendered)
+        self.assertIn("Enter this code on Prolific to confirm your participation", rendered)
 
     def test_prolific_participant_gets_return_to_prolific_link(self):
         at = _fresh_app()
         self._base_state(at)
         at.session_state["prolific_pid"] = "5f1a2b3c4d5e6f7a8b9c0d1e"
-        at.session_state["post_game_questionnaire_submitted"] = True
         at.session_state["debriefing_acknowledged"] = True
         at.session_state["remote_log_status"] = ""
         at.run()

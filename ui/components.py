@@ -10,6 +10,7 @@ from core.game_logic import compute_round_score
 from core.constants import (
     BOARD_SIZE,
     BOMB_COUNT,
+    CLUE_GIVER_EXTRA_SECONDS,
     CLUE_GIVER_TIMER_SECONDS,
     FINAL_GUESS_TIMER_SECONDS,
     FINAL_MEDAL_BRONZE_MIN,
@@ -738,7 +739,13 @@ def render_round_chip(text):
     )
 
 
-def render_clue_timer(remaining_seconds, pinned=True):
+GUESS_TIME_WARNING_SECONDS = 30
+GUESS_TIME_WARNING_TEXT = (
+    f"Only {GUESS_TIME_WARNING_SECONDS} seconds left. Please make your guess."
+)
+
+
+def render_clue_timer(remaining_seconds, pinned=True, warning_id=""):
     """A ring countdown (conic-gradient arc around a hollow clock face),
     sticky to the top of the viewport instead of scrolling away with the
     page -- so it stays visible during every timed decision, not just while
@@ -751,6 +758,11 @@ def render_clue_timer(remaining_seconds, pinned=True):
     timer can then scroll out of view on a long form below the board;
     pinned=True (the default, used by the tutorial and any other caller)
     keeps the original always-on-screen behavior unchanged.
+
+    warning_id (guessing timers only): when GUESS_TIME_WARNING_SECONDS are
+    left, the browser shows a short pop-up, once per id (the timer's start
+    time), so a rerun inside the last seconds doesn't show it again. Not
+    during the final-chance window, which has its own message.
 
     The ring itself (arc angle, color, border) is a plain st.markdown element,
     not a custom HTML/JS component -- those render inside a sandboxed iframe
@@ -773,6 +785,7 @@ def render_clue_timer(remaining_seconds, pinned=True):
     """
     remaining = max(0, int(math.ceil(remaining_seconds or 0)))
     is_final_guess = bool(st.session_state.get("final_guess_deadline_active"))
+    is_extra_time = bool(st.session_state.get("clue_extra_time_granted")) and remaining > 0
     clock = f"{remaining // 60:02d}:{remaining % 60:02d}"
     # Absolute deadline (ms since epoch, matches JS Date.now()) so the tiny
     # ticking script below can compute "seconds left" independently on every
@@ -787,6 +800,9 @@ def render_clue_timer(remaining_seconds, pinned=True):
     if is_final_guess:
         state_class = " final"
         caption = "Final chance"
+    elif is_extra_time:
+        state_class = " final"
+        caption = "Extra time"
     elif remaining <= 0:
         state_class = " expired"
         caption = "Time&rsquo;s up"
@@ -806,10 +822,20 @@ def render_clue_timer(remaining_seconds, pinned=True):
     # cross-frame script below advances it (and the warning state) every
     # second, together with the clock digits.
     total = st.session_state.get("clue_timer_duration_seconds") or remaining or 1
+    if is_extra_time:
+        # The ring restarts full for the extra time instead of showing a
+        # sliver of the extended total.
+        total = CLUE_GIVER_EXTRA_SECONDS
     # The filled arc represents time REMAINING (starts as a full circle,
     # empties out as the deadline approaches) -- the more familiar
     # countdown-ring convention, not "elapsed so far."
     progress_deg = max(0, min(360, round(360 * (remaining / total))))
+    warning_attrs = (
+        f' data-warn-ms="{GUESS_TIME_WARNING_SECONDS * 1000}" data-warn-id="{escape(str(warning_id))}"'
+        f' data-warn-text="{escape(GUESS_TIME_WARNING_TEXT)}"'
+        if warning_id and not is_final_guess
+        else ""
+    )
     caption_html = (
         f'<div class="timer-caption">{caption}</div>' if caption else ""
     )
@@ -822,7 +848,7 @@ def render_clue_timer(remaining_seconds, pinned=True):
     st.markdown(
         f'<div class="{row_class}">{caption_html}'
         f'<span class="timer-pill{state_class}" style="--ring-progress: {progress_deg}deg;" '
-        f'data-deadline-ms="{deadline_ms}" data-total-ms="{int(total * 1000)}" aria-live="polite">'
+        f'data-deadline-ms="{deadline_ms}" data-total-ms="{int(total * 1000)}"{warning_attrs} aria-live="polite">'
         f'<span class="timer-ring-label">{clock_html}</span></span></div>',
         unsafe_allow_html=True,
     )
@@ -839,6 +865,16 @@ def render_clue_timer(remaining_seconds, pinned=True):
     st_components.html(
         """
         <script>
+          function showTimeWarning(parentDoc, text) {
+            const old = parentDoc.querySelector(".timer-warning-popup");
+            if (old) old.remove();
+            const box = parentDoc.createElement("div");
+            box.className = "timer-warning-popup";
+            box.setAttribute("role", "alert");
+            box.textContent = text;
+            parentDoc.body.appendChild(box);
+            window.parent.setTimeout(() => box.remove(), 6000);
+          }
           function tickClueTimer() {
             const parentDoc = window.parent.document;
             // The ring and the last-15-seconds warning advance every second
@@ -852,6 +888,16 @@ def render_clue_timer(remaining_seconds, pinned=True):
               const degrees = Math.max(0, Math.min(360, (360 * left) / total));
               pill.style.setProperty("--ring-progress", degrees + "deg");
               const seconds = Math.round(left / 1000);
+              const warnMs = parseInt(pill.dataset.warnMs || "0", 10);
+              const warnId = pill.dataset.warnId || "";
+              if (warnMs && warnId && left > 0 && left <= warnMs) {
+                const shown = window.parent.__guessTimeWarnings
+                  || (window.parent.__guessTimeWarnings = {});
+                if (!shown[warnId]) {
+                  shown[warnId] = true;
+                  showTimeWarning(parentDoc, pill.dataset.warnText);
+                }
+              }
               if (seconds > 0 && seconds <= 15 && !pill.classList.contains("final")
                   && !pill.classList.contains("warn")) {
                 pill.classList.add("warn");
@@ -1096,7 +1142,7 @@ def render_hint_target_selector(
 
 
 def render_interaction_history(
-    history, show_ai_intended=False, share_explanations=True, show_title=True
+    history, show_ai_intended=False, share_explanations=True, show_title=True, show_points=False
 ):
     title_html = '<div class="panel-title">History</div>' if show_title else ""
     if not history:
@@ -1148,13 +1194,14 @@ def render_interaction_history(
             outcome = "Wrong"
             outcome_class = "history-outcome-wrong"
 
-        def chip_row(label, values, empty="none", class_for_value=None):
+        def chip_row(label, values, empty="none", class_for_value=None, suffix_for_value=None):
             chip_items = []
             for value in values:
                 css_class = "history-chip"
                 if class_for_value:
                     css_class = f"{css_class} {class_for_value(value)}".strip()
-                chip_items.append(f"<span class='{css_class}'>{escape(value)}</span>")
+                suffix = suffix_for_value(value) if suffix_for_value else ""
+                chip_items.append(f"<span class='{css_class}'>{escape(value)}{suffix}</span>")
             chips = "".join(chip_items)
             if not chips:
                 chips = f"<span class='history-chip muted'>{empty}</span>"
@@ -1186,10 +1233,20 @@ def render_interaction_history(
                 return "neutral"
             return ""
 
+        def guess_points(value):
+            if not show_points or value not in correct_set:
+                return ""
+            points = (
+                POINTS_EXACT_INTENDED_TARGET
+                if value in intended_targets
+                else POINTS_OTHER_TARGET
+            )
+            return f" <span class='history-chip-points'>+{points}</span>"
+
         guesses_row = (
             ""
             if is_full_skip
-            else chip_row("Guesses", guesses, class_for_value=guess_class)
+            else chip_row("Guesses", guesses, class_for_value=guess_class, suffix_for_value=guess_points)
         )
         skip_interpretation_row = (
             chip_row("Guesser thought", skip_interpreted_cards)
@@ -1212,7 +1269,13 @@ def render_interaction_history(
                 "</div>"
             )
         skip_note = ""
-        if is_skip:
+        if item.get("timed_out") and guesses:
+            skip_used = " One skip was used." if item.get("partial_skip") else ""
+            skip_note = (
+                "<div class='history-skip-note'>Time ran out after "
+                f"{len(guesses)} card(s); the clicked cards count.{skip_used}</div>"
+            )
+        elif is_skip:
             skipped_by = escape((item.get("skipped_by") or guesser).title())
             if is_partial_skip:
                 remaining = item.get("skipped_guesses", max(0, int(item.get("hint_number", 0) or 0) - len(guesses)))

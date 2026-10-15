@@ -183,7 +183,7 @@ class RunTypeAndEligibilityTests(unittest.TestCase):
             session_start_time="2026-01-01T00:00:00",
             prolific_pid="",
             attention_check_profile_answer="A few times a month",
-            attention_check_post_game_answer=2,
+            attention_check_mid_game_answer=2,
         )
         storage.st = SimpleNamespace(session_state=self.state)
 
@@ -213,7 +213,7 @@ class RunTypeAndEligibilityTests(unittest.TestCase):
     def test_failing_both_attention_checks_is_not_eligible(self):
         self.state.prolific_pid = "5f1a2b3c4d5e6f7a8b9c0d1e"
         self.state.attention_check_profile_answer = "Daily"
-        self.state.attention_check_post_game_answer = 5
+        self.state.attention_check_mid_game_answer = 5
         self.assertFalse(self.row()["analysis_eligible"])
 
     def test_pilot_deployment_is_labelled_pilot_and_not_eligible(self):
@@ -251,7 +251,7 @@ def _history_with_sentinels():
             "human_explanation_raw": SENTINELS["explanation"],
             "human_explanation_sanitized": SENTINELS["explanation"],
             "skip_interpreted_cards": [SENTINELS["interpretation"]],
-            "human_perceived_understanding_rating": 4,
+            "human_rating_ai_understood_my_clue": 4,
             "outcome": "correct",
             "correct": True,
         }

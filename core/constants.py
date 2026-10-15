@@ -9,7 +9,7 @@ REFLECTION_MODEL_NAME = "gpt-5.4-2026-03-05"
 # values to their platform's exact identifiers; blank means unavailable and is
 # preferable to fabricated provenance.
 EXPERIMENT_VERSION = os.getenv("EXPERIMENT_VERSION", "pilot-v1")
-SCHEMA_VERSION = "2.1.0"
+SCHEMA_VERSION = "2.2.0"
 CODE_COMMIT = next(
     (
         os.getenv(name, "").strip()
@@ -52,6 +52,10 @@ MAX_SKIPS_PER_ROUND = 2
 CLUE_TIMER_SECONDS = 90
 # Giving a clue is harder than guessing one, so it gets more time.
 CLUE_GIVER_TIMER_SECONDS = 120
+# When the clue-giver's time runs out, they first get this much extra time
+# once per clue (announced by a pop-up); only when that also runs out is it
+# a timeout, handled exactly as before.
+CLUE_GIVER_EXTRA_SECONDS = 30
 GUESSER_TIMER_SECONDS = CLUE_TIMER_SECONDS
 # Once both round skips are used up, a further timeout no longer has a skip
 # to consume -- the participant instead gets one last short window to submit

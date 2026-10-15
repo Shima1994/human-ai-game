@@ -165,9 +165,9 @@ Skipping is therefore available as a safety mechanism when communication is uncl
     ),
     (
         "Time Limit",
-        f"""When it is your turn to select a card, you will be given {GUESSER_TIMER_SECONDS} seconds as a Guesser. If you run out of time, it will consume one of your skip and game continues. The time take by AI is not counted. If you have already used both of your skips, you will be given {FINAL_GUESS_TIMER_SECONDS} seconds to make your guess or it will trigger the bomb card event.
+        f"""When it is your turn to select a card, you will be given {GUESSER_TIMER_SECONDS} seconds as a Guesser. If you run out of time, it will consume one of your skip and game continues. The time take by AI is not counted. If you have already used both of your skips, you will be given {FINAL_GUESS_TIMER_SECONDS} seconds to make your guess or the round ends automatically: you keep the points you already earned, but you get no star for that round.
 
-As a Clue-Giver, you will be given {CLUE_GIVER_TIMER_SECONDS} seconds to give a clue. If you run out of time (except for the first time when this happens in which case you will be allowed to finish the turn), you will consume one of the AI's three Guess turns until you run out and trigger the bomb card.
+As a Clue-Giver, you will be given {CLUE_GIVER_TIMER_SECONDS} seconds to give a clue. If you run out of time (except for the first time when this happens in which case you will be allowed to finish the turn), you will consume one of the AI's three Guess turns; when all three are used, the round ends.
 
 Try to answer carefully, but do not wait until the final seconds to submit your response.""",
     ),

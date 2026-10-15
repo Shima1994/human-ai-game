@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from core.constants import CLUE_TIMER_SECONDS
+from core.constants import CLUE_GIVER_TIMER_SECONDS, CLUE_TIMER_SECONDS
 from core.tutorial import (
     TUTORIAL_BOARD,
     TUTORIAL_BOMB,
@@ -114,6 +114,18 @@ class TutorialTests(unittest.TestCase):
             tutorial_time_remaining(started.isoformat(), started + timedelta(seconds=90)),
             0.0,
         )
+
+    def test_practice_clue_round_gets_the_real_clue_giver_time(self):
+        started = datetime(2026, 1, 1, 12, 0, 0)
+        self.assertEqual(
+            tutorial_time_remaining(
+                started.isoformat(), started, duration_seconds=CLUE_GIVER_TIMER_SECONDS
+            ),
+            float(CLUE_GIVER_TIMER_SECONDS),
+        )
+        source = Path("ui/screens.py").read_text(encoding="utf-8-sig")
+        clue_round = source[source.index('if step == "human_clue_round"'):]
+        self.assertIn("duration_seconds=CLUE_GIVER_TIMER_SECONDS", clue_round[:1200])
 
     def test_tutorial_has_no_ai_condition_or_experimental_recording_calls(self):
         source = Path("ui/screens.py").read_text(encoding="utf-8-sig")

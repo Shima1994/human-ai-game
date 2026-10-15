@@ -15,6 +15,8 @@ import streamlit as st
 from core.constants import (
     BOARD_SIZE,
     BOMB_COUNT,
+    CLUE_GIVER_TIMER_SECONDS,
+    GUESSER_TIMER_SECONDS,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
     N_ROUNDS,
@@ -29,7 +31,6 @@ from ui.components import (
     guide_history_figure,
     guide_scoring_figure,
     guide_status_bar_figure,
-    guide_timers_figure,
     role_badge_html,
 )
 
@@ -135,6 +136,16 @@ def _rating(question, selected):
     )
 
 
+def _timer(role, seconds, label):
+    """The countdown ring as the game shows it next to the board."""
+    return (
+        f'<div class="guide-timer"><span class="timer-pill" style="--ring-progress: 360deg; '
+        f'--color-primary-strong: var(--role-{role}-strong);">'
+        f'<span class="timer-ring-label">{seconds // 60:02d}:{seconds % 60:02d}</span></span>'
+        f'<span class="guide-timer-label">{escape(label)}</span></div>'
+    )
+
+
 def _points(text):
     return f'<span class="medal-chip points guide-walk-points">{escape(text)}</span>'
 
@@ -162,8 +173,13 @@ def fig_roles():
     return _figure(f'<div class="guide-walk-roles">{items}</div>')
 
 
-def fig_clue_board():
-    return _figure(_board(CLUE_GIVER_BOARD, reveal=True), "Your board as the Clue-Giver.")
+def fig_clue_board_and_timer():
+    body = (
+        '<div class="guide-walk-board-timer">'
+        f"{_board(CLUE_GIVER_BOARD, reveal=True)}"
+        f'{_timer("clue", CLUE_GIVER_TIMER_SECONDS, "Your time")}</div>'
+    )
+    return _figure(body, "Your board as the Clue-Giver, with the timer next to it.")
 
 
 def fig_clue_step1():
@@ -191,7 +207,7 @@ def fig_clue_step3():
 
 def fig_clue_step4():
     body = _form_step(4, "Before AI guesses") + _rating(
-        "How well do you expect the AI understood your clue?", 4
+        "How well do you expect the AI to understand your clue?", 4
     )
     return _figure(body)
 
@@ -230,12 +246,15 @@ def fig_clue_result():
     return _figure(body, "The outlined cards are the AI's guesses.")
 
 
-def fig_guesser_clue():
+def fig_guesser_clue_and_timer():
     word, number = GUESSER_CLUE
-    return _figure(
-        _guide_clue_panel("AI clue", word, number, "guess") + _board(GUESSER_BOARD),
-        "As the Guesser you see only the words.",
+    body = (
+        _guide_clue_panel("AI clue", word, number, "guess")
+        + '<div class="guide-walk-board-timer">'
+        f"{_board(GUESSER_BOARD)}"
+        f'{_timer("guess", GUESSER_TIMER_SECONDS, "Your time")}</div>'
     )
+    return _figure(body, "As the Guesser you see only the words.")
 
 
 def fig_guesser_why():
@@ -254,7 +273,7 @@ def fig_guesser_result():
     body = (
         _board(GUESSER_BOARD, found=(hit,), missed=(miss,), selected=GUESSER_PICKS)
         + _row(_points(f"{hit}: +{POINTS_EXACT_INTENDED_TARGET}"), _points(f"{miss}: 0"))
-        + _rating("After the guesses, how well do you think you understood the AI?", 3)
+        + _rating("How well do you think you understood the AI's clue?", 3)
     )
     return _figure(body)
 
@@ -272,7 +291,7 @@ def fig_skip():
 
 def fig_round_summary():
     body = (
-        '<div class="summary-stat"><strong>Points this round:</strong> 6</div>'
+        '<div class="summary-stat"><strong>Points this round:</strong> 8</div>'
         '<div class="summary-stat"><strong>&#11088; Star earned!</strong></div>'
     )
     return _figure(body, "The end of a round, when all targets were found without a bomb.")
@@ -299,19 +318,19 @@ GUIDE_WALKTHROUGH_SLIDES = (
             f"Each round has a board of {BOARD_SIZE} word cards:",
             fig_goal_board,
             f"**Green** = {TARGET_COUNT} target cards to find · **gray** = {NEUTRAL_COUNT} neutral cards · "
-            f"**red** = {BOMB_COUNT} bombs to avoid. One of you gives a one-word clue, the other guesses.",
+            f"**red** = {BOMB_COUNT} bombs to avoid. One of you gives a clue, **one word and a number**, "
+            "and the other guesses.",
         ),
     ),
     (
         "",
-        "A round begins",
+        "Points, stars and medals",
         (
-            "At the top of the screen, this bar shows how the round is going:",
-            guide_status_bar_figure,
-            f"**Targets found** · **Turns used** ({MAX_INTERACTIONS_PER_ROUND} per round) · "
-            f"**Skips left** ({MAX_SKIPS_PER_ROUND} per round) · your **role** · your **points** and **stars**.",
-            "Next to the board, a timer counts down each decision:",
-            guide_timers_figure,
+            f"**+{POINTS_EXACT_INTENDED_TARGET}** for the card the clue-giver had in mind, "
+            f"**+{POINTS_OTHER_TARGET}** for another target, 0 for a neutral card. "
+            f"Find all {TARGET_COUNT} targets without a bomb to earn a star.",
+            guide_scoring_figure,
+            f"Your points over all {N_ROUNDS} rounds decide your final medal.",
         ),
     ),
     (
@@ -324,12 +343,23 @@ GUIDE_WALKTHROUGH_SLIDES = (
         ),
     ),
     (
+        "",
+        "A round begins",
+        (
+            "At the top of the screen, this bar shows how the round is going:",
+            guide_status_bar_figure,
+            f"**Targets found** · **Turns used** ({MAX_INTERACTIONS_PER_ROUND} per round) · "
+            f"**Skips left** ({MAX_SKIPS_PER_ROUND} per round) · your **role** · your **points** and **stars**.",
+        ),
+    ),
+    (
         "clue",
-        "Your board",
+        "Your board and your time",
         (
             "As the Clue-Giver you see the colour of every card. The AI sees only the words.",
-            fig_clue_board,
-            f"In this example the player wants the AI to find **{CLUE_GIVER_INTENDED[0]}** and "
+            fig_clue_board_and_timer,
+            f"You have **{CLUE_GIVER_TIMER_SECONDS} seconds** for the whole clue (steps 1 to 5), so keep an "
+            f"eye on the timer. In this example the player wants the AI to find **{CLUE_GIVER_INTENDED[0]}** and "
             f"**{CLUE_GIVER_INTENDED[1]}**, and to keep away from the red cards **Knife** and **Fire**.",
         ),
     ),
@@ -356,14 +386,13 @@ GUIDE_WALKTHROUGH_SLIDES = (
         "clue",
         "Step 3 · What you think the AI will choose",
         (
-            "Now open the drop-down list and pick the cards you **expect the AI to choose**. "
-            "This is not about your cards, but your guess about the AI:",
+            "Now look at the board **through the AI's eyes**: it sees only your clue and the words, "
+            "not the colours. Open the drop-down list and pick the cards you expect it to choose:",
             fig_clue_step3,
-            f"Here the player meant **{CLUE_GIVER_INTENDED[0]}** and **{CLUE_GIVER_INTENDED[1]}**, but expects "
-            f"the AI to choose **{CLUE_GIVER_PREDICTED[0]}** and **{CLUE_GIVER_PREDICTED[1]}**, because "
-            f"“{CLUE_GIVER_CLUE[0]}” might also make it think of a plate.",
-            "If you are confident, pick the same cards as in step 2. "
-            "If you think the AI will pick a wrong card, you can still change your clue.",
+            f"Here the player meant **{CLUE_GIVER_INTENDED[0]}** and **{CLUE_GIVER_INTENDED[1]}**, but thinks "
+            f"“{CLUE_GIVER_CLUE[0]}” could also make the AI choose **{CLUE_GIVER_PREDICTED[1]}**.",
+            "Your prediction can match your cards or differ from them. There is no right answer: "
+            "just give your honest guess about the AI.",
         ),
     ),
     (
@@ -397,7 +426,7 @@ GUIDE_WALKTHROUGH_SLIDES = (
             f"The AI chose **{CLUE_GIVER_AI_PICKS[0]}** and **{CLUE_GIVER_AI_PICKS[1]}**, just as the "
             f"player predicted. {CLUE_GIVER_AI_PICKS[0]} was a card the player meant: "
             f"**+{POINTS_EXACT_INTENDED_TARGET} points**. {CLUE_GIVER_AI_PICKS[1]} was neutral: 0 points.",
-            "A short window then asks how well you think you and the AI understood each other.",
+            "A short window then asks how well you think the AI understood your clue.",
         ),
     ),
     (
@@ -406,9 +435,11 @@ GUIDE_WALKTHROUGH_SLIDES = (
         (
             "In another round the roles switch: the AI gives the clue and you guess. "
             "Now you **do not** see the colours.",
-            fig_guesser_clue,
+            fig_guesser_clue_and_timer,
             f"**{GUESSER_CLUE[0].upper()} - {GUESSER_CLUE[1]}** means: {GUESSER_CLUE[1]} target cards "
-            f"are linked to “{GUESSER_CLUE[0]}”. Sometimes you first press **Ask AI for a clue**.",
+            f"are linked to “{GUESSER_CLUE[0]}”. You have **{GUESSER_TIMER_SECONDS} seconds** for each clue, "
+            "and a short warning appears when 30 seconds are left. If the time runs out, the cards you "
+            "have already clicked still count. Sometimes you first press **Ask AI for a clue**.",
         ),
     ),
     (
@@ -417,9 +448,9 @@ GUIDE_WALKTHROUGH_SLIDES = (
         (
             "Before clicking, write **why** you think the cards fit (3–30 English words, no card names):",
             fig_guesser_why,
-            "Writing it first shows how you understood the clue before you see any colours. "
-            "Then click the cards: each click is final, and the turn ends once you have clicked "
-            "as many cards as the number.",
+            "Then click the cards. Each click is final, and the turn ends once you have clicked as many "
+            "cards as the number. **Tip:** click the card you are most sure of first. A bomb ends the "
+            "round at once, and the points you could still have won are lost.",
         ),
     ),
     (
@@ -429,7 +460,9 @@ GUIDE_WALKTHROUGH_SLIDES = (
             fig_guesser_result,
             f"**{GUESSER_PICKS[0]}** was a card the AI meant: **+{POINTS_EXACT_INTENDED_TARGET}**. "
             f"**{GUESSER_PICKS[1]}** was neutral: 0. Because {GUESSER_PICKS[1]} was not a target, you are "
-            "also asked which card you would choose instead. Then you rate how well you understood each other.",
+            "also asked which card you would choose instead. Then you rate how well you understood the AI's clue.",
+            "After every turn, the **History** panel on the left shows the clue, the guesses and the result. "
+            "Have a look at it before your next move, especially when the AI gives the clues.",
         ),
     ),
     (
@@ -438,31 +471,21 @@ GUIDE_WALKTHROUGH_SLIDES = (
         (
             "If the clue is unclear, press **Skip** (under the timer) instead of clicking:",
             fig_skip,
-            f"You have {MAX_SKIPS_PER_ROUND} skips per round. Skipping **before** clicking any card does not "
-            "use one of your turns. Skipping **after** clicking at least one card still counts as a turn. "
-            "You are then asked which cards you think the clue was meant for.",
+            f"You have {MAX_SKIPS_PER_ROUND} skips per round, and every skip uses one of them. Skipping "
+            "**before** clicking any card does not use a turn. Skipping **after** clicking at least one card "
+            "still counts as a turn. Skip is useful when you have clicked the cards you are sure of and the "
+            "rest is unclear or might be a bomb. You are then asked which cards you think the clue was meant for.",
         ),
     ),
     (
         "",
         "The end of a round",
         (
-            f"A round ends after {MAX_INTERACTIONS_PER_ROUND} turns, when all {TARGET_COUNT} targets are found, "
-            "or as soon as a bomb is chosen. You then see all colours, your points, and whether you earned a star:",
+            f"A round ends in one of three ways: all {TARGET_COUNT} targets are found, a bomb is chosen, "
+            f"or {MAX_INTERACTIONS_PER_ROUND} turns are used. You then see all colours, your points, "
+            "and whether you earned a star:",
             fig_round_end,
-            "You also write a short reflection on the round. "
-            "During the round, the History panel on the left keeps every turn.",
-        ),
-    ),
-    (
-        "",
-        "Points, stars and medals",
-        (
-            f"**+{POINTS_EXACT_INTENDED_TARGET}** for the card the clue-giver had in mind, "
-            f"**+{POINTS_OTHER_TARGET}** for another target, 0 for a neutral card. "
-            f"Find all {TARGET_COUNT} targets without a bomb to earn a star.",
-            guide_scoring_figure,
-            f"Your points over all {N_ROUNDS} rounds decide your final medal. "
+            "Then you write a short reflection and answer a few quick questions about the round. "
             "Before the real game, you will play two short practice rounds.",
         ),
     ),

@@ -8,7 +8,7 @@ import streamlit as st
 from core.ai_service import (
     AIClueGenerationError,
     ai_guess,
-    generate_ai_post_game_reflection,
+    generate_ai_round_questionnaire,
     generate_ai_round_reflection,
     generate_ai_hint,
     generate_ai_turn_explanation,
@@ -19,6 +19,7 @@ from core.ai_service import (
 )
 from core.constants import (
     AI_API_TIMEOUT_SECONDS,
+    CLUE_GIVER_EXTRA_SECONDS,
     CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_POSSIBLE_SESSION_SCORE,
@@ -34,7 +35,9 @@ from core.game_logic import (
     can_skip_current_clue,
     clear_participant_decision_timer,
     compute_round_score,
+    finish_round,
     get_final_medal,
+    grant_clue_giver_extra_time,
     participant_decision_timer_expired,
     participant_decision_time_remaining,
     record_forced_timeout_loss,
@@ -66,8 +69,9 @@ from core.tutorial import (
     tutorial_time_remaining,
 )
 from core.prolific import (
-    ATTENTION_CHECK_POST_GAME_ID,
-    ATTENTION_CHECK_POST_GAME_QUESTION,
+    ATTENTION_CHECK_MID_GAME_ID,
+    ATTENTION_CHECK_MID_GAME_QUESTION,
+    ATTENTION_CHECK_MID_GAME_ROUND,
     ATTENTION_CHECK_PROFILE_OPTIONS,
     ATTENTION_CHECK_PROFILE_QUESTION,
     prolific_complete_url,
@@ -112,30 +116,48 @@ from ui.study_documents import (
     render_debriefing_document,
 )
 
-POST_GAME_QUESTIONS = [
+# Asked after every round (not once at the end), so the change in perceived
+# alignment can be followed round by round. Same items as the former
+# end-of-game questionnaire, each framed as "In this round". The AI answers
+# the mirrored items (core.ai_service.AI_ROUND_QUESTIONNAIRE_KEYS).
+ROUND_QUESTIONS = [
     (
         "i_understood_ai_clues",
-        "I felt that I understood what the AI meant when it gave clues.",
+        "In this round, I felt that I understood what the AI meant when it gave clues.",
     ),
     (
         "predict_ai_interpretation",
-        "By the end of the game, I could predict how the AI would interpret my clues.",
+        "In this round, I could predict how the AI would interpret my clues.",
     ),
     (
         "adapted_to_ai_behavior",
-        "I adapted my communication based on the AI's behaviour.",
+        "In this round, I adapted my communication based on the AI's behaviour.",
     ),
     (
         "reflection_helped",
-        "The reflection steps helped me recover from misunderstandings with the AI.",
+        "In this round, the reflection steps helped me recover from misunderstandings with the AI.",
     ),
     (
         "shared_understanding",
-        "By the end of the game, I felt that the AI and I had developed a shared understanding.",
+        "In this round, I felt that the AI and I had developed a shared understanding.",
     ),
 ]
+# Items that only fit one role: understanding the AI's clues is asked only
+# when the AI gave the clues, predicting the AI's interpretation only when
+# the AI guessed the participant's clues. A round's row leaves the other blank.
+ROUND_QUESTION_ROLES = {
+    "i_understood_ai_clues": "ai_clue",
+    "predict_ai_interpretation": "human_clue",
+}
 
 AGE_GROUP_OPTIONS = ["18-24", "25-34", "35-44", "45-54", "55+", "Prefer not to say"]
+# Optional, requested by the supervisor for the main data collection: the
+# participant may skip it, and the characteristics box only opens on "Yes".
+NEURODIVERGENT_QUESTION = "Are you neurodivergent? (optional)"
+NEURODIVERGENT_OPTIONS = ["Yes", "No", "Prefer not to say"]
+NEURODIVERGENT_CHARACTERISTICS_QUESTION = (
+    "If yes, what neurodivergent characteristics do you have? (optional)"
+)
 GENDER_OPTIONS = [
     "Female",
     "Male",
@@ -492,7 +514,7 @@ def _tutorial_round1_result_dialog(result):
         st.warning("The intended cards were Cat and Dog. The revealed colors show each card's role.")
     st.markdown(f"**AI's explanation:** {TUTORIAL_AI_EXPLANATION}")
     rating = st.radio(
-        "After the guesses, how well do you think you and the AI understood each other?",
+        TURN_RATING_GUESSER,
         options=RATING_OPTIONS,
         index=None,
         horizontal=True,
@@ -514,7 +536,7 @@ def _tutorial_round1_result_dialog(result):
 def _tutorial_round2_result_dialog(ai_guesses):
     st.markdown("**Simulated AI guesses:** " + ", ".join(ai_guesses))
     rating_after = st.radio(
-        "After the guesses, how well do you think you and the AI understood each other?",
+        TURN_RATING_CLUE_GIVER,
         options=RATING_OPTIONS,
         index=None,
         horizontal=True,
@@ -677,7 +699,12 @@ def screen_tutorial():
             board_col, board_timer_col = st.columns([1.7, 1])
             with board_timer_col:
                 with st.container(key="tutorial_timer_stack"):
-                    render_clue_timer(remaining, pinned=False)
+                    render_clue_timer(
+                        remaining,
+                        pinned=False,
+                        warning_id="tutorial-"
+                        + str(st.session_state.get("tutorial_practice_started_at", "")),
+                    )
                     tutorial_skip_cluster_placeholder = st.empty()
             with board_col:
                 with st.container(key="tutorial_board_wrap"):
@@ -861,9 +888,22 @@ def screen_tutorial():
         # that from being an accident that breaks the moment the fallback
         # ever changes.
         st.markdown('<div class="role-marker-clue"></div>', unsafe_allow_html=True)
+        # Same as the real clue-giver timer: when the time runs out, the
+        # extra seconds are given once (with the same pop-up) before the
+        # practice counts as expired.
         remaining = tutorial_time_remaining(
-            st.session_state.get("tutorial_practice_started_at", "")
+            st.session_state.get("tutorial_practice_started_at", ""),
+            duration_seconds=CLUE_GIVER_TIMER_SECONDS
+            + (CLUE_GIVER_EXTRA_SECONDS if st.session_state.get("clue_extra_time_granted") else 0),
         )
+        if (
+            remaining <= 0
+            and not st.session_state.get("clue_extra_time_granted")
+            and not st.session_state.get("tutorial_human_clue_submitted")
+        ):
+            st.session_state.clue_extra_time_granted = True
+            _clue_extra_time_toast()
+            remaining = float(CLUE_GIVER_EXTRA_SECONDS)
         render_tutorial_status(
             "Round 2 of 2",
             "You're giving the clue",
@@ -882,6 +922,7 @@ def screen_tutorial():
             st.warning("Practice time expired. This does not affect your study participation or score.")
             if st.button("Retry with a fresh timer", key="tutorial_round2_retry"):
                 st.session_state.tutorial_practice_started_at = _now_iso()
+                st.session_state.clue_extra_time_granted = False
                 st.rerun()
             return
         with st.container(border=True, key="tutorial_human_clue_panel"):
@@ -979,7 +1020,7 @@ def screen_tutorial():
                         st.markdown(
                             """
                             <div class="panel-title section-gap">Before AI guesses</div>
-                            <p class="subtle-text before-ai-question">How well do you expect the AI understood your clue?</p>
+                            <p class="subtle-text before-ai-question">How well do you expect the AI to understand your clue?</p>
                             """,
                             unsafe_allow_html=True,
                         )
@@ -1183,6 +1224,21 @@ def screen_name():
                         horizontal=True,
                         key="profile_codenames_experience",
                     )
+                with st.container(key="profile_neurodivergent_group"):
+                    neurodivergent = st.radio(
+                        NEURODIVERGENT_QUESTION,
+                        NEURODIVERGENT_OPTIONS,
+                        index=None,
+                        horizontal=True,
+                        key="profile_neurodivergent",
+                    )
+                    neurodivergent_characteristics = ""
+                    if neurodivergent == "Yes":
+                        neurodivergent_characteristics = st.text_input(
+                            NEURODIVERGENT_CHARACTERISTICS_QUESTION,
+                            max_chars=200,
+                            key="profile_neurodivergent_characteristics",
+                        )
             with aside_col:
                 with st.container(key="profile_side_cards"):
                     st.markdown(
@@ -1243,6 +1299,12 @@ def screen_name():
                     st.session_state.english_proficiency = english_proficiency
                     st.session_state.ai_experience = ai_experience
                     st.session_state.codenames_experience = codenames_experience
+                    st.session_state.neurodivergent = neurodivergent or ""
+                    st.session_state.neurodivergent_characteristics = (
+                        neurodivergent_characteristics.strip()
+                        if neurodivergent == "Yes"
+                        else ""
+                    )
                     # Recorded, never used to block: Prolific only allows a
                     # rejection after two failed checks, decided afterwards.
                     st.session_state.attention_check_profile_answer = attention_check_answer
@@ -1285,6 +1347,7 @@ def _log_timeout(timeout_timestamp, repair_context):
                 "clue_timer_duration_seconds", CLUE_TIMER_SECONDS
             ),
             "clue_start_timestamp": st.session_state.get("clue_timer_started_at", ""),
+            "clue_extra_time_used": bool(st.session_state.get("clue_extra_time_granted", False)),
             "human_timed_out": True,
             "timeout_timestamp": timeout_timestamp,
             "timed_out": True,
@@ -1318,10 +1381,58 @@ def _handle_skip_exhausted_timeout(hint, hint_number, intended_targets, expected
     return True
 
 
+def _record_partial_timeout(clicked_cards, uses_skip):
+    """Time ran out after the guesser had already clicked at least one card.
+    Those cards were revealed, so they count and score; the rest of the clue
+    is dropped. With a skip left this uses one, exactly like pressing Skip
+    after clicking; in the final window (no skip left) it doesn't."""
+    pending_meta = st.session_state.get("pending_hint_meta") or {}
+    record_interaction(
+        st.session_state.hint,
+        st.session_state.hint_number,
+        clicked_cards,
+        st.session_state.hint_targets,
+        expected_guesses=st.session_state.get("hint_expected_guesses", []),
+        guess_rationale=st.session_state.get("current_guess_rationale", ""),
+        hint_explanation=st.session_state.get("hint_explanation", ""),
+        hint_raw_response=pending_meta.get("raw_response", ""),
+        hint_time_sec=pending_meta.get("hint_time_sec"),
+        hint_response_time_sec=pending_meta.get("response_time_sec"),
+        hint_attempts=pending_meta.get("attempts"),
+        guess_time_sec=_seconds_between(st.session_state.get("current_guess_start_time", "")),
+        partial_skip=uses_skip,
+        skipped_by="human" if uses_skip else None,
+        repair_context=pending_meta.get("repair_context"),
+        timed_out=True,
+    )
+    recorded_item = st.session_state.interaction_history[-1]
+    log_event(
+        "partial_timeout",
+        {
+            "guessed_cards": list(clicked_cards),
+            "used_skip": bool(uses_skip),
+            "completed_turn_number": recorded_item.get("completed_turn_number", ""),
+            "skip_number": recorded_item.get("skip_number", ""),
+        },
+        turn_number=recorded_item.get("turn", ""),
+    )
+    st.session_state.last_timeout_notice = "partial_skip" if uses_skip else "partial_final"
+    _clear_current_clue()
+
+
 def _consume_human_guess_timeout():
     """Consume an expired AI-clue turn once, preserving unsubmitted analysis input."""
     if not st.session_state.get("hint") or not participant_decision_timer_expired():
         return False
+    clicked_cards = list(st.session_state.get("pending_guesses", []))
+    if clicked_cards and can_skip_current_clue():
+        _record_partial_timeout(clicked_cards, uses_skip=True)
+        return True
+    if clicked_cards and st.session_state.get("final_guess_deadline_active"):
+        _record_partial_timeout(clicked_cards, uses_skip=False)
+        if not st.session_state.get("round_finished"):
+            finish_round(forced_loss_reason="timeout_loss")
+        return True
     if not can_skip_current_clue():
         return _handle_skip_exhausted_timeout(
             st.session_state.hint,
@@ -1354,6 +1465,15 @@ def _consume_human_guess_timeout():
     return True
 
 
+def _clue_extra_time_toast():
+    st.toast(
+        f"Time is up, but you get {CLUE_GIVER_EXTRA_SECONDS} extra seconds. "
+        "Please finish your clue quickly.",
+        icon=":material/timer:",
+        duration="long",
+    )
+
+
 def _consume_human_clue_timeout():
     """Consume an expired human clue-form task without invoking the AI.
 
@@ -1368,6 +1488,18 @@ def _consume_human_clue_timeout():
     hatch -- repeated clue-giver timeouts alone will end the round.
     """
     if not participant_decision_timer_expired():
+        return False
+    if grant_clue_giver_extra_time():
+        # No page rerun here: this runs before the clue form is drawn, and a
+        # rerun at this point reset the clue-number box, which then trimmed
+        # the selected target cards. The form simply goes on rendering with
+        # the extended deadline.
+        log_event(
+            "clue_extra_time_granted",
+            {"extra_seconds": CLUE_GIVER_EXTRA_SECONDS},
+            turn_number=_next_action_number(),
+        )
+        _clue_extra_time_toast()
         return False
     turn_index = _current_action_index()
     hint = st.session_state.get(
@@ -1691,7 +1823,6 @@ def _sync_reflection_to_round_summary(item):
         for summary_item in summary.get("interactions", []):
             if summary_item.get("turn") == item.get("turn"):
                 for key in [
-                    "reflection_rating",
                     "reflection_relationship_type",
                     "reflection_explanation_raw",
                     "reflection_explanation_is_valid",
@@ -1699,7 +1830,8 @@ def _sync_reflection_to_round_summary(item):
                     "reflection_start_time",
                     "reflection_end_time",
                     "reflection_time_sec",
-                    "human_perceived_understanding_rating",
+                    "human_rating_ai_understood_my_clue",
+                    "human_rating_i_understood_ai_clue",
                     "human_relationship_type",
                     "human_explanation_raw",
                     "human_explanation_is_valid",
@@ -1722,12 +1854,26 @@ def _sync_reflection_to_round_summary(item):
                     summary_item[key] = item.get(key, "")
 
 
-def _save_turn_reflection(item, understood_ai_rating, relationship_type, explanation):
+# Asked after every turn, the same question with or without guesses. The
+# clue-giver's answer is stored in human_rating_ai_understood_my_clue (it
+# mirrors human_expected_ai_understanding_rating, asked before the AI
+# guesses); the guesser's in human_rating_i_understood_ai_clue.
+TURN_RATING_CLUE_GIVER = "How well do you think the AI understood your clue?"
+TURN_RATING_GUESSER = "How well do you think you understood the AI's clue?"
+
+
+def _turn_understanding_question(human_clue_giver):
+    return TURN_RATING_CLUE_GIVER if human_clue_giver else TURN_RATING_GUESSER
+
+
+def _save_turn_reflection(item, understanding_rating, relationship_type, explanation):
     explanation = (explanation or "").strip()
-    understood_ai_rating = int(understood_ai_rating)
-    item["reflection_rating"] = understood_ai_rating
-    item["human_perceived_understanding_rating"] = understood_ai_rating
-    st.session_state.perception_rating = understood_ai_rating
+    understanding_rating = int(understanding_rating)
+    # One field per question (see _turn_understanding_question).
+    if item.get("clue_giver") == "human":
+        item["human_rating_ai_understood_my_clue"] = understanding_rating
+    else:
+        item["human_rating_i_understood_ai_clue"] = understanding_rating
     if item.get("clue_giver") == "human":
         item["reflection_relationship_type"] = relationship_type or ""
         item["human_relationship_type"] = relationship_type or ""
@@ -1800,9 +1946,18 @@ def _guess_outcome_summary(item):
     bomb = item.get("bomb_guesses", [])
     if outcome == "bomb":
         return "error", f"Bomb hit: {', '.join(bomb)}. The round has ended."
-    if outcome in ("skip", "partial_skip") or not guesses:
+    if not guesses:
         return "info", "Skipped — no cards were guessed this turn."
-    if outcome == "correct" and not neutral:
+    kind, result = _guess_result_text(guesses, correct, neutral)
+    if outcome == "partial_timeout":
+        return kind, f"Time ran out, but the cards you clicked count. {result}"
+    if outcome == "partial_skip":
+        return kind, f"Skipped after {len(guesses)} card(s); those cards count. {result}"
+    return kind, result
+
+
+def _guess_result_text(guesses, correct, neutral):
+    if correct and not neutral:
         was_were = "was" if len(correct) == 1 else "were"
         return "success", f"Correct: {', '.join(correct)} {was_were} the target."
     if correct and neutral:
@@ -1860,7 +2015,11 @@ def _render_live_history_sidebar(history, share_explanations, show_ai_intended=F
             history,
             show_ai_intended=show_ai_intended,
             share_explanations=share_explanations,
-            show_title=False
+            show_title=False,
+            # Points per correct card (+2 shows which card the clue-giver
+            # meant) only in the adaptive game -- not in baseline, which
+            # never shows the AI's intentions, and not in the tutorial.
+            show_points=share_explanations and bool(st.session_state.get("tutorial_completed")),
         )
 
 
@@ -1951,31 +2110,8 @@ def _turn_reflection_dialog(item, human_clue_giver, replacement_count):
             "</div>",
             unsafe_allow_html=True,
         )
-    # A no-guess turn (full skip) has no completed exchange to judge *mutual*
-    # understanding by -- asking "how well did you and the AI understand
-    # EACH OTHER" here has no honest answer. Each role instead rates the one
-    # thing it actually has a basis to judge: the clue-giver rates their own
-    # guess at whether their clue landed (informed by the AI declining to
-    # guess rather than guessing wrong); the guesser rates their own
-    # comprehension of the clue they chose not to act on.
-    # All three branches feed the SAME stored field
-    # (human_perceived_understanding_rating) -- it is one column holding
-    # answers to three different questions, disambiguated only by
-    # reflection_source (human_clue_giver/ai_clue_giver) plus whether this
-    # turn had any guesses at all. Analysis code must join on those two
-    # fields to know which question a given value actually answers:
-    #   had_guesses=True            -> perceived SHARED understanding after a
-    #                                   completed exchange (either role)
-    #   had_guesses=False, clue-giver -> did the AI understand MY clue
-    #   had_guesses=False, guesser    -> did I understand the AI's clue
-    if had_guesses:
-        rating_question = "After the guesses, how well do you think you understood the AI?"
-    elif human_clue_giver:
-        rating_question = "How well do you think the AI understood your clue?"
-    else:
-        rating_question = "How well do you think you understood the AI's clue?"
     st.radio(
-        rating_question,
+        _turn_understanding_question(human_clue_giver),
         options=list(RATING_OPTIONS.keys()),
         index=None,
         format_func=lambda option: f"{option}",
@@ -2177,6 +2313,7 @@ def _save_ai_guess_turn(review, repair_context):
         repair_context=repair_context,
         clue_timer_started_at=review.get("clue_timer_started_at"),
         timer_duration_seconds=review.get("timer_duration_seconds"),
+        clue_extra_time_used=review.get("clue_extra_time_used"),
         human_explanation_raw=review.get("human_explanation_raw", ""),
         human_explanation_is_valid=review.get("human_explanation_is_valid"),
         human_explanation_source=review.get("human_explanation_source", ""),
@@ -2382,7 +2519,7 @@ def screen_human_clue():
                 st.markdown(
                     """
                     <div class="panel-title section-gap">Before AI guesses</div>
-                    <p class="subtle-text before-ai-question">How well do you expect the AI understood your clue?</p>
+                    <p class="subtle-text before-ai-question">How well do you expect the AI to understand your clue?</p>
                     """,
                     unsafe_allow_html=True,
                 )
@@ -2482,7 +2619,7 @@ def screen_human_clue():
             if not predicted_ready:
                 problems.append(f"Please select exactly {selected_count} card(s) you think the AI will choose.")
             if not rating_ready:
-                problems.append("Please select how well you expect the AI understood your clue.")
+                problems.append("Please select how well you expect the AI to understand your clue.")
             if not general_link_is_valid:
                 problems.append(_general_link_error(general_link_blocked_reason))
             _clue_form_errors_dialog(problems)
@@ -2504,6 +2641,7 @@ def screen_human_clue():
             timer_duration_seconds = st.session_state.get(
                 "clue_timer_duration_seconds", CLUE_TIMER_SECONDS
             )
+            clue_extra_time_used = bool(st.session_state.get("clue_extra_time_granted", False))
             log_event(
                 "clue_submitted",
                 {
@@ -2586,6 +2724,7 @@ def screen_human_clue():
                     guess_response_time_sec=guess_result.get("response_time_sec"),
                     clue_timer_started_at=clue_timer_started_at,
                     timer_duration_seconds=timer_duration_seconds,
+                    clue_extra_time_used=clue_extra_time_used,
                     human_explanation_raw=submitted_general_link,
                     human_explanation_is_valid=True,
                     human_explanation_source="pre_ai_human_clue_form",
@@ -2627,6 +2766,7 @@ def screen_human_clue():
                     ),
                     "clue_timer_started_at": clue_timer_started_at,
                     "timer_duration_seconds": timer_duration_seconds,
+                    "clue_extra_time_used": clue_extra_time_used,
                     "human_explanation_raw": submitted_general_link,
                     "human_explanation_is_valid": True,
                     "human_explanation_source": "pre_ai_human_clue_form",
@@ -2657,7 +2797,12 @@ def screen_human_guesser():
 
     render_top_status()
 
-    if st.session_state.pop("last_timeout_notice", False):
+    timeout_notice = st.session_state.pop("last_timeout_notice", False)
+    if timeout_notice == "partial_skip":
+        st.warning("Time expired. The cards you had clicked count, and one of your skips was used.")
+    elif timeout_notice == "partial_final":
+        st.warning("Time expired. The cards you had clicked count, and the round has ended.")
+    elif timeout_notice:
         st.warning("Time expired. That used one of your skips.")
     if st.session_state.pop("final_guess_warning_notice", False):
         st.error(
@@ -2734,7 +2879,11 @@ def screen_human_guesser():
             with board_timer_col:
                 with st.container(key="guesser_timer_skip_stack"):
                     if remaining_time is not None:
-                        render_clue_timer(remaining_time, pinned=False)
+                        render_clue_timer(
+                            remaining_time,
+                            pinned=False,
+                            warning_id=st.session_state.get("clue_timer_started_at", ""),
+                        )
                     skip_cluster_placeholder = st.empty()
         with board_col:
             with st.container(key="human_guesser_board_wrap"):
@@ -2979,6 +3128,9 @@ def screen_human_guesser():
 
 def screen_round_summary():
     render_top_status()
+    if st.session_state.get("round_reflection_saved"):
+        _render_round_questions_page()
+        return
     render_round_chip("Round complete")
 
     summary_col, action_col = st.columns([1.45, 1])
@@ -3085,7 +3237,7 @@ def screen_round_summary():
         feedback_words = _word_count(st.session_state.human_round_feedback)
         st.caption(f"{feedback_words} / 200 words · English only")
 
-        if st.button("Save round and continue", type="primary", use_container_width=True):
+        if st.button("Continue", type="primary", use_container_width=True, key="round_reflection_continue"):
             problems = []
             if feedback_words < 3:
                 problems.append("Please write at least 3 words in your end-of-round reflection.")
@@ -3096,35 +3248,152 @@ def screen_round_summary():
             if problems:
                 _round_summary_errors_dialog(problems)
                 return
+            st.session_state.round_reflection_saved = True
+            log_event(
+                "round_reflection_submitted",
+                {"word_count": feedback_words},
+                round_number=st.session_state.round,
+                turn_number="",
+            )
+            st.rerun()
+
+
+def _render_round_questions_page():
+    """Second page of the round end: only the questions, large and across
+    the full width, after the reflection page. The History stays in the
+    sidebar."""
+    render_round_chip("Round complete")
+    _render_live_history_sidebar(
+        st.session_state.interaction_history,
+        _share_explanations(),
+        show_ai_intended=True,
+    )
+    # Full width, where the board was on the round's own screen.
+    with st.container(key="round_questions_page"):
+        questionnaire_answers = _render_round_questionnaire()
+        if st.button("Save round and continue", type="primary", use_container_width=True):
+            if any(answer is None for answer in questionnaire_answers.values()):
+                _round_summary_errors_dialog(["Please answer all questions about this round."])
+                return
+            _save_round_questionnaire(questionnaire_answers)
             update_current_round_summary()
             log_round(st.session_state.participant_id)
-            medal = st.session_state.round_medal
-            st.session_state.medal_counts[medal] = st.session_state.medal_counts.get(medal, 0) + 1
-
-            if st.session_state.round >= N_ROUNDS:
-                st.session_state.game_over = True
-            else:
-                st.session_state.round += 1
-                st.session_state.board = None
-                st.session_state.round_finished = False
-                st.session_state.guesses = []
-                st.session_state.pending_guesses = []
-                st.session_state.round_skips = 0
-                st.session_state.round_clue_giver_timeouts = 0
-                st.session_state.final_guess_deadline_active = False
-                st.session_state.hint = ""
-                st.session_state.hint_number = 1
-                st.session_state.hint_targets = []
-                st.session_state.hint_explanation = ""
-                st.session_state.previous_hint = None
-                st.session_state.last_ai_guesses = []
-                st.session_state.last_ai_hint = ""
-                st.session_state.pending_hint_meta = None
-                st.session_state.pending_reflection_turn = None
-                st.session_state.ai_round_reflection = ""
-                st.session_state.human_round_feedback = ""
-
+            _advance_after_round()
             st.rerun()
+
+
+def _advance_after_round():
+    """Count the round's medal and move on: the next round, or the end of
+    the game after the last one."""
+    medal = st.session_state.round_medal
+    st.session_state.medal_counts[medal] = st.session_state.medal_counts.get(medal, 0) + 1
+    st.session_state.round_reflection_saved = False
+
+    if st.session_state.round >= N_ROUNDS:
+        st.session_state.game_over = True
+        # The last round's questions are the study's final
+        # questionnaire.
+        mark_session_progress("post_study_questionnaire")
+    else:
+        st.session_state.round += 1
+        st.session_state.board = None
+        st.session_state.round_finished = False
+        st.session_state.guesses = []
+        st.session_state.pending_guesses = []
+        st.session_state.round_skips = 0
+        st.session_state.round_clue_giver_timeouts = 0
+        st.session_state.final_guess_deadline_active = False
+        st.session_state.hint = ""
+        st.session_state.hint_number = 1
+        st.session_state.hint_targets = []
+        st.session_state.hint_explanation = ""
+        st.session_state.previous_hint = None
+        st.session_state.last_ai_guesses = []
+        st.session_state.last_ai_hint = ""
+        st.session_state.pending_hint_meta = None
+        st.session_state.pending_reflection_turn = None
+        st.session_state.ai_round_reflection = ""
+        st.session_state.human_round_feedback = ""
+        st.session_state.round_questionnaire = {}
+        st.session_state.ai_round_questionnaire = {}
+
+
+def _round_questions_for_role():
+    role = st.session_state.get("role", "")
+    return [
+        (question_id, text)
+        for question_id, text in ROUND_QUESTIONS
+        if ROUND_QUESTION_ROLES.get(question_id, role) == role
+    ]
+
+
+def _round_questionnaire_items():
+    """The round's questions in display order. After round 2 (mid-game) the
+    second attention check sits among them, after the second statement, so
+    it reads like any other statement."""
+    questions = _round_questions_for_role()
+    if st.session_state.round != ATTENTION_CHECK_MID_GAME_ROUND:
+        return questions
+    return (
+        questions[:2]
+        + [(ATTENTION_CHECK_MID_GAME_ID, ATTENTION_CHECK_MID_GAME_QUESTION)]
+        + questions[2:]
+    )
+
+
+def _render_round_questionnaire():
+    answers = {}
+    with st.container(border=True, key="round_questionnaire_panel"):
+        st.markdown(
+            f"""
+            <div class="panel-title">Round {st.session_state.round} · Questions about this round</div>
+            <p class="subtle-text" style="margin-top:0;">Rate how much you agree with each statement: 1 = strongly disagree, 5 = strongly agree. Please answer every statement.</p>
+            """,
+            unsafe_allow_html=True,
+        )
+        for question_id, question_text in _round_questionnaire_items():
+            answers[question_id] = st.radio(
+                question_text,
+                options=[1, 2, 3, 4, 5],
+                index=None,
+                horizontal=True,
+                key=f"round_questionnaire_{st.session_state.round}_{question_id}",
+            )
+    return answers
+
+
+def _save_round_questionnaire(answers):
+    """Store the participant's answers for this round and collect the AI's
+    mirrored self-report. Both go into this round's row (log_round)."""
+    round_number = st.session_state.round
+    st.session_state.round_questionnaire = {
+        question_id: int(answers[question_id]) for question_id, _ in _round_questions_for_role()
+    }
+    log_event(
+        "round_questionnaire_submitted",
+        st.session_state.round_questionnaire,
+        round_number=round_number,
+        turn_number="",
+    )
+    if ATTENTION_CHECK_MID_GAME_ID in answers:
+        st.session_state.attention_check_mid_game_answer = int(
+            answers[ATTENTION_CHECK_MID_GAME_ID]
+        )
+    # Private and never shown to the participant, regardless of condition.
+    with st.spinner("Saving your answers..."):
+        st.session_state.ai_round_questionnaire = generate_ai_round_questionnaire(
+            st.session_state.role,
+            st.session_state.interaction_history,
+            st.session_state.round_success,
+            st.session_state.round_bomb_hit,
+            condition=st.session_state.get("condition", DEFAULT_CONDITION),
+        )
+    log_event(
+        "ai_round_questionnaire_generated",
+        st.session_state.ai_round_questionnaire,
+        round_number=round_number,
+        turn_number="",
+    )
 
 
 def _study_completion_code():
@@ -3183,81 +3452,10 @@ def screen_game_over():
         f"<div class='summary-stat'><strong>Final medal</strong><br>{medal_label}</div>",
         unsafe_allow_html=True,
     )
-    if not st.session_state.get("post_game_questionnaire_submitted"):
-        with st.container(border=True, key="post_game_questionnaire_panel"):
-            st.markdown(
-                """
-                <div class="panel-title">Final questions</div>
-                <p class="subtle-text" style="margin-top:0;">Rate how much you agree with each statement: 1 = strongly disagree, 5 = strongly agree.</p>
-                """,
-                unsafe_allow_html=True,
-            )
-            answers = {}
-            # The attention item sits mid-list so it reads like any other
-            # statement; it is stored separately from the questionnaire.
-            displayed_questions = (
-                POST_GAME_QUESTIONS[:2]
-                + [(ATTENTION_CHECK_POST_GAME_ID, ATTENTION_CHECK_POST_GAME_QUESTION)]
-                + POST_GAME_QUESTIONS[2:]
-            )
-            for question_id, question_text in displayed_questions:
-                answers[question_id] = st.radio(
-                    question_text,
-                    options=[1, 2, 3, 4, 5],
-                    index=None,
-                    horizontal=True,
-                    key=f"post_game_{question_id}",
-                )
-            if st.button("Submit final answers", type="primary", use_container_width=True):
-                missing = [
-                    question_text
-                    for question_id, question_text in displayed_questions
-                    if answers.get(question_id) is None
-                ]
-                if missing:
-                    _round_summary_errors_dialog(["Please answer all final questions before finishing."])
-                    return
-                st.session_state.post_game_questionnaire = {
-                    question_id: int(answers[question_id])
-                    for question_id, _ in POST_GAME_QUESTIONS
-                }
-                st.session_state.attention_check_post_game_answer = int(
-                    answers[ATTENTION_CHECK_POST_GAME_ID]
-                )
-                st.session_state.post_game_questionnaire_submitted = True
-                if not st.session_state.get("completion_code"):
-                    st.session_state.completion_code = _study_completion_code()
-                log_event(
-                    "post_game_questionnaire_submitted",
-                    st.session_state.post_game_questionnaire,
-                    round_number="",
-                    turn_number="",
-                )
-                # A private, structured self-report mirroring the human's
-                # questionnaire, collected for research comparison only.
-                # Never shown to the participant, regardless of condition.
-                with st.spinner("Saving your answers..."):
-                    st.session_state.ai_post_game_questionnaire = generate_ai_post_game_reflection(
-                        st.session_state.get("ai_round_summaries", []),
-                        condition=st.session_state.get("condition", DEFAULT_CONDITION),
-                    )
-                log_event(
-                    "ai_post_game_questionnaire_generated",
-                    st.session_state.ai_post_game_questionnaire,
-                    round_number="",
-                    turn_number="",
-                )
-                mark_session_progress("post_study_questionnaire")
-                st.rerun()
-        return
-
     if not st.session_state.get("debriefing_acknowledged"):
         with st.container(key="debriefing_document"):
             st.markdown(
-                render_debriefing_document(
-                    st.session_state.get("condition"),
-                    st.session_state.get("completion_code"),
-                ),
+                render_debriefing_document(st.session_state.get("condition")),
                 unsafe_allow_html=True,
             )
         with st.container(border=True, key="debriefing_action_panel"):
@@ -3287,7 +3485,6 @@ def screen_game_over():
                         "final_star_count": total_stars,
                         "final_medal": final_medal,
                         "completion_code": st.session_state.completion_code,
-                        "post_game_questionnaire": st.session_state.post_game_questionnaire,
                     },
                     round_number="",
                     turn_number="",
@@ -3305,23 +3502,22 @@ def screen_game_over():
     else:
         st.success(f"Thank you, {player_name}. Your answers and game data have been saved.")
 
-    # The debriefing page (shown just before this one) is the only other
-    # place the completion code appears -- a participant who clicks through
-    # without copying it down there had no way to recover it once they
-    # reached this final screen, which is the one they're actually looking
-    # at when they go to paste the code into Prolific.
+    # The completion code appears only here, after Finish study (not on the
+    # debriefing page), so the participant reads the debriefing first.
+    complete_url = prolific_complete_url(st.session_state.get("completion_code", ""))
+    show_prolific_button = bool(st.session_state.get("prolific_pid") and complete_url)
+    button_hint = " (or use the Return to Prolific button below)" if show_prolific_button else ""
     st.markdown(
         f"""
-        <div class="glass-card compact-card section-gap">
-            <div class="panel-title">Your completion code</div>
-            <p class="subtle-text" style="margin:0 0 0.4rem 0;">Enter this code on the platform where you found this study to confirm your participation:</p>
-            <p style="font-size:1.4rem; font-weight:800; letter-spacing:0.08em; margin:0;">{escape(st.session_state.get("completion_code", ""))}</p>
-        </div>
+        <section class="debrief-section debrief-completion-code-section section-gap">
+            <h2>Your completion code</h2>
+            <p class="completion-code-instruction">Enter this code on Prolific to confirm your participation{button_hint}:</p>
+            <p class="debrief-completion-code">{escape(st.session_state.get("completion_code", ""))}</p>
+        </section>
         """,
         unsafe_allow_html=True,
     )
-    complete_url = prolific_complete_url(st.session_state.get("completion_code", ""))
-    if st.session_state.get("prolific_pid") and complete_url:
+    if show_prolific_button:
         st.link_button(
             "Return to Prolific to complete your submission",
             complete_url,

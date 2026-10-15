@@ -42,6 +42,8 @@ SESSIONS_LOG_FIELDS = [
     "english_proficiency",
     "ai_experience",
     "codenames_experience",
+    "neurodivergent",
+    "neurodivergent_characteristics",
     "session_id",
     "condition",
     "starting_role",
@@ -66,21 +68,8 @@ SESSIONS_LOG_FIELDS = [
     "browser_language",
     "completion_code",
     "attention_check_profile_answer",
-    "attention_check_post_game_answer",
+    "attention_check_mid_game_answer",
     "attention_checks_failed",
-    "post_game_i_understood_ai_clues",
-    "post_game_predict_ai_interpretation",
-    "post_game_adapted_to_ai_behavior",
-    "post_game_reflection_helped",
-    "post_game_shared_understanding",
-    "post_game_questionnaire_json",
-    "ai_post_game_i_understood_human_clues",
-    "ai_post_game_predict_human_interpretation",
-    "ai_post_game_adapted_to_human_behavior",
-    "ai_post_game_reflection_helped",
-    "ai_post_game_shared_understanding",
-    "ai_post_game_reasoning",
-    "ai_post_game_questionnaire_json",
     "experiment_version",
     "schema_version",
     "code_commit",
@@ -132,6 +121,19 @@ ROUNDS_LOG_FIELDS = [
     "round_end_reason",
     "ai_round_reflection",
     "human_round_feedback",
+    "round_questionnaire_i_understood_ai_clues",
+    "round_questionnaire_predict_ai_interpretation",
+    "round_questionnaire_adapted_to_ai_behavior",
+    "round_questionnaire_reflection_helped",
+    "round_questionnaire_shared_understanding",
+    "round_questionnaire_json",
+    "ai_round_questionnaire_i_understood_human_clues",
+    "ai_round_questionnaire_predict_human_interpretation",
+    "ai_round_questionnaire_adapted_to_human_behavior",
+    "ai_round_questionnaire_reflection_helped",
+    "ai_round_questionnaire_shared_understanding",
+    "ai_round_questionnaire_reasoning",
+    "ai_round_questionnaire_json",
 ]
 
 
@@ -209,7 +211,8 @@ TURNS_LOG_FIELDS = [
     "reflection_time_sec",
     "reflection_source",
     "human_expected_ai_understanding_rating",
-    "human_perceived_understanding_rating",
+    "human_rating_ai_understood_my_clue",
+    "human_rating_i_understood_ai_clue",
     "human_relationship_type",
     "human_explanation_raw",
     "human_explanation_sanitized",
@@ -236,6 +239,7 @@ TURNS_LOG_FIELDS = [
     "repair_success",
     "timer_duration_seconds",
     "clue_timer_started_at",
+    "clue_extra_time_used",
     "human_timed_out",
     "timeout_timestamp",
     "timed_out",
@@ -277,7 +281,7 @@ SESSION_STAGES = frozenset(
     }
 )
 SESSION_END_REASONS = frozenset({"completed", "participant_withdrawal", "technical_termination"})
-ACTION_TYPES = frozenset({"interaction", "full_skip", "partial_skip", "timeout"})
+ACTION_TYPES = frozenset({"interaction", "full_skip", "partial_skip", "timeout", "partial_timeout"})
 ALIGNMENT_APPLICABILITY_VALUES = frozenset(
     {
         "observed_completed_selection",
@@ -412,6 +416,7 @@ def clean_interaction_history(history):
                 "repair_success": bool(item.get("repair_success", False)),
                 "timer_duration_seconds": item.get("timer_duration_seconds", ""),
                 "clue_timer_started_at": item.get("clue_timer_started_at", ""),
+                "clue_extra_time_used": bool(item.get("clue_extra_time_used", False)),
                 "human_timed_out": bool(item.get("human_timed_out", item.get("timed_out", False))),
                 "timeout_timestamp": item.get("timeout_timestamp", ""),
                 "timed_out": bool(item.get("timed_out", False)),
@@ -456,12 +461,12 @@ def clean_interaction_history(history):
                 "reflection_start_time": item.get("reflection_start_time", ""),
                 "reflection_end_time": item.get("reflection_end_time", ""),
                 "reflection_time_sec": item.get("reflection_time_sec", ""),
-                "reflection_rating": item.get("reflection_rating", ""),
                 "reflection_relationship_type": item.get("reflection_relationship_type", ""),
                 "reflection_explanation_raw": item.get("reflection_explanation_raw", ""),
                 "reflection_explanation_is_valid": item.get("reflection_explanation_is_valid", ""),
                 "reflection_blocked_reason": item.get("reflection_blocked_reason", ""),
-                "human_perceived_understanding_rating": item.get("human_perceived_understanding_rating", ""),
+                "human_rating_ai_understood_my_clue": item.get("human_rating_ai_understood_my_clue", ""),
+                "human_rating_i_understood_ai_clue": item.get("human_rating_i_understood_ai_clue", ""),
                 "human_relationship_type": item.get("human_relationship_type", ""),
                 "human_explanation_raw": item.get("human_explanation_raw", ""),
                 "human_explanation_sanitized": item.get("human_explanation_sanitized", ""),
@@ -517,8 +522,6 @@ def _session_row(completed=False):
     total_completed = len(st.session_state.get("ai_round_summaries", []))
     if st.session_state.get("round_finished"):
         total_completed = max(total_completed, int(st.session_state.get("round", 0) or 0))
-    questionnaire = st.session_state.get("post_game_questionnaire", {}) or {}
-    ai_questionnaire = st.session_state.get("ai_post_game_questionnaire", {}) or {}
     last_completed_stage = st.session_state.get("last_completed_stage", "")
     session_end_reason = st.session_state.get("session_end_reason", "")
     if last_completed_stage and last_completed_stage not in SESSION_STAGES:
@@ -528,7 +531,7 @@ def _session_row(completed=False):
     run_type = resolve_run_type(st.session_state.get("prolific_pid", ""))
     attention_failures = attention_checks_failed(
         st.session_state.get("attention_check_profile_answer", ""),
-        st.session_state.get("attention_check_post_game_answer", ""),
+        st.session_state.get("attention_check_mid_game_answer", ""),
     )
     return {
         "participant_id": st.session_state.get("participant_id", ""),
@@ -541,6 +544,8 @@ def _session_row(completed=False):
         "english_proficiency": st.session_state.get("english_proficiency", ""),
         "ai_experience": st.session_state.get("ai_experience", ""),
         "codenames_experience": st.session_state.get("codenames_experience", ""),
+        "neurodivergent": st.session_state.get("neurodivergent", ""),
+        "neurodivergent_characteristics": st.session_state.get("neurodivergent_characteristics", ""),
         "session_id": st.session_state.get("session_id", ""),
         "condition": st.session_state.get("condition", DEFAULT_CONDITION),
         "starting_role": st.session_state.get("starting_role", ""),
@@ -575,21 +580,8 @@ def _session_row(completed=False):
         "browser_language": st.session_state.get("browser_language", "unknown"),
         "completion_code": st.session_state.get("completion_code", ""),
         "attention_check_profile_answer": st.session_state.get("attention_check_profile_answer", ""),
-        "attention_check_post_game_answer": st.session_state.get("attention_check_post_game_answer", ""),
+        "attention_check_mid_game_answer": st.session_state.get("attention_check_mid_game_answer", ""),
         "attention_checks_failed": attention_failures,
-        "post_game_i_understood_ai_clues": questionnaire.get("i_understood_ai_clues", ""),
-        "post_game_predict_ai_interpretation": questionnaire.get("predict_ai_interpretation", ""),
-        "post_game_adapted_to_ai_behavior": questionnaire.get("adapted_to_ai_behavior", ""),
-        "post_game_reflection_helped": questionnaire.get("reflection_helped", ""),
-        "post_game_shared_understanding": questionnaire.get("shared_understanding", ""),
-        "post_game_questionnaire_json": json.dumps(questionnaire, ensure_ascii=False),
-        "ai_post_game_i_understood_human_clues": ai_questionnaire.get("i_understood_human_clues", ""),
-        "ai_post_game_predict_human_interpretation": ai_questionnaire.get("predict_human_interpretation", ""),
-        "ai_post_game_adapted_to_human_behavior": ai_questionnaire.get("adapted_to_human_behavior", ""),
-        "ai_post_game_reflection_helped": ai_questionnaire.get("reflection_helped", ""),
-        "ai_post_game_shared_understanding": ai_questionnaire.get("shared_understanding", ""),
-        "ai_post_game_reasoning": ai_questionnaire.get("reasoning", ""),
-        "ai_post_game_questionnaire_json": json.dumps(ai_questionnaire, ensure_ascii=False),
         "experiment_version": EXPERIMENT_VERSION,
         "schema_version": SCHEMA_VERSION,
         "code_commit": CODE_COMMIT,
@@ -763,6 +755,10 @@ def initialize_session_log(participant_id):
             "english_proficiency": st.session_state.get("english_proficiency", ""),
             "ai_experience": st.session_state.get("ai_experience", ""),
             "codenames_experience": st.session_state.get("codenames_experience", ""),
+            "neurodivergent": st.session_state.get("neurodivergent", ""),
+            "neurodivergent_characteristics": st.session_state.get(
+                "neurodivergent_characteristics", ""
+            ),
         },
         round_number="",
         turn_number="",
@@ -801,6 +797,8 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         raise ValueError(f"Unknown round end reason: {round_end_reason}")
     if not st.session_state.get("round_finished"):
         round_end_reason = ""
+    questionnaire = st.session_state.get("round_questionnaire", {}) or {}
+    ai_questionnaire = st.session_state.get("ai_round_questionnaire", {}) or {}
     return {
         "participant_id": participant_id,
         "session_id": st.session_state.get("session_id", ""),
@@ -840,12 +838,26 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         "round_end_reason": round_end_reason,
         "ai_round_reflection": st.session_state.get("ai_round_reflection", ""),
         "human_round_feedback": st.session_state.get("human_round_feedback", ""),
+        "round_questionnaire_i_understood_ai_clues": questionnaire.get("i_understood_ai_clues", ""),
+        "round_questionnaire_predict_ai_interpretation": questionnaire.get("predict_ai_interpretation", ""),
+        "round_questionnaire_adapted_to_ai_behavior": questionnaire.get("adapted_to_ai_behavior", ""),
+        "round_questionnaire_reflection_helped": questionnaire.get("reflection_helped", ""),
+        "round_questionnaire_shared_understanding": questionnaire.get("shared_understanding", ""),
+        "round_questionnaire_json": json.dumps(questionnaire, ensure_ascii=False),
+        "ai_round_questionnaire_i_understood_human_clues": ai_questionnaire.get("i_understood_human_clues", ""),
+        "ai_round_questionnaire_predict_human_interpretation": ai_questionnaire.get("predict_human_interpretation", ""),
+        "ai_round_questionnaire_adapted_to_human_behavior": ai_questionnaire.get("adapted_to_human_behavior", ""),
+        "ai_round_questionnaire_reflection_helped": ai_questionnaire.get("reflection_helped", ""),
+        "ai_round_questionnaire_shared_understanding": ai_questionnaire.get("shared_understanding", ""),
+        "ai_round_questionnaire_reasoning": ai_questionnaire.get("reasoning", ""),
+        "ai_round_questionnaire_json": json.dumps(ai_questionnaire, ensure_ascii=False),
     }
 
 
 def _action_classification(item):
-    if item.get("timed_out") or item.get("outcome") == "timeout":
-        return "timeout"
+    if item.get("timed_out") or item.get("outcome") in ("timeout", "partial_timeout"):
+        # Time ran out after at least one card was clicked: those cards count.
+        return "partial_timeout" if item.get("guesses") else "timeout"
     if item.get("partial_skip") or item.get("outcome") == "partial_skip":
         return "partial_skip"
     if item.get("skipped") or item.get("outcome") == "skip":
@@ -857,7 +869,7 @@ def _alignment_applicability(item, action_type=None):
     action_type = action_type or _action_classification(item)
     if action_type == "timeout":
         return "timeout_no_behavioral_selection"
-    if action_type == "partial_skip":
+    if action_type in ("partial_skip", "partial_timeout"):
         return "partial_selection"
     if action_type == "full_skip":
         return (
@@ -1042,7 +1054,8 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "reflection_time_sec": _format_optional_float(item.get("reflection_time_sec")),
         "reflection_source": item.get("reflection_source", ""),
         "human_expected_ai_understanding_rating": item.get("human_expected_ai_understanding_rating"),
-        "human_perceived_understanding_rating": item.get("human_perceived_understanding_rating", ""),
+        "human_rating_ai_understood_my_clue": item.get("human_rating_ai_understood_my_clue", ""),
+        "human_rating_i_understood_ai_clue": item.get("human_rating_i_understood_ai_clue", ""),
         "human_relationship_type": item.get("human_relationship_type", ""),
         "human_explanation_raw": human_raw,
         "human_explanation_sanitized": human_sanitized if human_valid else "",
@@ -1079,6 +1092,7 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "repair_success": bool(item.get("repair_success", False)),
         "timer_duration_seconds": item.get("timer_duration_seconds", ""),
         "clue_timer_started_at": item.get("clue_timer_started_at", ""),
+        "clue_extra_time_used": bool(item.get("clue_extra_time_used", False)),
         "human_timed_out": bool(item.get("human_timed_out", False)),
         "timeout_timestamp": item.get("timeout_timestamp", ""),
         "timed_out": bool(item.get("timed_out", False)),

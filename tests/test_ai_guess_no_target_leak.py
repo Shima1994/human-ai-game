@@ -33,7 +33,7 @@ TURN_1 = {
     "outcome": "partial_correct",
     "human_explanation_is_valid": True,
     "human_explanation_sanitized": "All relate to people getting engaged",
-    "human_perceived_understanding_rating": 3,
+    "human_rating_ai_understood_my_clue": 3,
 }
 
 INTENDED_OR_EXPECTED = re.compile(r"(?:intended|expected guesses|expected_guesses)=\[([^\]]*)\]")

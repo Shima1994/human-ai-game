@@ -43,14 +43,13 @@ def _current_view_key():
     if not state.tutorial_completed:
         return f"tutorial:{state.get('tutorial_step', 'introduction')}"
     if state.game_over:
-        if not state.get("post_game_questionnaire_submitted"):
-            return "post_study_questionnaire"
         if not state.get("debriefing_acknowledged"):
             return "debriefing"
         return "completion"
     round_number = state.get("round", 0)
     if state.get("round_finished"):
-        return f"round:{round_number}:summary"
+        page = "questions" if state.get("round_reflection_saved") else "summary"
+        return f"round:{round_number}:{page}"
     return f"round:{round_number}:{state.get('role', '')}"
 
 

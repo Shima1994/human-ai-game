@@ -80,7 +80,6 @@ def session_state():
         round_finished=False,
         round_interactions=0,
         score=0,
-        post_game_questionnaire={},
         last_activity_at="",
         last_completed_stage="participant_profile",
         session_end_reason="",

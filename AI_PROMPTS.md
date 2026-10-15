@@ -10,7 +10,7 @@ Models are configured in `core/constants.py`:
 | --- | --- | --- |
 | `HINT_MODEL_NAME` | `gpt-5.4-2026-03-05` | AI clue generation, including skip-repair clues |
 | `GUESS_MODEL_NAME` | `gpt-5.4-2026-03-05` | AI card selection, partial-skip decision, and post-hoc wrong-guess replacement suggestions |
-| `REFLECTION_MODEL_NAME` | `gpt-5.4-2026-03-05` | AI turn explanations, round reflections, and the end-of-game self-report |
+| `REFLECTION_MODEL_NAME` | `gpt-5.4-2026-03-05` | AI turn explanations, round reflections, and the end-of-round self-report |
 
 All requests pass through:
 
@@ -282,20 +282,20 @@ The prompt asks for plain text with each clue's explanation, the skip note, and 
 - Baseline stores it without displaying or reusing it.
 - On failure, a fixed fallback sentence is returned instead of the AI's own text (never fabricated as if it were a real model reflection).
 
-## 6. AI end-of-game self-report
+## 6. AI end-of-round self-report
 
 Function:
 
 ```python
-generate_ai_post_game_reflection(round_summaries, condition)
+generate_ai_round_questionnaire(role, history, round_success, round_bomb_hit, condition)
 ```
 
-Runs once, after the human's own post-game questionnaire, so the two can be compared directly. The AI answers five 1–5 agreement ratings mirroring the human's questionnaire (`i_understood_human_clues`, `predict_human_interpretation`, `adapted_to_human_behavior`, `reflection_helped`, `shared_understanding`) plus a short `reasoning` string, based strictly on the full game history (adaptive: full history; baseline: fact-only history). Never shown to the participant.
+Runs after every round, when the human saves their own end-of-round questionnaire, so the two can be compared round by round. The AI answers five 1–5 agreement ratings about this round, mirroring the human's items (`i_understood_human_clues`, `predict_human_interpretation`, `adapted_to_human_behavior`, `reflection_helped`, `shared_understanding`) plus a short `reasoning` string, based strictly on this round's history (adaptive: full history; baseline: fact-only history). Never shown to the participant.
 
 - Temperature: `0.2`; forced JSON mode.
 - Every rating must be an integer 1–5; `reasoning` is capped at 60 words.
 - If the response is not valid JSON, is not an object, or any rating is missing/out of range, all ratings are stored as `None` with a `blocked_reason` (`"invalid_response"`, `"invalid_rating"`, or `"generation_failed"` on an API error) rather than a guessed value.
-- Stored fields: the five `ai_post_game_*` ratings, `ai_post_game_reasoning`, and the full `ai_post_game_questionnaire_json`.
+- Stored on the round row: the five `ai_round_questionnaire_*` ratings, `ai_round_questionnaire_reasoning`, and the full `ai_round_questionnaire_json`.
 
 ## 7. Human-input validation relevant to prompts
 

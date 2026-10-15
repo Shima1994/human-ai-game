@@ -37,11 +37,14 @@ ATTENTION_CHECK_PROFILE_OPTIONS = [
 ]
 ATTENTION_CHECK_PROFILE_ANSWER = "A few times a month"
 
-ATTENTION_CHECK_POST_GAME_ID = "attention_check"
-ATTENTION_CHECK_POST_GAME_QUESTION = (
-    "This statement checks that you are reading carefully. Please select 2 for this statement."
+# The second check sits among the questions after round 2, i.e. after one
+# guessing round and one clue-giving round (roles alternate every round).
+ATTENTION_CHECK_MID_GAME_ROUND = 2
+ATTENTION_CHECK_MID_GAME_ID = "attention_check"
+ATTENTION_CHECK_MID_GAME_QUESTION = (
+    "This statement checks that you are reading carefully. Please select two for this statement."
 )
-ATTENTION_CHECK_POST_GAME_ANSWER = 2
+ATTENTION_CHECK_MID_GAME_ANSWER = 2
 
 
 def read_setting(name):
@@ -104,11 +107,11 @@ def provisional_analysis_eligible(run_type, completed, attention_failures):
     return bool(run_type == "participant" and completed and attention_failures < 2)
 
 
-def attention_checks_failed(profile_answer, post_game_answer):
+def attention_checks_failed(profile_answer, mid_game_answer):
     """Number of failed checks; an unanswered check counts as not yet taken."""
     failed = 0
     if profile_answer not in (None, "") and profile_answer != ATTENTION_CHECK_PROFILE_ANSWER:
         failed += 1
-    if post_game_answer not in (None, "") and post_game_answer != ATTENTION_CHECK_POST_GAME_ANSWER:
+    if mid_game_answer not in (None, "") and mid_game_answer != ATTENTION_CHECK_MID_GAME_ANSWER:
         failed += 1
     return failed

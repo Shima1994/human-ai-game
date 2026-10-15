@@ -78,12 +78,15 @@ def tutorial_repair_clue(unresolved_targets, repair_attempt=1):
     return alternatives[index], len(targets)
 
 
-def tutorial_time_remaining(started_at, now=None):
+def tutorial_time_remaining(started_at, now=None, duration_seconds=CLUE_TIMER_SECONDS):
+    """duration_seconds matches the real game's timer for the practice
+    round's role: guessing by default, CLUE_GIVER_TIMER_SECONDS when the
+    participant gives the clue."""
     if not started_at:
-        return float(CLUE_TIMER_SECONDS)
+        return float(duration_seconds)
     try:
         started = datetime.fromisoformat(started_at)
     except (TypeError, ValueError):
         return 0.0
     now = now or datetime.now(timezone.utc)
-    return max(0.0, float(CLUE_TIMER_SECONDS) - (now - started).total_seconds())
+    return max(0.0, float(duration_seconds) - (now - started).total_seconds())

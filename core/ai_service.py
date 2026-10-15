@@ -250,6 +250,13 @@ def format_word_type_per_card(words, word_type_per_card):
     )
 
 
+def _human_rating_label(clue_giver):
+    """What the participant's post-turn rating answered, in the AI's terms."""
+    if clue_giver == "human":
+        return "Human's rating of how well you understood their clue"
+    return "Human's rating of how well they understood your clue"
+
+
 def format_participant_feedback(history):
     feedback_lines = []
     for item in history:
@@ -257,13 +264,13 @@ def format_participant_feedback(history):
         if clue_giver == "human":
             if not item.get("human_explanation_is_valid"):
                 continue
-            rating = item.get("human_perceived_understanding_rating")
+            rating = item.get("human_rating_ai_understood_my_clue")
             relationship_type = item.get("human_relationship_type", "")
             explanation = str(item.get("human_explanation_sanitized", "") or "").strip()
             if not rating and not relationship_type and not explanation:
                 continue
         elif clue_giver == "ai":
-            rating = item.get("human_perceived_understanding_rating")
+            rating = item.get("human_rating_i_understood_ai_clue")
             if not rating:
                 continue
             relationship_type = ""
@@ -271,8 +278,9 @@ def format_participant_feedback(history):
         else:
             continue
 
+        rating_label = _human_rating_label(clue_giver)
         line_parts = [
-            f"- Perceived understanding: {rating}/5" if rating else "- Perceived understanding: not provided",
+            f"- {rating_label}: {rating}/5" if rating else f"- {rating_label}: not provided",
             f"  Relationship type: {relationship_type or 'not provided'}",
         ]
         if explanation:
@@ -293,22 +301,23 @@ def format_round_participant_feedback(round_summaries):
             if clue_giver == "human":
                 if not item.get("human_explanation_is_valid"):
                     continue
-                rating = item.get("human_perceived_understanding_rating")
+                rating = item.get("human_rating_ai_understood_my_clue")
                 relationship_type = item.get("human_relationship_type", "")
                 explanation = str(item.get("human_explanation_sanitized", "") or "").strip()
                 if not rating and not relationship_type and not explanation:
                     continue
             elif clue_giver == "ai":
-                rating = item.get("human_perceived_understanding_rating")
+                rating = item.get("human_rating_i_understood_ai_clue")
                 if not rating:
                     continue
                 relationship_type = ""
                 explanation = ""
             else:
                 continue
+            rating_label = _human_rating_label(clue_giver)
             parts = [
                 f"- Round {round_number}, turn {item.get('turn', '')}",
-                f"  Perceived understanding: {rating}/5" if rating else "  Perceived understanding: not provided",
+                f"  {rating_label}: {rating}/5" if rating else f"  {rating_label}: not provided",
                 f"  Relationship type: {relationship_type or 'not provided'}",
             ]
             if explanation:
@@ -402,7 +411,11 @@ def _memory_interaction_lines(interactions, round_label="current"):
             ", ".join(item.get("wrong_guess_replacements", [])) or "none"
         )
         rationale = str(item.get("guess_rationale", "") or "").strip()
-        human_rating = item.get("human_perceived_understanding_rating")
+        human_rating = item.get(
+            "human_rating_ai_understood_my_clue"
+            if item.get("clue_giver") == "human"
+            else "human_rating_i_understood_ai_clue"
+        )
         human_relationship = str(item.get("human_relationship_type", "") or "").strip()
         human_explanation = str(
             item.get("human_explanation_sanitized", "")
@@ -431,7 +444,9 @@ def _memory_interaction_lines(interactions, round_label="current"):
                 f"  guesser would replace wrong choices with=[{wrong_replacements}]"
             )
         if human_rating:
-            parts.append(f"  human understanding rating: {human_rating}/5")
+            parts.append(
+                f"  {_human_rating_label(item.get('clue_giver'))}: {human_rating}/5"
+            )
         if human_relationship or human_explanation:
             parts.append(
                 f"  human-described clue relationship: {human_relationship or 'not specified'}"
@@ -1473,62 +1488,100 @@ def generate_ai_round_reflection(
         return fallback_text
 
 
-AI_POST_GAME_SYSTEM_PROMPT = """You are an AI teammate who just finished a full cooperative word-game session with one human partner across several rounds. You are now answering a private end-of-study self-assessment about the collaboration, mirroring the questions the human partner answers about you. Your answers are never shown to the human and are used only for research analysis.
+AI_ROUND_QUESTIONNAIRE_INTRO = """You are an AI teammate who just finished one round of a cooperative word game with one human partner. You are now answering a private self-assessment about this round only, mirroring the questions the human partner answers about you after the same round. Your answers are never shown to the human and are used only for research analysis.
 
-Rate your agreement with each of the following statements about the whole session, from 1 (strongly disagree) to 5 (strongly agree):
-1. i_understood_human_clues: "I felt that I understood what the human meant when they gave clues."
-2. predict_human_interpretation: "By the end of the game, I could predict how the human would interpret my clues."
-3. adapted_to_human_behavior: "I adapted my communication based on the human's behaviour."
-4. reflection_helped: "The reflection steps helped me recover from misunderstandings with the human."
-5. shared_understanding: "By the end of the game, I felt that the human and I had developed a shared understanding."
-
-Base every rating strictly on the game history provided below; do not assume a generically positive outcome.
-
-Return strict JSON only, no markdown, no commentary outside the JSON. Schema:
-{
-  "i_understood_human_clues": <integer 1-5>,
-  "predict_human_interpretation": <integer 1-5>,
-  "adapted_to_human_behavior": <integer 1-5>,
-  "reflection_helped": <integer 1-5>,
-  "shared_understanding": <integer 1-5>,
-  "reasoning": "<one or two sentences justifying the ratings; logged for research analysis, never shown to the player>"
-}
+Rate your agreement with each of the following statements about this round, from 1 (strongly disagree) to 5 (strongly agree):
 """
 
-AI_POST_GAME_RATING_KEYS = (
-    "i_understood_human_clues",
-    "predict_human_interpretation",
-    "adapted_to_human_behavior",
-    "reflection_helped",
-    "shared_understanding",
+AI_ROUND_QUESTIONNAIRE_ITEMS = (
+    (
+        "i_understood_human_clues",
+        "In this round, I felt that I understood what the human meant when they gave clues.",
+    ),
+    (
+        "predict_human_interpretation",
+        "In this round, I could predict how the human would interpret my clues.",
+    ),
+    (
+        "adapted_to_human_behavior",
+        "In this round, I adapted my communication based on the human's behaviour.",
+    ),
+    (
+        "reflection_helped",
+        "In this round, the reflection steps helped me recover from misunderstandings with the human.",
+    ),
+    (
+        "shared_understanding",
+        "In this round, I felt that the human and I had developed a shared understanding.",
+    ),
 )
+AI_ROUND_QUESTIONNAIRE_KEYS = tuple(key for key, _ in AI_ROUND_QUESTIONNAIRE_ITEMS)
+# Items that only fit one role, mirroring the human's: the AI rates
+# understanding the human's clues only when the human gave them, and
+# predicting the human's interpretation only when the AI gave the clues.
+AI_ROUND_QUESTIONNAIRE_ITEM_ROLES = {
+    "i_understood_human_clues": "human_clue",
+    "predict_human_interpretation": "ai_clue",
+}
 
 
-def _empty_ai_post_game_reflection(raw="", reason="generation_failed"):
+def ai_round_questionnaire_keys(role):
+    return tuple(
+        key
+        for key in AI_ROUND_QUESTIONNAIRE_KEYS
+        if AI_ROUND_QUESTIONNAIRE_ITEM_ROLES.get(key, role) == role
+    )
+
+
+def ai_round_questionnaire_system_prompt(role):
+    texts = dict(AI_ROUND_QUESTIONNAIRE_ITEMS)
+    keys = ai_round_questionnaire_keys(role)
+    statements = "\n".join(
+        f'{number}. {key}: "{texts[key]}"' for number, key in enumerate(keys, start=1)
+    )
+    schema = "\n".join(f'  "{key}": <integer 1-5>,' for key in keys)
+    return (
+        AI_ROUND_QUESTIONNAIRE_INTRO
+        + statements
+        + "\n\nBase every rating strictly on the round history provided below; "
+        "do not assume a generically positive outcome.\n\n"
+        "Return strict JSON only, no markdown, no commentary outside the JSON. Schema:\n{\n"
+        + schema
+        + '\n  "reasoning": "<one or two sentences justifying the ratings; logged for '
+        'research analysis, never shown to the player>"\n}\n'
+    )
+
+
+def _empty_ai_round_questionnaire(role, raw="", reason="generation_failed"):
     return {
-        **{key: None for key in AI_POST_GAME_RATING_KEYS},
+        **{key: None for key in ai_round_questionnaire_keys(role)},
         "reasoning": "",
         "raw_response": raw,
         "blocked_reason": reason,
     }
 
 
-def generate_ai_post_game_reflection(round_summaries, condition=DEFAULT_CONDITION):
-    """A structured, private end-of-game self-report from the AI, mirroring
-    the human's post-game questionnaire so the two can be compared directly.
-    Never shown to the participant."""
+def generate_ai_round_questionnaire(
+    role,
+    history,
+    round_success,
+    round_bomb_hit,
+    condition=DEFAULT_CONDITION,
+):
+    """A structured, private end-of-round self-report from the AI, mirroring
+    the human's end-of-round questionnaire so the two can be compared round
+    by round. Never shown to the participant."""
     user_prompt = (
-        "Full game history across all rounds:\n"
-        + (
-            format_round_memory(round_summaries or [])
-            if condition == "adaptive"
-            else format_baseline_round_memory(round_summaries or [])
-        )
-        + "\n\nAnswer the private self-assessment now. Respond with the JSON object only."
+        f"Round role: {role}\n"
+        f"All targets found: {round_success}\n"
+        f"Bomb hit: {round_bomb_hit}\n\n"
+        "Interaction history of this round:\n"
+        f"{format_interaction_history(history) if condition == 'adaptive' else format_baseline_history(history)}\n\n"
+        "Answer the private self-assessment now. Respond with the JSON object only."
     )
     try:
         raw, _ = call_openai_chat(
-            AI_POST_GAME_SYSTEM_PROMPT,
+            ai_round_questionnaire_system_prompt(role),
             user_prompt,
             temperature=0.2,
             model=REFLECTION_MODEL_NAME,
@@ -1536,19 +1589,19 @@ def generate_ai_post_game_reflection(round_summaries, condition=DEFAULT_CONDITIO
         )
         data = json.loads(raw)
         if not isinstance(data, dict):
-            return _empty_ai_post_game_reflection(raw, "invalid_response")
+            return _empty_ai_round_questionnaire(role, raw, "invalid_response")
         ratings = {}
-        for key in AI_POST_GAME_RATING_KEYS:
+        for key in ai_round_questionnaire_keys(role):
             value = data.get(key)
             if not isinstance(value, int) or isinstance(value, bool) or not (1 <= value <= 5):
-                return _empty_ai_post_game_reflection(raw, "invalid_rating")
+                return _empty_ai_round_questionnaire(role, raw, "invalid_rating")
             ratings[key] = value
         ratings["reasoning"] = limit_words(str(data.get("reasoning", "") or "").strip(), 60)
         ratings["raw_response"] = raw
         ratings["blocked_reason"] = ""
         return ratings
     except Exception as error:
-        return _empty_ai_post_game_reflection(f"<api_error: {error}>", "generation_failed")
+        return _empty_ai_round_questionnaire(role, f"<api_error: {error}>", "generation_failed")
 
 
 def validate_human_hint(hint, board_words):

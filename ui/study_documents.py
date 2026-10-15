@@ -1,5 +1,3 @@
-from html import escape
-
 CONSENT_DOCUMENT = """
 # Information Sheet for Participation in Research
 
@@ -223,7 +221,6 @@ INFORMATION_SHEET_SECTIONS = (
 
 
 DEBRIEFING_CONDITION_PLACEHOLDER = "[Static Baseline / Adaptive AI]"
-DEBRIEFING_COMPLETION_CODE_PLACEHOLDER = "[COMPLETION_CODE]"
 
 DEBRIEFING_DOCUMENT = """
 <section class="debrief-contact">
@@ -269,12 +266,6 @@ DEBRIEFING_DOCUMENT = """
     <p>Results will only be reported in aggregated or anonymized form</p>
 </section>
 
-<section class="debrief-section debrief-completion-code-section">
-    <h2>Your completion code</h2>
-    <p>Enter this code on Prolific to confirm your participation (or use the Return to Prolific button on the next page):</p>
-    <p class="debrief-completion-code">[COMPLETION_CODE]</p>
-</section>
-
 <section class="debrief-section debrief-final-section">
     <h2>Do you have any questions?</h2>
     <p>If you have any questions about this study or would like to learn more about the results, you can contact:</p>
@@ -284,7 +275,9 @@ DEBRIEFING_DOCUMENT = """
 """
 
 
-def render_debriefing_document(condition, completion_code):
+def render_debriefing_document(condition):
+    """The completion code is not part of the debriefing: it is shown only
+    on the final page, after the participant presses Finish study."""
     condition_labels = {
         "baseline": "Static Baseline",
         "adaptive": "Adaptive AI",
@@ -294,13 +287,7 @@ def render_debriefing_document(condition, completion_code):
         condition_label = condition_labels[normalized_condition]
     except KeyError as error:
         raise ValueError("Cannot render debriefing without a valid assigned condition.") from error
-    cleaned_completion_code = str(completion_code or "").strip()
-    if not cleaned_completion_code:
-        raise ValueError("Cannot render debriefing without a completion code.")
     return DEBRIEFING_DOCUMENT.replace(
         DEBRIEFING_CONDITION_PLACEHOLDER,
         condition_label,
-    ).replace(
-        DEBRIEFING_COMPLETION_CODE_PLACEHOLDER,
-        escape(cleaned_completion_code),
     )

@@ -17,6 +17,7 @@ from core.constants import (
     POINTS_EXACT_INTENDED_TARGET,
     POINTS_OTHER_TARGET,
     CLUE_TIMER_SECONDS,
+    CLUE_GIVER_EXTRA_SECONDS,
 )
 from core.words import ROUND_BOARDS
 
@@ -33,7 +34,21 @@ def start_participant_decision_timer(started_at=None, duration_seconds=None):
         duration_seconds if duration_seconds is not None else CLUE_TIMER_SECONDS
     )
     st.session_state.clue_timer_timeout_consumed = False
+    st.session_state.clue_extra_time_granted = False
     return started_at
+
+
+def grant_clue_giver_extra_time():
+    """Extend the running clue-giver deadline by CLUE_GIVER_EXTRA_SECONDS,
+    once per clue. Returns False when the extra time was already given, so
+    the caller then treats the expiry as an ordinary timeout."""
+    if st.session_state.get("clue_extra_time_granted"):
+        return False
+    st.session_state.clue_extra_time_granted = True
+    st.session_state.clue_timer_duration_seconds = (
+        st.session_state.get("clue_timer_duration_seconds") or 0
+    ) + CLUE_GIVER_EXTRA_SECONDS
+    return True
 
 
 def clear_participant_decision_timer():
@@ -188,6 +203,12 @@ def setup_new_round():
     st.session_state.round_skips = 0
     st.session_state.round_clue_giver_timeouts = 0
     st.session_state.final_guess_deadline_active = False
+    for notice in (
+        "clue_giver_timeout_notice",
+        "last_timeout_notice",
+        "final_guess_warning_notice",
+    ):
+        st.session_state.pop(notice, None)
     st.session_state.round_finished = False
     st.session_state.hint = ""
     st.session_state.hint_number = 1
@@ -196,7 +217,6 @@ def setup_new_round():
     st.session_state.hint_explanation = ""
     st.session_state.last_ai_guesses = []
     st.session_state.last_ai_hint = ""
-    st.session_state.perception_rating = None
     st.session_state.human_expected_ai_understanding_rating = None
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.now(timezone.utc)
@@ -213,6 +233,9 @@ def setup_new_round():
     st.session_state.round_end_reason = ""
     st.session_state.ai_round_reflection = ""
     st.session_state.human_round_feedback = ""
+    st.session_state.round_questionnaire = {}
+    st.session_state.ai_round_questionnaire = {}
+    st.session_state.round_reflection_saved = False
     st.session_state.pending_hint_meta = None
     st.session_state.pending_reflection_turn = None
 
@@ -293,12 +316,18 @@ def record_interaction(
     repair_context=None,
     clue_timer_started_at=None,
     timer_duration_seconds=None,
+    clue_extra_time_used=None,
     human_explanation_raw="",
     human_explanation_is_valid=None,
     human_explanation_blocked_reason="",
     human_explanation_source="",
     human_explanation_collected_at="",
+    timed_out=False,
 ):
+    """Record a completed turn. timed_out=True: the guesser's time ran out
+    after at least one card was clicked -- those cards count and score like
+    any guess (a "partial timeout"); with partial_skip=True it also uses a
+    skip, exactly like pressing Skip after clicking."""
     intended_targets = intended_targets or []
     expected_guesses = expected_guesses or []
     skip_interpreted_cards = skip_interpreted_cards or []
@@ -347,6 +376,8 @@ def record_interaction(
     guesser = "ai" if st.session_state.role == "human_clue" else "human"
     if bomb_hit:
         outcome = "bomb"
+    elif timed_out:
+        outcome = "partial_timeout"
     elif partial_skip:
         outcome = "partial_skip"
     elif correct_guesses and neutral_guesses:
@@ -442,18 +473,19 @@ def record_interaction(
             ),
             "timer_duration_seconds": timer_duration_seconds if timer_duration_seconds is not None else st.session_state.get("clue_timer_duration_seconds", CLUE_TIMER_SECONDS),
             "clue_timer_started_at": clue_timer_started_at if clue_timer_started_at is not None else st.session_state.get("clue_timer_started_at", ""),
-            "human_timed_out": False,
-            "timeout_timestamp": "",
-            "timed_out": False,
+            "clue_extra_time_used": clue_extra_time_used if clue_extra_time_used is not None else bool(st.session_state.get("clue_extra_time_granted", False)),
+            "human_timed_out": bool(timed_out),
+            "timeout_timestamp": turn_end.isoformat() if timed_out else "",
+            "timed_out": bool(timed_out),
             "timeout_repair_attempt": False,
-            "timeout_selected_cards": [],
+            "timeout_selected_cards": list(guesses) if timed_out else [],
             "wrong_guess_replacements": [],
             "wrong_guess_replacement_actor": "",
             "wrong_guess_replacement_raw_response": "",
             "wrong_guess_replacement_response_time_sec": "",
             "wrong_guess_replacement_attempts": "",
             "completed_guesses": len(guesses),
-            "skipped_guesses": max(0, int(hint_number or 0) - len(guesses)) if partial_skip else 0,
+            "skipped_guesses": max(0, int(hint_number or 0) - len(guesses)) if (partial_skip or timed_out) else 0,
             "alignment_status": alignment_status,
             "error_type": error_type,
             "human_expected_ai_understanding_rating": human_expected_ai_understanding_rating,
@@ -478,12 +510,12 @@ def record_interaction(
             "reflection_end_time": "",
             "reflection_time_sec": "",
             "recorded_at": turn_end.isoformat(),
-            "reflection_rating": "",
             "reflection_relationship_type": "",
             "reflection_explanation_raw": human_explanation_raw,
             "reflection_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
             "reflection_blocked_reason": "",
-            "human_perceived_understanding_rating": "",
+            "human_rating_ai_understood_my_clue": "",
+            "human_rating_i_understood_ai_clue": "",
             "human_relationship_type": "",
             "human_explanation_raw": human_explanation_raw,
             "human_explanation_sanitized": human_explanation_raw if human_explanation_is_valid else "",
@@ -537,6 +569,7 @@ def record_skip(
     timeout_selected_cards=None,
     clue_timer_started_at=None,
     timer_duration_seconds=None,
+    clue_extra_time_used=None,
     human_explanation_raw="",
     human_explanation_is_valid=None,
     human_explanation_blocked_reason="",
@@ -624,6 +657,7 @@ def record_skip(
             "repair_success": False,
             "timer_duration_seconds": timer_duration_seconds if timer_duration_seconds is not None else st.session_state.get("clue_timer_duration_seconds", CLUE_TIMER_SECONDS),
             "clue_timer_started_at": clue_timer_started_at if clue_timer_started_at is not None else st.session_state.get("clue_timer_started_at", ""),
+            "clue_extra_time_used": clue_extra_time_used if clue_extra_time_used is not None else bool(st.session_state.get("clue_extra_time_granted", False)),
             "human_timed_out": bool(timed_out),
             "timeout_timestamp": timeout_timestamp if timed_out else "",
             "timed_out": bool(timed_out),
@@ -666,12 +700,12 @@ def record_skip(
             "reflection_end_time": "",
             "reflection_time_sec": "",
             "recorded_at": turn_end.isoformat(),
-            "reflection_rating": "",
             "reflection_relationship_type": "",
             "reflection_explanation_raw": human_explanation_raw,
             "reflection_explanation_is_valid": human_explanation_is_valid if human_explanation_is_valid is not None else "",
             "reflection_blocked_reason": "",
-            "human_perceived_understanding_rating": "",
+            "human_rating_ai_understood_my_clue": "",
+            "human_rating_i_understood_ai_clue": "",
             "human_relationship_type": "",
             "human_explanation_raw": human_explanation_raw,
             "human_explanation_sanitized": human_explanation_raw if human_explanation_is_valid else "",
@@ -710,6 +744,9 @@ def record_forced_timeout_loss(hint, hint_number, intended_targets=None, expecte
     clue_giver = "human" if st.session_state.role == "human_clue" else "ai"
     guesser = "ai" if st.session_state.role == "human_clue" else "human"
     normalized_hint = (hint or "").strip().lower()
+    # The turn whose final window ran out counts as a used turn, so the
+    # status bar no longer shows a turn left once the round has ended.
+    st.session_state.round_interactions = st.session_state.get("round_interactions", 0) + 1
     st.session_state.interaction_history.append(
         {
             "turn": interaction_sequence,
@@ -922,12 +959,12 @@ def append_ai_round_summary():
                     "completed_guesses": item.get("completed_guesses", len(item.get("guesses", []))),
                     "skipped_guesses": item.get("skipped_guesses", 0),
                     "human_expected_ai_understanding_rating": item.get("human_expected_ai_understanding_rating"),
-                    "reflection_rating": item.get("reflection_rating", ""),
                     "reflection_relationship_type": item.get("reflection_relationship_type", ""),
                     "reflection_explanation_raw": item.get("reflection_explanation_raw", ""),
                     "reflection_explanation_is_valid": item.get("reflection_explanation_is_valid", ""),
                     "reflection_blocked_reason": item.get("reflection_blocked_reason", ""),
-                    "human_perceived_understanding_rating": item.get("human_perceived_understanding_rating", ""),
+                    "human_rating_ai_understood_my_clue": item.get("human_rating_ai_understood_my_clue", ""),
+                    "human_rating_i_understood_ai_clue": item.get("human_rating_i_understood_ai_clue", ""),
                     "human_relationship_type": item.get("human_relationship_type", ""),
                     "human_explanation_raw": item.get("human_explanation_raw", ""),
                     "human_explanation_sanitized": item.get("human_explanation_sanitized", ""),
