@@ -681,7 +681,7 @@ def render_tutorial_status(round_label, role_label, role_variant, stats):
     """Same visual status bar as render_top_status, for the two practice
     rounds -- which never call that function since it reads real-game
     session-state fields (st.session_state.round, .found_targets,
-    .round_interactions, .medal_counts, ...) the tutorial doesn't populate.
+    .round_interactions, ...) the tutorial doesn't populate.
     Left without this, the tutorial's own header was a bare heading with no
     equivalent of the name/progress/role info the real screens always show,
     which read as a different, less-finished-looking screen entirely.

@@ -3,7 +3,6 @@ context, alignment applicability, run type / eligibility, baseline prompt
 isolation, and participant-visible AI explanations."""
 
 import json
-import os
 import unittest
 from collections import Counter
 from types import SimpleNamespace

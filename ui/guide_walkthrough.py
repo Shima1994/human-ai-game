@@ -370,7 +370,9 @@ GUIDE_WALKTHROUGH_SLIDES = (
             fig_clue_step1,
             "Type **one word** that links your cards (not a word that is on the board), "
             f"and choose **how many** cards it links: **{CLUE_GIVER_CLUE[0].upper()} - {CLUE_GIVER_CLUE[1]}**.",
-            "Careful: a clue that also fits a red card is dangerous. If the AI picks a bomb, the round ends.",
+            "One clue can link several of your cards, which saves turns, but the bigger the number, "
+            "the easier the clue is to misread. Careful: a clue that also fits a red card is dangerous. "
+            "If the AI picks a bomb, the round ends.",
         ),
     ),
     (

@@ -218,7 +218,6 @@ class DurablePersistenceTests(unittest.TestCase):
             round_medal="none",
             round_bomb_hit=False,
             score=0,
-            last_score_change=0,
             interaction_history=[],
         )
         minimal_round_row = {"session_id": "s1", "round_number": 1, "condition": "adaptive"}
@@ -241,7 +240,6 @@ class DurablePersistenceTests(unittest.TestCase):
             round_medal="none",
             round_bomb_hit=False,
             score=0,
-            last_score_change=0,
             interaction_history=[],
             pending_round_saves=[],
         )

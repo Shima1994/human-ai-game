@@ -16,7 +16,7 @@ REMOVED = {
 
 class SchemaCleanupTests(_GameAndStorageState):
     def test_duplicate_columns_are_gone_and_their_originals_stay(self):
-        self.assertEqual(SCHEMA_VERSION, "2.3.0")
+        self.assertGreaterEqual(SCHEMA_VERSION, "2.3.0")
         self.assertFalse(REMOVED["rounds"] & set(storage.ROUNDS_LOG_FIELDS))
         self.assertFalse(REMOVED["turns"] & set(storage.TURNS_LOG_FIELDS))
         for kept in ("target_words", "round_terminated_by_bomb"):
@@ -31,7 +31,7 @@ class SchemaCleanupTests(_GameAndStorageState):
         }
         row = storage._turn_analysis_row("p1", item, self.state.word_type_per_card)
         self.assertEqual(row["human_expected_ai_understanding_rating"], "")
-        self.assertEqual(row["hint_attempts"], "")
+        self.assertEqual(row["ai_clue_attempts"], "")
         self.assertEqual(set(row), set(storage.TURNS_LOG_FIELDS))
 
 
@@ -41,11 +41,12 @@ class PromptCorrectnessTests(unittest.TestCase):
             self.assertNotIn("zero points", prompt)
             self.assertIn("points already earned this round still count", prompt)
 
-    def test_prompt_version_labels_are_v3(self):
+    def test_prompt_version_labels_are_current(self):
         source = open("core/storage.py", encoding="utf-8").read()
-        self.assertIn('prompt_version = "hint_v3_condition_memory"', source)
-        self.assertIn('prompt_version = "guess_v3_partial_skip"', source)
+        self.assertIn('prompt_version = "hint_v4_condition_memory"', source)
+        self.assertIn('prompt_version = "guess_v4_partial_skip"', source)
         self.assertNotIn("_v2_", source)
+        self.assertNotIn("_v3_", source)
 
 
 if __name__ == "__main__":

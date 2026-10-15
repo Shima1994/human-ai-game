@@ -51,6 +51,7 @@ SESSIONS_LOG_FIELDS = [
     "board_order",
     "start_time",
     "end_time",
+    "debriefing_acknowledged_at",
     "completed",
     "consent_given",
     "consent_timestamp",
@@ -106,7 +107,6 @@ ROUNDS_LOG_FIELDS = [
     "remaining_targets_end",
     "number_of_turns",
     "round_score",
-    "medal",
     "round_star",
     "round_star_awarded_at",
     "total_stars_so_far",
@@ -149,8 +149,8 @@ TURNS_LOG_FIELDS = [
     "guesser",
     "clue",
     "clue_number",
-    "hint_explanation",
-    "hint_attempts",
+    "ai_clue_reasoning",
+    "ai_clue_attempts",
     "board_template_id",
     "board_material_version",
     "board_instance_id",
@@ -178,8 +178,8 @@ TURNS_LOG_FIELDS = [
     "bomb_guess_word_types",
     "remaining_targets_before_turn",
     "remaining_targets_after_turn",
-    "hint_time_sec",
-    "guess_time_sec",
+    "human_clue_time_sec",
+    "human_guess_time_sec",
     "hit_rate",
     "target_yield",
     "jaccard_alignment",
@@ -553,6 +553,8 @@ def _session_row(completed=False):
         "board_order": board_order_label(st.session_state.get("round_board_order") or []),
         "start_time": st.session_state.get("session_start_time", ""),
         "end_time": st.session_state.get("session_end_time", "") if completed else "",
+        # When the participant pressed Finish study after the debriefing.
+        "debriefing_acknowledged_at": st.session_state.get("debriefing_acknowledged_at", ""),
         "completed": bool(completed),
         "consent_given": bool(st.session_state.get("consent_given", False)),
         "consent_timestamp": st.session_state.get("consent_timestamp", ""),
@@ -823,7 +825,6 @@ def _round_analysis_row(participant_id, timestamp, score_change):
         ),
         "number_of_turns": st.session_state.round_interactions,
         "round_score": score_change,
-        "medal": st.session_state.round_medal,
         "round_star": bool(st.session_state.get("round_star", False)),
         "round_star_awarded_at": st.session_state.get("round_star_awarded_at", ""),
         "total_stars_so_far": st.session_state.get("total_stars_so_far", 0),
@@ -896,8 +897,8 @@ def _llm_fields_for_turn(item):
         temperature = "0.55"
         # v3 (schema 2.3.0): role-labelled human ratings in the adaptive
         # memory, corrected bomb rule in the guess prompt.
-        prompt_version = "hint_v3_condition_memory"
-        system_version = f"hint_system_v3_{condition}"
+        prompt_version = "hint_v4_condition_memory"
+        system_version = f"hint_system_v4_{condition}"
     else:
         raw = item.get("guess_raw_response", "")
         latency = item.get("guess_response_time_sec")
@@ -915,8 +916,8 @@ def _llm_fields_for_turn(item):
         }
         model = GUESS_MODEL_NAME
         temperature = "0.2"
-        prompt_version = "guess_v3_partial_skip"
-        system_version = f"guess_system_v3_{condition}"
+        prompt_version = "guess_v4_partial_skip"
+        system_version = f"guess_system_v4_{condition}"
     error = raw if str(raw).startswith("<api_error:") else ""
     return {
         "llm_model": model,
@@ -962,8 +963,10 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "guesser": item.get("guesser", ""),
         "clue": item.get("hint", ""),
         "clue_number": item.get("hint_number", ""),
-        "hint_explanation": item.get("hint_explanation", ""),
-        "hint_attempts": _blank_if_none(item.get("hint_attempts")),
+        # The AI clue-giver's hidden reasoning and how many tries its clue
+        # took; blank on turns where the human gave the clue.
+        "ai_clue_reasoning": item.get("hint_explanation", "") if item.get("clue_giver") == "ai" else "",
+        "ai_clue_attempts": _blank_if_none(item.get("hint_attempts")) if item.get("clue_giver") == "ai" else "",
         "board_template_id": st.session_state.get("board_template_id", ""),
         "board_material_version": st.session_state.get("board_material_version", ""),
         "board_instance_id": st.session_state.get("board_instance_id", ""),
@@ -998,8 +1001,14 @@ def _turn_analysis_row(participant_id, item, word_type_per_card):
         "bomb_guess_word_types": _json(_types_for_words(bombs, word_type_per_card)),
         "remaining_targets_before_turn": _json(item.get("remaining_targets_before_turn", [])),
         "remaining_targets_after_turn": _json(item.get("remaining_targets_after_turn", [])),
-        "hint_time_sec": _format_optional_float(item.get("hint_time_sec")),
-        "guess_time_sec": _format_optional_float(item.get("guess_time_sec")),
+        # The human's own decision time only; the AI's response time is in
+        # llm_latency_seconds.
+        "human_clue_time_sec": (
+            _format_optional_float(item.get("hint_time_sec")) if item.get("clue_giver") == "human" else ""
+        ),
+        "human_guess_time_sec": (
+            _format_optional_float(item.get("guess_time_sec")) if item.get("guesser") == "human" else ""
+        ),
         "hit_rate": _format_optional_float(item.get("hit_rate")),
         "target_yield": item.get("target_yield", ""),
         # No card was selected on a timeout or full skip, so selection
@@ -1211,7 +1220,6 @@ def log_round(participant_id):
     score_change = compute_round_score(st.session_state.interaction_history)
     clean_history = clean_interaction_history(st.session_state.interaction_history)
 
-    st.session_state.last_score_change = score_change
     st.session_state.score += score_change
 
     rows = _build_round_rows(participant_id, timestamp, score_change, clean_history)
@@ -1231,7 +1239,6 @@ def log_round(participant_id):
         "round_completed",
         {
             "round_score": score_change,
-            "medal": st.session_state.round_medal,
             "turns": st.session_state.round_interactions,
         },
         round_number=st.session_state.round,

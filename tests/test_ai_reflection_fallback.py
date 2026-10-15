@@ -21,7 +21,6 @@ class AiRoundReflectionFallbackTests(unittest.TestCase):
             history=[],
             round_success=True,
             round_bomb_hit=False,
-            round_medal="gold",
         )
 
     @patch("core.ai_service.call_openai_chat")

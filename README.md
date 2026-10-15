@@ -151,8 +151,8 @@ Important turn-level fields include:
 - `missed_intended_targets` and `extra_correct_guesses` (set differences between intended and actual guesses);
 - counterfactual wrong-guess replacements, actor, word types, count, and AI-call metadata;
 - raw and sanitized human/AI explanations plus validation status and block reason;
-- `hint_explanation` and `hint_attempts`;
-- explicit per-turn timing: `hint_time_sec`, `guess_time_sec`, `human_decision_time_sec`, `reflection_time_sec`, separate from LLM latency;
+- `ai_clue_reasoning` and `ai_clue_attempts` (AI clue turns only);
+- explicit per-turn human timing: `human_clue_time_sec`, `human_guess_time_sec`, `reflection_time_sec`, separate from the AI's response time (`llm_latency_seconds`);
 - raw LLM response, parsed response, model, temperature, retries, and latency;
 - `repair_applied_to_next_prompt`, immediate `repair_source_turn`, stable `repair_chain_id`, and `repair_attempt_number` for repeated repairs;
 - canonical `action_type` and `alignment_applicability` classifications derived from the raw action fields without changing stored outcome metrics.
@@ -172,6 +172,8 @@ Rating fields represent different stages and directions, not one mutual score. E
 Until schema 2.1.0 a single field, `human_perceived_understanding_rating`, held the post-turn answer to different questions depending on the role and on whether guesses were made; those sessions keep it in their `data` JSON.
 
 Schema 2.3.0 stores missing values as an empty string everywhere (never null) and drops five columns that always repeated another one: `remaining_targets_start` (= `target_words`), `bomb_selected` (= `round_terminated_by_bomb`), `ai_explanation` (= `ai_explanation_sanitized`), `human_timed_out` (= `timed_out`) and `turn_score_delta` (= `target_yield`). Older rows keep them in their `data` JSON.
+
+Schema 2.4.0 removes the per-round `medal` (a leftover efficiency rating the participant never saw; it was also dropped from the AI prompts), renames `hint_explanation` to `ai_clue_reasoning` and `hint_attempts` to `ai_clue_attempts` (both filled only on turns where the AI gave the clue), and replaces `hint_time_sec`/`guess_time_sec`, which mixed human decision time with AI response time, by `human_clue_time_sec` and `human_guess_time_sec` (the human's own time only; the AI's response time is `llm_latency_seconds`).
 - `human_explanation_*` is the canonical pre-AI General Link, with `human_explanation_source=pre_ai_human_clue_form` and `human_explanation_collected_at` marking its origin and submission time.
 - `human_round_feedback` is the qualitative end-of-round response. The five `round_questionnaire_*` round fields are the human's per-round questionnaire items (1 = strongly disagree, 5 = strongly agree); the `ai_round_questionnaire_*` fields are the AI's mirrored self-report for the same round. `attention_check_mid_game_answer` (session) is the second attention check, shown among the round 2 questions; the first is `attention_check_profile_answer` on the profile page. A submission counts as failed only when both are failed.
 

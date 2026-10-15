@@ -2293,7 +2293,6 @@ def _save_ai_guess_turn(review, repair_context):
     (There used to be a separate, untimed "Save this turn" review step here,
     which left the status bar stale and gave the clue-giver unlimited time
     with the full board before the next clue's timer started.)"""
-    st.session_state.last_ai_guesses = review.get("guesses", [])
     record_interaction(
         review.get("hint", ""),
         review.get("hint_number", 1),
@@ -2375,12 +2374,6 @@ def screen_human_clue():
         st.warning(
             "Time expired. That used one of this round's 3 interactions."
         )
-    if st.session_state.pop("final_guess_warning_notice", False):
-        st.error(
-            f"Both skips are used. You have {FINAL_GUESS_TIMER_SECONDS} seconds to submit "
-            "your clue or the round ends automatically."
-        )
-
     repair_context = _pending_human_clue_repair_context()
     if repair_context:
         # A nudge, never a rule: it names only the participant's own intended
@@ -3191,7 +3184,6 @@ def screen_round_summary():
                     st.session_state.interaction_history,
                     st.session_state.round_success,
                     st.session_state.round_bomb_hit,
-                    st.session_state.round_medal,
                     condition=st.session_state.get("condition", DEFAULT_CONDITION),
                 )
                 update_current_round_summary()
@@ -3283,10 +3275,7 @@ def _render_round_questions_page():
 
 
 def _advance_after_round():
-    """Count the round's medal and move on: the next round, or the end of
-    the game after the last one."""
-    medal = st.session_state.round_medal
-    st.session_state.medal_counts[medal] = st.session_state.medal_counts.get(medal, 0) + 1
+    """Move on: the next round, or the end of the game after the last one."""
     st.session_state.round_reflection_saved = False
 
     if st.session_state.round >= N_ROUNDS:
@@ -3308,8 +3297,6 @@ def _advance_after_round():
         st.session_state.hint_targets = []
         st.session_state.hint_explanation = ""
         st.session_state.previous_hint = None
-        st.session_state.last_ai_guesses = []
-        st.session_state.last_ai_hint = ""
         st.session_state.pending_hint_meta = None
         st.session_state.pending_reflection_turn = None
         st.session_state.ai_round_reflection = ""

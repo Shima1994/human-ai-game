@@ -276,7 +276,8 @@ The model summarizes clue interpretation, successes, errors, skips, and one acti
 The prompt asks for plain text with each clue's explanation, the skip note, and the final suggestion on a new line. Any Markdown markers are removed before the text is stored, and each line is shown as its own paragraph.
 
 - Temperature: `0.4`.
-- Adaptive context may contain full interaction history.
+- Adaptive context is an explicit fact list per turn (`format_reflection_turn_facts`): who gave the clues, the clue-giver's intended cards, the guesser's picks in order, which correct cards were intended and which were not, neutral and bomb picks, whether and how the guesser skipped, and whether time ran out. The clue and guess prompts keep `format_interaction_history`.
+- Skips: only the guesser can skip. The prompt tells the AI never to talk about skipping itself when it gave the clues, and not to mention skips when nobody skipped.
 - Baseline context uses fact-only history and therefore excludes human/AI explanation exchange.
 - Adaptive displays the reflection and may reuse it in later memory.
 - Baseline stores it without displaying or reusing it.

@@ -9,7 +9,7 @@ REFLECTION_MODEL_NAME = "gpt-5.4-2026-03-05"
 # values to their platform's exact identifiers; blank means unavailable and is
 # preferable to fabricated provenance.
 EXPERIMENT_VERSION = os.getenv("EXPERIMENT_VERSION", "pilot-v1")
-SCHEMA_VERSION = "2.3.0"
+SCHEMA_VERSION = "2.4.0"
 CODE_COMMIT = next(
     (
         os.getenv(name, "").strip()
@@ -69,15 +69,9 @@ AI_API_TIMEOUT_SECONDS = 20
 # the same round onward, it costs a completed interaction instead (the
 # round's 3-interaction budget, same as a real guess would).
 CLUE_GIVER_FREE_TIMEOUTS_PER_ROUND = 1
-MEDAL_POINTS = {
-    "gold": 5,
-    "silver": 4,
-    "none": 0,
-}
 
 # Behavioural card-selection points -- how many points a guess earns based on
-# what was actually selected, independent of round_medal/MEDAL_POINTS above
-# (an unrelated interaction-count efficiency rating) and of jaccard_alignment
+# what was actually selected, independent of jaccard_alignment
 # (an unrelated intersubjective-alignment measure computed alongside it in
 # record_interaction). See core/game_logic.py's turn_points calculation.
 POINTS_EXACT_INTENDED_TARGET = 2
@@ -85,9 +79,8 @@ POINTS_OTHER_TARGET = 1
 
 # Final, session-level medal -- assigned once, from the cumulative score
 # across all N_ROUNDS rounds (max possible: N_ROUNDS * TARGET_COUNT *
-# POINTS_EXACT_INTENDED_TARGET). Deliberately separate from round_medal
-# (a per-round efficiency rating) and from the per-round star (round
-# completion without a bomb).
+# POINTS_EXACT_INTENDED_TARGET). Deliberately separate from the per-round
+# star (round completion without a bomb).
 MAX_POSSIBLE_SESSION_SCORE = N_ROUNDS * TARGET_COUNT * POINTS_EXACT_INTENDED_TARGET
 FINAL_MEDAL_GOLD_MIN = 30
 FINAL_MEDAL_SILVER_MIN = 20

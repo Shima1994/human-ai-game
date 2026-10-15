@@ -200,6 +200,62 @@ def format_interaction_history(history):
     return "\n".join(lines)
 
 
+def _names(cards):
+    return ", ".join(cards) if cards else "none"
+
+
+def format_reflection_turn_facts(history, role):
+    """The round's turns as explicit facts, for the adaptive end-of-round
+    reflection only (the clue and guess prompts keep format_interaction_history).
+    Spelling out which correct cards were or were not intended, which were
+    neutral, and who skipped keeps the reflection from misstating them."""
+    if not history:
+        return "No turns were played in this round."
+    who = (
+        "In this round you (the AI) gave the clues and the human guessed."
+        if role == "ai_clue"
+        else "In this round the human gave the clues and you (the AI) guessed."
+    )
+    lines = [who]
+    for index, item in enumerate(history, start=1):
+        intended = list(item.get("intended_targets", []) or [])
+        guesses = list(item.get("guesses", []) or [])
+        correct = list(item.get("correct_guesses", []) or [])
+        bombs = list(item.get("bomb_guesses", []) or [])
+        neutral = list(item.get("neutral_guesses", []) or [])
+        clue_giver = item.get("clue_giver", "")
+        guesser = item.get("guesser", "")
+        hint = item.get("hint", "")
+        timed_out = bool(item.get("timed_out")) or item.get("outcome") in ("timeout", "partial_timeout")
+        if item.get("partial_skip"):
+            skip = f"yes, the {guesser} skipped after {len(guesses)} card(s)"
+        elif item.get("skipped") or item.get("outcome") == "skip":
+            skip = f"yes, the {guesser} skipped without picking a card"
+        else:
+            skip = "no"
+        if not hint and timed_out:
+            lines.append(
+                f"Turn {index} | the {clue_giver} clue-giver's time ran out before a clue was given"
+            )
+            continue
+        lines.append(
+            f"Turn {index} | {clue_giver} clue \"{hint}\" for {item.get('hint_number', '')} card(s), "
+            f"{guesser} guessed\n"
+            f"  intended by the clue-giver: {_names(intended)}\n"
+            f"  clue-giver expected the guesser to pick: {_names(item.get('expected_guesses', []))}\n"
+            f"  picked by the guesser (in order): {_names(guesses)}\n"
+            f"  correct and intended: {_names([c for c in correct if c in intended])}\n"
+            f"  correct but not intended (still a valid target): {_names([c for c in correct if c not in intended])}\n"
+            f"  neutral (wrong): {_names(neutral)}\n"
+            f"  bomb: {_names(bombs)}\n"
+            f"  skipped: {skip}\n"
+            f"  guesser's likely intended cards at the skip: {_names(item.get('skip_interpreted_cards', []))}\n"
+            f"  guesser would have chosen instead of a wrong card: {_names(item.get('wrong_guess_replacements', []))}\n"
+            f"  time ran out: {'yes' if timed_out else 'no'}"
+        )
+    return "\n".join(lines)
+
+
 def format_baseline_history(history):
     """Game facts only: no intentions, expected guesses, rationales, or reflections."""
     if not history:
@@ -233,7 +289,7 @@ def format_baseline_round_memory(round_summaries):
     for summary in round_summaries:
         lines.append(
             f"Round {summary.get('round', '')}: success={summary.get('success', '')}; "
-            f"bomb_hit={summary.get('bomb_hit', '')}; medal={summary.get('medal', '')}"
+            f"bomb_hit={summary.get('bomb_hit', '')}"
         )
         lines.append(format_baseline_history(summary.get("interactions", [])))
     return "\n".join(lines)
@@ -345,7 +401,6 @@ def format_round_memory(round_summaries):
             "round": summary.get("round"),
             "role": summary.get("role"),
             "word_type": summary.get("word_type"),
-            "medal": summary.get("medal"),
             "success": summary.get("success"),
             "bomb_hit": summary.get("bomb_hit"),
             "turns": summary.get("turns"),
@@ -467,7 +522,7 @@ def format_persistent_teammate_memory(history, round_summaries):
     for summary in round_summaries or []:
         round_label = f"round {summary.get('round', '')}"
         lines.append(
-            f"{round_label} summary: role={summary.get('role', '')}; medal={summary.get('medal', '')}; "
+            f"{round_label} summary: role={summary.get('role', '')}; "
             f"success={summary.get('success', '')}; bomb_hit={summary.get('bomb_hit', '')}; "
             f"found_targets=[{', '.join(summary.get('found_targets', [])) or 'none'}]"
         )
@@ -1431,10 +1486,10 @@ REFLECTION_SYSTEM_PROMPT = """You are an AI teammate writing a short reflection 
 Your reflection should:
 1. If you gave the clues, explain plainly why each clue was meant for which targets, what link you used (category, metaphor, idiom, image), and how you tried to keep the bombs and neutrals safe. Acknowledge any guess that went wrong.
 2. If the human gave the clues, compare their marked intended targets to your guesses. Where you misread, say what association pulled you the wrong way. Where you guessed right, say what clicked.
-3. Mention any skips and what made the clue feel risky.
+3. Skips: only the guesser can skip. If you gave the clues, never talk about skipping yourself; if the human skipped one of your clues, say what may have made it unclear. If the human gave the clues and you skipped, say what made the clue feel risky. If nobody skipped, do not mention skips at all.
 4. End with one specific, actionable suggestion the team can apply in the next round.
 5. Be warm, plain, and concrete. No empty praise. Maximum 180 words.
-6. Format: plain text, no Markdown. Start each clue's explanation, the note about skips, and the final suggestion on a new line.
+6. Format: plain text, no Markdown. Start each clue's explanation, the note about skips (only if there was a skip), and the final suggestion on a new line.
 """
 
 
@@ -1447,7 +1502,6 @@ def generate_ai_round_reflection(
     history,
     round_success,
     round_bomb_hit,
-    round_medal,
     condition=DEFAULT_CONDITION,
 ):
     if isinstance(bomb_words, str) or bomb_words is None:
@@ -1459,10 +1513,9 @@ def generate_ai_round_reflection(
         f"Neutral words: {', '.join(neutral_words)}\n"
         f"Bombs: {', '.join(bomb_words)}\n"
         f"All targets found: {round_success}\n"
-        f"Bomb hit: {round_bomb_hit}\n"
-        f"Medal: {round_medal}\n\n"
+        f"Bomb hit: {round_bomb_hit}\n\n"
         "Interaction history:\n"
-        f"{format_interaction_history(history) if condition == 'adaptive' else format_baseline_history(history)}\n"
+        f"{format_reflection_turn_facts(history, role) if condition == 'adaptive' else format_baseline_history(history)}\n"
     )
     fallback_text = (
         "I could not generate a reflection this time. Look back at the history above: "

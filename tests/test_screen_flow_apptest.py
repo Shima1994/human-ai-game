@@ -381,7 +381,6 @@ class SaveAiGuessTurnTests(unittest.TestCase):
             current_guess_start_time="t",
             current_reflection_start_time="t",
             previous_hint="",
-            last_ai_guesses=[],
         )
         review = {"hint": "letters", "hint_number": 2, "guesses": ["A", "B"], "intended_targets": ["A"]}
         repair = {"skipped_turn": 0, "unresolved_targets": ["A"]}
@@ -395,7 +394,6 @@ class SaveAiGuessTurnTests(unittest.TestCase):
         self.assertIs(record.call_args.kwargs["repair_context"], repair)
         # The slow AI call is deferred to the result step, never run here.
         replacements.assert_not_called()
-        self.assertEqual(state.last_ai_guesses, ["A", "B"])
         self.assertEqual(state.hint, "")
         self.assertEqual(state.previous_hint, "letters")
 

@@ -12,7 +12,6 @@ from core.constants import (
     FINAL_MEDAL_SILVER_MIN,
     MAX_INTERACTIONS_PER_ROUND,
     MAX_SKIPS_PER_ROUND,
-    MEDAL_POINTS,
     N_ROUNDS,
     POINTS_EXACT_INTENDED_TARGET,
     POINTS_OTHER_TARGET,
@@ -215,8 +214,6 @@ def setup_new_round():
     st.session_state.hint_targets = []
     st.session_state.hint_expected_guesses = []
     st.session_state.hint_explanation = ""
-    st.session_state.last_ai_guesses = []
-    st.session_state.last_ai_hint = ""
     st.session_state.human_expected_ai_understanding_rating = None
     st.session_state.previous_hint = None
     st.session_state.start_time = datetime.now(timezone.utc)
@@ -226,8 +223,6 @@ def setup_new_round():
     st.session_state.current_guess_start_time = ""
     st.session_state.current_reflection_start_time = ""
     clear_participant_decision_timer()
-    st.session_state.last_score_change = 0
-    st.session_state.round_medal = "none"
     st.session_state.round_success = False
     st.session_state.round_bomb_hit = False
     st.session_state.round_end_reason = ""
@@ -240,21 +235,10 @@ def setup_new_round():
     st.session_state.pending_reflection_turn = None
 
 
-def get_medal_for_round(interactions, success, bomb_hit):
-    if bomb_hit or not success:
-        return "none"
-    if interactions <= 2:
-        return "gold"
-    if interactions == 3:
-        return "silver"
-    return "none"
-
-
 def compute_round_score(interaction_history=None):
     """Sum of this round's turn_points (see record_interaction) -- +2 for a
     guess matching the clue-giver's intended card, +1 for any other valid
-    target, 0 for neutral/bomb/skipped cards. Independent of round_medal/
-    MEDAL_POINTS (an unrelated interaction-count efficiency rating)."""
+    target, 0 for neutral/bomb/skipped cards."""
     if interaction_history is None:
         interaction_history = st.session_state.get("interaction_history", [])
     return sum(item.get("turn_points", 0) for item in interaction_history)
@@ -853,12 +837,6 @@ def finish_round(forced_loss_reason=None):
         st.session_state.round_end_reason = "completed_turn_limit"
     else:
         st.session_state.round_end_reason = ""
-    st.session_state.round_medal = get_medal_for_round(
-        st.session_state.round_interactions,
-        st.session_state.round_success,
-        st.session_state.round_bomb_hit,
-    )
-    st.session_state.last_score_change = MEDAL_POINTS[st.session_state.round_medal]
     # Round-completion star: all 5 targets found and no bomb selected this
     # round. A partial/full skip doesn't itself block a star, since it
     # doesn't change round_success/round_bomb_hit on its own.
@@ -908,7 +886,6 @@ def append_ai_round_summary():
             "bomb_word_types": word_types_for(st.session_state.get("bomb_words", [])),
             "success": bool(st.session_state.round_success),
             "bomb_hit": bool(st.session_state.round_bomb_hit),
-            "medal": st.session_state.round_medal,
             "turns": st.session_state.round_interactions,
             "found_targets": list(st.session_state.found_targets),
             "skips": st.session_state.get("round_skips", 0),

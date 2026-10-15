@@ -124,7 +124,9 @@ means that the AI is trying to communicate two cards that it believes are relate
 
 Select the number of cards indicated by the clue number.
 
-Think about the relationship between the clue and the words on the board, but remember that some apparently related cards may be neutral cards or bombs.""",
+Think about the relationship between the clue and the words on the board, but remember that some apparently related cards may be neutral cards or bombs.
+
+Before you select any card, write a short reason (3–30 English words, no card names) explaining why you think the cards fit the clue. Each card you click is revealed immediately, and the turn ends once you have clicked as many cards as the number. If a card you chose is a neutral card, you will be asked which card you would have chosen instead.""",
     ),
     (
         "Try to Connect More Than One Target",
@@ -167,6 +169,8 @@ Skipping is therefore available as a safety mechanism when communication is uncl
         "Time Limit",
         f"""When it is your turn to select a card, you will be given {GUESSER_TIMER_SECONDS} seconds as a Guesser. If you run out of time, it will consume one of your skip and game continues. The time take by AI is not counted. If you have already used both of your skips, you will be given {FINAL_GUESS_TIMER_SECONDS} seconds to make your guess or the round ends automatically: you keep the points you already earned, but you get no star for that round.
 
+When only 30 of your {GUESSER_TIMER_SECONDS} seconds are left, a short warning appears. If the time runs out after you have already clicked a card, the cards you clicked still count.
+
 As a Clue-Giver, you will be given {CLUE_GIVER_TIMER_SECONDS} seconds to give a clue. If you run out of time (except for the first time when this happens in which case you will be allowed to finish the turn), you will consume one of the AI's three Guess turns; when all three are used, the round ends.
 
 Try to answer carefully, but do not wait until the final seconds to submit your response.""",
@@ -179,7 +183,9 @@ These questions are part of the research study.
 
 Please answer based on your actual understanding and experience during that interaction.
 
-There are no “correct” answers to these reflection questions.""",
+There are no “correct” answers to these reflection questions.
+
+At the end of each round, you will also write a short reflection and answer a few short questions about that round.""",
     ),
     (
         "Scoring, Stars, and Medals",
