@@ -10,6 +10,7 @@ order of 150 typed SQL columns while keeping every value queryable in SQL
 """
 
 import json
+import os
 import threading
 import time
 
@@ -117,6 +118,11 @@ CREATE INDEX IF NOT EXISTS idx_events_session_time ON events (session_id, timest
 
 
 def _database_url():
+    """An environment variable wins over .streamlit/secrets.toml, like every
+    other setting (see core.prolific.read_setting)."""
+    from_env = os.getenv("DATABASE_URL", "").strip()
+    if from_env:
+        return from_env
     try:
         return st.secrets.get("DATABASE_URL", "")
     except Exception:

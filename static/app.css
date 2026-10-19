@@ -3956,3 +3956,18 @@ div[data-testid="stAlert"] {
     min-height: 0;
     height: 100%;
 }
+/* Visual guide: the guesser's timer with the Skip button under it, as in the game. */
+.guide-walk-timer-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+}
+.guide-walk-button.skip {
+    min-width: 8rem;
+    text-align: center;
+    border-color: var(--role-guess-strong);
+    border-radius: var(--radius-pill);
+    background: var(--role-guess-strong);
+    color: #fff;
+}

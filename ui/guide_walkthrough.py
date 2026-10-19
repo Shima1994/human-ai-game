@@ -28,7 +28,6 @@ from ui.components import (
     _guide_card,
     _guide_clue_panel,
     _stat_block,
-    guide_history_figure,
     guide_scoring_figure,
     guide_status_bar_figure,
     role_badge_html,
@@ -60,6 +59,14 @@ GUESSER_CLUE = ("ocean", 2)
 GUESSER_INTENDED = ("Whale", "Coral")
 GUESSER_PICKS = ("Whale", "Anchor")
 GUESSER_RATIONALE = "Both are found in the sea."
+
+ROUND_REFLECTION_EXAMPLE = (
+    "My clue was too broad. Next time I will pick a word that fits only my cards."
+)
+ROUND_QUESTION_EXAMPLES = (
+    "In this round, I adapted my communication based on the AI's behaviour.",
+    "In this round, I felt that the AI and I had developed a shared understanding.",
+)
 
 # Streamlit draws the prediction drop-down's tags in the theme's primaryColor
 # (.streamlit/config.toml); the picture copies that so it looks the same.
@@ -252,7 +259,11 @@ def fig_guesser_clue_and_timer():
         _guide_clue_panel("AI clue", word, number, "guess")
         + '<div class="guide-walk-board-timer">'
         f"{_board(GUESSER_BOARD)}"
-        f'{_timer("guess", GUESSER_TIMER_SECONDS, "Your time")}</div>'
+        # The Skip button sits under the timer, as in the game; step
+        # "Not sure? Skip" explains it.
+        '<div class="guide-walk-timer-stack">'
+        f'{_timer("guess", GUESSER_TIMER_SECONDS, "Your time")}'
+        '<span class="guide-walk-button skip">Skip</span></div></div>'
     )
     return _figure(body, "As the Guesser you see only the words.")
 
@@ -297,10 +308,39 @@ def fig_round_summary():
     return _figure(body, "The end of a round, when all targets were found without a bomb.")
 
 
+def fig_round_reflection():
+    body = (
+        '<div class="guide-walk-label">Your reflection on this round</div>'
+        + _input(ROUND_REFLECTION_EXAMPLE, "guide-walk-textarea")
+    )
+    return _figure(body, "You write a few sentences about the round.")
+
+
 def fig_round_end():
-    """Round summary and a History card side by side, to keep this step as
-    short as the others."""
-    return f'<div class="guide-walk-split">{fig_round_summary()}{guide_history_figure()}</div>'
+    """Round summary and the reflection box side by side, to keep this step
+    as short as the others."""
+    return f'<div class="guide-walk-split">{fig_round_summary()}{fig_round_reflection()}</div>'
+
+
+def _agree(statement, selected):
+    pills = "".join(
+        f'<span class="guide-walk-rate{" on" if value == selected else ""}">{value}</span>'
+        for value in range(1, 6)
+    )
+    return (
+        f'<div class="guide-walk-label">{escape(statement)}</div>'
+        f'<div class="guide-walk-rating">{pills}</div>'
+        '<div class="guide-walk-ends"><span>Strongly disagree</span><span>Strongly agree</span></div>'
+    )
+
+
+def fig_round_questions():
+    body = (
+        '<div class="panel-title">Questions about this round</div>'
+        + _agree(ROUND_QUESTION_EXAMPLES[0], 4)
+        + _agree(ROUND_QUESTION_EXAMPLES[1], 3)
+    )
+    return _figure(body, "Two of the short questions asked after every round.")
 
 
 # --- Steps (in the order of a real game) --------------------------------------
@@ -457,18 +497,6 @@ GUIDE_WALKTHROUGH_SLIDES = (
     ),
     (
         "guess",
-        "See the result",
-        (
-            fig_guesser_result,
-            f"**{GUESSER_PICKS[0]}** was a card the AI meant: **+{POINTS_EXACT_INTENDED_TARGET}**. "
-            f"**{GUESSER_PICKS[1]}** was neutral: 0. Because {GUESSER_PICKS[1]} was not a target, you are "
-            "also asked which card you would choose instead. Then you rate how well you understood the AI's clue.",
-            "After every turn, the **History** panel on the left shows the clue, the guesses and the result. "
-            "Have a look at it before your next move, especially when the AI gives the clues.",
-        ),
-    ),
-    (
-        "guess",
         "Not sure? Skip",
         (
             "If the clue is unclear, press **Skip** (under the timer) instead of clicking:",
@@ -480,6 +508,18 @@ GUIDE_WALKTHROUGH_SLIDES = (
         ),
     ),
     (
+        "guess",
+        "See the result",
+        (
+            fig_guesser_result,
+            f"**{GUESSER_PICKS[0]}** was a card the AI meant: **+{POINTS_EXACT_INTENDED_TARGET}**. "
+            f"**{GUESSER_PICKS[1]}** was neutral: 0. Because {GUESSER_PICKS[1]} was not a target, you are "
+            "also asked which card you would choose instead. Then you rate how well you understood the AI's clue.",
+            "After every turn, the **History** panel on the left shows the clue, the guesses and the result. "
+            "Have a look at it before your next move, especially when the AI gives the clues.",
+        ),
+    ),
+    (
         "",
         "The end of a round",
         (
@@ -487,8 +527,20 @@ GUIDE_WALKTHROUGH_SLIDES = (
             f"or {MAX_INTERACTIONS_PER_ROUND} turns are used. You then see all colours, your points, "
             "and whether you earned a star:",
             fig_round_end,
-            "Then you write a short reflection and answer a few quick questions about the round. "
-            "Before the real game, you will play two short practice rounds.",
+            "Then you write a short reflection on the round. **Read everything on this page carefully "
+            "before you write**: it can help you in the next rounds.",
+        ),
+    ),
+    (
+        "",
+        "Questions, then the next round",
+        (
+            "Next, a separate page asks a few short questions about the round. Rate each statement from "
+            "1 (strongly disagree) to 5 (strongly agree); every statement needs an answer:",
+            fig_round_questions,
+            f"After the **{N_ROUNDS}th round** the game ends: you see your final points and medal, read a "
+            "short debriefing, and then receive your **completion code** for Prolific. Before the real game, "
+            "you will play two short practice rounds.",
         ),
     ),
 )

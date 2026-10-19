@@ -3208,6 +3208,7 @@ def screen_round_summary():
                 f"""
                     <div class="glass-card compact-card">
                     <div class="panel-title">AI reflection</div>
+                    <p class="ai-reflection-note">Please read this carefully: it explains how the AI saw this round, and it can help you in the next rounds.</p>
                     {reflection_html}
                 </div>
                 """,
