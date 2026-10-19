@@ -13,6 +13,23 @@ class GuessOutcomeMessageTests(unittest.TestCase):
         self.assertEqual(kind, "error")
         self.assertIn("Bomb hit", message)
 
+    def test_bomb_hit_names_the_correct_card_clicked_before_it(self):
+        from ui.screens import _turn_points_message
+
+        item = {
+            "outcome": "bomb",
+            "guesses": ["Penguin", "Robot"],
+            "correct_guesses": ["Penguin"],
+            "bomb_guesses": ["Robot"],
+            "turn_points": 2,
+        }
+        kind, message = _guess_outcome_summary(item)
+        self.assertEqual(kind, "error")
+        self.assertEqual(
+            message, "Bomb hit: Robot. Before it, Penguin was correct. The round has ended."
+        )
+        self.assertEqual(_turn_points_message(item), "+2 points from the cards before the bomb")
+
     def test_single_neutral_guess_is_a_warning_not_red(self):
         kind, message = _guess_outcome_summary(
             {"outcome": "neutral", "guesses": ["Loyalty"], "neutral_guesses": ["Loyalty"]}

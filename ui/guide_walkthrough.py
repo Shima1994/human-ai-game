@@ -366,6 +366,8 @@ GUIDE_WALKTHROUGH_SLIDES = (
         "",
         "Points, stars and medals",
         (
+            "Your goal is to work with the AI **as one team** to earn as many points and stars as "
+            f"possible over the {N_ROUNDS} rounds. "
             f"**+{POINTS_EXACT_INTENDED_TARGET}** for the card the clue-giver had in mind, "
             f"**+{POINTS_OTHER_TARGET}** for another target, 0 for a neutral card. "
             f"Find all {TARGET_COUNT} targets without a bomb to earn a star.",

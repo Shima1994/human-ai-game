@@ -105,6 +105,16 @@ class NoticeAndResultTextTests(unittest.TestCase):
         ):
             self.assertIn(f'"{notice}"', setup)
 
+    def test_a_clue_from_an_earlier_round_can_be_used_again(self):
+        source = Path("core/game_logic.py").read_text(encoding="utf-8-sig")
+        setup = source[source.index("def setup_new_round"):]
+        setup = setup[: setup.index("\ndef ", 10)]
+        self.assertIn("st.session_state.used_hints = []", setup)
+        from core.ai_service import validate_human_hint_with_history
+        board = ["Alpha", "Beta"]
+        self.assertTrue(validate_human_hint_with_history("test", board, [], [])[0])
+        self.assertFalse(validate_human_hint_with_history("test", board, [], ["test"])[0])
+
     def test_partial_skip_result_names_the_clicked_cards(self):
         kind, text = screens._guess_outcome_summary(
             {"outcome": "partial_skip", "guesses": ["Penguin"], "correct_guesses": ["Penguin"],

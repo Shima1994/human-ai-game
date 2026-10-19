@@ -198,6 +198,9 @@ def setup_new_round():
     st.session_state.current_guess_rationale = ""
     st.session_state.found_targets = []
     st.session_state.interaction_history = []
+    # A clue may not repeat within a round, but each round may reuse earlier
+    # rounds' clues (the boards are different).
+    st.session_state.used_hints = []
     st.session_state.round_interactions = 0
     st.session_state.round_skips = 0
     st.session_state.round_clue_giver_timeouts = 0

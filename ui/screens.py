@@ -1945,7 +1945,15 @@ def _guess_outcome_summary(item):
     neutral = item.get("neutral_guesses", [])
     bomb = item.get("bomb_guesses", [])
     if outcome == "bomb":
-        return "error", f"Bomb hit: {', '.join(bomb)}. The round has ended."
+        # Cards clicked before the bomb stay revealed and still score, so
+        # name them too -- otherwise a correct first card looked lost.
+        before_bomb = []
+        if correct:
+            before_bomb.append(f"{', '.join(correct)} {_was_were(correct)} correct")
+        if neutral:
+            before_bomb.append(f"{', '.join(neutral)} {_was_were(neutral)} neutral")
+        before_text = f" Before it, {' and '.join(before_bomb)}." if before_bomb else ""
+        return "error", f"Bomb hit: {', '.join(bomb)}.{before_text} The round has ended."
     if not guesses:
         return "info", "Skipped — no cards were guessed this turn."
     kind, result = _guess_result_text(guesses, correct, neutral)
@@ -1954,6 +1962,10 @@ def _guess_outcome_summary(item):
     if outcome == "partial_skip":
         return kind, f"Skipped after {len(guesses)} card(s); those cards count. {result}"
     return kind, result
+
+
+def _was_were(words):
+    return "was" if len(words) == 1 else "were"
 
 
 def _guess_result_text(guesses, correct, neutral):
@@ -1980,12 +1992,14 @@ def _turn_points_message(item):
     the fact, never predicted for them)."""
     turn_points = item.get("turn_points", 0)
     correct = item.get("correct_guesses", [])
-    if item.get("outcome") == "bomb" or not correct:
+    if not correct:
         return ""
+    point_word = "point" if turn_points == 1 else "points"
+    if item.get("outcome") == "bomb":
+        return f"+{turn_points} {point_word} from the cards before the bomb"
     intended = item.get("intended_targets", [])
     exact_only = len(correct) == 1 and correct[0] in intended
     other_only = len(correct) == 1 and correct[0] not in intended
-    point_word = "point" if turn_points == 1 else "points"
     if exact_only:
         return f"Great match! +{turn_points} {point_word}"
     if other_only:

@@ -1118,7 +1118,10 @@ def render_hint_target_selector(
             is_selected = word in selected_targets
             label = f"✓ {word}" if is_selected else word
             with cols[index % len(cols)]:
-                if st.button(
+                # A click callback instead of st.rerun(): a rerun here would end
+                # the run before the widgets below this selector (rating, general
+                # link) are drawn, and Streamlit then clears their values.
+                st.button(
                     label,
                     key=(
                         f"{key_prefix}_{st.session_state.get('round', 0)}_"
@@ -1131,14 +1134,18 @@ def render_hint_target_selector(
                         or word not in selectable_set
                         or (not is_selected and len(selected_targets) >= max_targets)
                     ),
-                ):
-                    if is_selected:
-                        st.session_state[state_key] = [
-                            item for item in selected_targets if item != word
-                        ]
-                    else:
-                        st.session_state[state_key] = selected_targets + [word]
-                    st.rerun()
+                    on_click=_toggle_hint_target,
+                    args=(state_key, word),
+                )
+
+
+def _toggle_hint_target(state_key, word):
+    selected = list(st.session_state.get(state_key, []))
+    if word in selected:
+        selected.remove(word)
+    else:
+        selected.append(word)
+    st.session_state[state_key] = selected
 
 
 def render_interaction_history(

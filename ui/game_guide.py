@@ -189,7 +189,9 @@ At the end of each round, you will also write a short reflection and answer a fe
     ),
     (
         "Scoring, Stars, and Medals",
-        """Score points by finding target cards together:
+        """Your goal is to work with the AI **as one team** to earn as many points and stars as possible over the 4 rounds.
+
+Score points by finding target cards together:
 
 - 2 points when the guesser selects the card the clue-giver had in mind.
 - 1 point for another valid target card.

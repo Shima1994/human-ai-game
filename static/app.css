@@ -1809,10 +1809,9 @@ div[class*="st-key-guide_clue_step_"] [data-testid="stMarkdownContainer"] p {
     letter-spacing: -0.01em;
 }
 .debrief-study-title {
-    max-width: 850px;
     margin: 0.7rem 0 1.15rem;
     color: var(--color-text);
-    font-size: clamp(1rem, 1.8vw, 1.25rem);
+    font-size: clamp(0.95rem, 1.25vw, 1.08rem);
     line-height: 1.48;
 }
 .debrief-thanks {
