@@ -43,8 +43,8 @@ class PromptCorrectnessTests(unittest.TestCase):
 
     def test_prompt_version_labels_are_current(self):
         source = open("core/storage.py", encoding="utf-8").read()
-        self.assertIn('prompt_version = "hint_v4_condition_memory"', source)
-        self.assertIn('prompt_version = "guess_v4_partial_skip"', source)
+        self.assertIn('prompt_version = "hint_v5_rules_and_bonus"', source)
+        self.assertIn('prompt_version = "guess_v5_rules_and_bonus"', source)
         self.assertNotIn("_v2_", source)
         self.assertNotIn("_v3_", source)
 

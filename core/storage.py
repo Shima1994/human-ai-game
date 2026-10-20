@@ -897,7 +897,7 @@ def _llm_fields_for_turn(item):
         temperature = "0.55"
         # v3 (schema 2.3.0): role-labelled human ratings in the adaptive
         # memory, corrected bomb rule in the guess prompt.
-        prompt_version = "hint_v4_condition_memory"
+        prompt_version = "hint_v5_rules_and_bonus"
         system_version = f"hint_system_v4_{condition}"
     else:
         raw = item.get("guess_raw_response", "")
@@ -916,7 +916,7 @@ def _llm_fields_for_turn(item):
         }
         model = GUESS_MODEL_NAME
         temperature = "0.2"
-        prompt_version = "guess_v4_partial_skip"
+        prompt_version = "guess_v5_rules_and_bonus"
         system_version = f"guess_system_v4_{condition}"
     error = raw if str(raw).startswith("<api_error:") else ""
     return {

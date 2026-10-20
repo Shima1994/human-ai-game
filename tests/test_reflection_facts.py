@@ -38,7 +38,7 @@ class ReflectionFactsTests(unittest.TestCase):
         self.assertIn("If nobody skipped, do not mention skips at all.", prompt)
         self.assertNotIn("Mention any skips and what made the clue feel risky.", prompt)
 
-    def test_only_the_adaptive_reflection_uses_the_fact_list(self):
+    def test_both_conditions_give_the_reflection_the_fact_list(self):
         calls = []
         with patch.object(ai_service, "call_openai_chat", side_effect=lambda s, u, **k: (calls.append(u) or ("ok", 0))), \
              patch.object(ai_service, "st", SimpleNamespace(session_state={})):
@@ -47,14 +47,16 @@ class ReflectionFactsTests(unittest.TestCase):
                     ["Honey", "Spider"], ["Mouse"], ["Honesty"], "mixed", "ai_clue", [TURN],
                     False, False, condition=condition,
                 )
+        # After the round every card is revealed to the participant in both
+        # conditions, and the baseline reflection is never shown or fed back,
+        # so both get the same facts (the prompt asks about intended cards).
         self.assertIn("correct but not intended", calls[0])
-        self.assertNotIn("correct but not intended", calls[1])
-        self.assertNotIn("intended", calls[1].split("Interaction history:")[1])
+        self.assertEqual(calls[0], calls[1])
 
     def test_clue_and_guess_prompts_keep_the_old_history_format(self):
         source = Path("core/ai_service.py").read_text(encoding="utf-8")
-        # One call site (the reflection), besides the definition itself.
-        self.assertEqual(source.count("format_reflection_turn_facts(history, role) if condition"), 1)
+        # The definition and one call site (the reflection).
+        self.assertEqual(source.count("format_reflection_turn_facts(history, role)"), 2)
         hint = source[source.index("def build_hint_user_prompt"):source.index("def parse_hint_json")]
         guess = source[source.index("def build_guess_user_prompt"):source.index("def build_guess_repair_prompt")]
         for block in (hint, guess):

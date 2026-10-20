@@ -46,6 +46,10 @@ N_ROUNDS = 4
 MAX_HINT_NUMBER = 5
 BOARD_SIZE = 16
 TARGET_COUNT = 5
+# Money bonus paid on Prolific after the study: GBP per star (a round with
+# all targets found and no bomb), and the total when every round earns a star.
+BONUS_PER_STAR_GBP = 1
+ALL_STARS_BONUS_GBP = 5
 BOMB_COUNT = 2
 MAX_INTERACTIONS_PER_ROUND = 3
 MAX_SKIPS_PER_ROUND = 2

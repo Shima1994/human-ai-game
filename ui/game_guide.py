@@ -200,6 +200,8 @@ Score points by finding target cards together:
 
 Complete all 5 target cards in a round without selecting a bomb to earn a star. You can earn up to one star per round, and up to 4 stars across the whole study.
 
+💷 **Bonus: if you complete the study, you receive £1 for every star you earn. If you earn all 4 stars, you receive £5, one pound extra.**
+
 🥇🥈🥉 At the end of the study, your total points across all 4 rounds decide your final medal.""",
     ),
 )
@@ -233,7 +235,7 @@ GUIDE_REMINDERS = """
 - You may use Skip up to 2 times per round.
 - Avoid bomb cards — selecting one ends the round immediately.
 - Finding the clue-giver's intended card is worth more than finding any other target card.
-- Complete a round with all 5 targets and no bomb to earn a star.
+- Complete a round with all 5 targets and no bomb to earn a star. **If you complete the study, each star earns you a £1 bonus; all 4 stars earn you £5.**
 - Answer reflection questions based on your genuine experience.
 - Play on your own: using AI tools such as ChatGPT is not allowed.
 

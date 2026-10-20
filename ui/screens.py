@@ -44,6 +44,7 @@ from core.game_logic import (
     record_interaction,
     record_skip,
     record_timeout,
+    star_bonus_gbp,
     start_participant_decision_timer,
     update_current_round_summary,
 )
@@ -3169,7 +3170,12 @@ def screen_round_summary():
         guesses_text = ", ".join(st.session_state.guesses) if st.session_state.guesses else "No guesses"
         round_score = compute_round_score()
         round_star = bool(st.session_state.get("round_star", False))
-        star_label = "&#11088; Star earned!" if round_star else "No star this round"
+        star_label = (
+            "&#11088; Star earned! Your bonus so far: "
+            f"&pound;{star_bonus_gbp(st.session_state.get('total_stars_so_far', 0))}"
+            if round_star
+            else "No star this round"
+        )
         timed_out_loss = st.session_state.get("round_end_reason") == "timeout_loss"
         outcome = "Bomb hit" if st.session_state.round_bomb_hit else (
             "Timed out" if timed_out_loss else (
@@ -3459,12 +3465,16 @@ def screen_game_over():
         unsafe_allow_html=True,
     )
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     col1.markdown(
         f"<div class='summary-stat'><strong>&#11088; Stars earned</strong><br>{total_stars} / {N_ROUNDS}</div>",
         unsafe_allow_html=True,
     )
     col2.markdown(
+        f"<div class='summary-stat'><strong>&#128183; Your bonus</strong><br>&pound;{star_bonus_gbp(total_stars)}</div>",
+        unsafe_allow_html=True,
+    )
+    col3.markdown(
         f"<div class='summary-stat'><strong>Final medal</strong><br>{medal_label}</div>",
         unsafe_allow_html=True,
     )

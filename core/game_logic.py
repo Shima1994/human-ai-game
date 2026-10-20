@@ -5,8 +5,10 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from core.constants import (
+    ALL_STARS_BONUS_GBP,
     BOARD_MATERIAL_VERSION,
     BOARD_SIZE,
+    BONUS_PER_STAR_GBP,
     FINAL_MEDAL_BRONZE_MIN,
     FINAL_MEDAL_GOLD_MIN,
     FINAL_MEDAL_SILVER_MIN,
@@ -245,6 +247,15 @@ def compute_round_score(interaction_history=None):
     if interaction_history is None:
         interaction_history = st.session_state.get("interaction_history", [])
     return sum(item.get("turn_points", 0) for item in interaction_history)
+
+
+def star_bonus_gbp(stars):
+    """The Prolific bonus for this many stars: GBP 1 per star, and GBP 5
+    (one pound extra) when every round earned a star."""
+    stars = int(stars or 0)
+    if stars >= N_ROUNDS:
+        return ALL_STARS_BONUS_GBP
+    return stars * BONUS_PER_STAR_GBP
 
 
 def get_final_medal(total_score):

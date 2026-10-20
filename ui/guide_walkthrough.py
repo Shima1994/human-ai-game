@@ -13,8 +13,10 @@ from html import escape
 import streamlit as st
 
 from core.constants import (
+    ALL_STARS_BONUS_GBP,
     BOARD_SIZE,
     BOMB_COUNT,
+    BONUS_PER_STAR_GBP,
     CLUE_GIVER_TIMER_SECONDS,
     GUESSER_TIMER_SECONDS,
     MAX_INTERACTIONS_PER_ROUND,
@@ -303,7 +305,7 @@ def fig_skip():
 def fig_round_summary():
     body = (
         '<div class="summary-stat"><strong>Points this round:</strong> 8</div>'
-        '<div class="summary-stat"><strong>&#11088; Star earned!</strong></div>'
+        '<div class="summary-stat"><strong>&#11088; Star earned! Your bonus so far: &pound;1</strong></div>'
     )
     return _figure(body, "The end of a round, when all targets were found without a bomb.")
 
@@ -370,7 +372,10 @@ GUIDE_WALKTHROUGH_SLIDES = (
             f"possible over the {N_ROUNDS} rounds. "
             f"**+{POINTS_EXACT_INTENDED_TARGET}** for the card the clue-giver had in mind, "
             f"**+{POINTS_OTHER_TARGET}** for another target, 0 for a neutral card. "
-            f"Find all {TARGET_COUNT} targets without a bomb to earn a star.",
+            f"Find all {TARGET_COUNT} targets without a bomb to earn a star. "
+            f"**Bonus: if you complete the study, you receive £{BONUS_PER_STAR_GBP} for every star. "
+            f"If you earn all {N_ROUNDS} stars, "
+            f"you receive £{ALL_STARS_BONUS_GBP}, one pound extra.**",
             guide_scoring_figure,
             f"Your points over all {N_ROUNDS} rounds decide your final medal.",
         ),

@@ -13,7 +13,9 @@ from core.constants import (
     GUESS_MODEL_NAME,
     HINT_MODEL_NAME,
     MAX_HINT_NUMBER,
+    MAX_INTERACTIONS_PER_ROUND,
     REFLECTION_MODEL_NAME,
+    TARGET_COUNT,
 )
 from core.validation import mentions_board_word
 
@@ -205,8 +207,9 @@ def _names(cards):
 
 
 def format_reflection_turn_facts(history, role):
-    """The round's turns as explicit facts, for the adaptive end-of-round
-    reflection only (the clue and guess prompts keep format_interaction_history).
+    """The round's turns as explicit facts, for the end-of-round reflection
+    in both conditions (the clue and guess prompts keep their own history
+    formats).
     Spelling out which correct cards were or were not intended, which were
     neutral, and who skipped keeps the reflection from misstating them."""
     if not history:
@@ -337,7 +340,6 @@ def format_participant_feedback(history):
         rating_label = _human_rating_label(clue_giver)
         line_parts = [
             f"- {rating_label}: {rating}/5" if rating else f"- {rating_label}: not provided",
-            f"  Relationship type: {relationship_type or 'not provided'}",
         ]
         if explanation:
             line_parts.append(f'  Explanation: "{explanation}"')
@@ -374,7 +376,6 @@ def format_round_participant_feedback(round_summaries):
             parts = [
                 f"- Round {round_number}, turn {item.get('turn', '')}",
                 f"  {rating_label}: {rating}/5" if rating else f"  {rating_label}: not provided",
-                f"  Relationship type: {relationship_type or 'not provided'}",
             ]
             if explanation:
                 parts.append(f'  Explanation: "{explanation}"')
@@ -471,7 +472,6 @@ def _memory_interaction_lines(interactions, round_label="current"):
             if item.get("clue_giver") == "human"
             else "human_rating_i_understood_ai_clue"
         )
-        human_relationship = str(item.get("human_relationship_type", "") or "").strip()
         human_explanation = str(
             item.get("human_explanation_sanitized", "")
             or item.get("human_explanation_raw", "")
@@ -502,11 +502,8 @@ def _memory_interaction_lines(interactions, round_label="current"):
             parts.append(
                 f"  {_human_rating_label(item.get('clue_giver'))}: {human_rating}/5"
             )
-        if human_relationship or human_explanation:
-            parts.append(
-                f"  human-described clue relationship: {human_relationship or 'not specified'}"
-                + (f' - "{human_explanation}"' if human_explanation else "")
-            )
+        if human_explanation:
+            parts.append(f'  human\'s general link for this clue: "{human_explanation}"')
         if ai_explanation:
             parts.append(f'  AI clue explanation shown to human: "{ai_explanation}"')
         lines.append("\n".join(parts))
@@ -551,11 +548,31 @@ def previous_hints(history):
     ]
 
 
+# The rules as the participant's written guide states them, shared by the
+# clue and guess prompts in both conditions.
+GAME_RULES = """GAME RULES (the same rules your human teammate read before the game)
+- You and the human are one team. The game has 4 rounds. In each round one of you gives the clues and the other guesses; the roles swap every round.
+- Each round has a new board of 16 cards: 5 targets (the cards your team must find), 9 neutral cards (safe but wrong) and 2 bombs.
+- The clue-giver gives one English word and a number N: how many target cards the clue is meant for. The clue may not be a board word or a variant of one, and may not repeat an earlier clue of the same round.
+- The guesser then picks N cards one after another; each picked card is revealed at once.
+- Points: +2 for a picked card the clue-giver meant, +1 for any other target card, 0 for a neutral card.
+- A bomb ends the round at once: the points already earned count, but the round earns no star.
+- A round allows at most 3 completed turns (one turn = one clue and its guesses). It ends earlier when all 5 targets are found or a bomb is picked.
+- The guesser may skip a clue up to 2 times per round. A skip before any card is picked does not use one of the 3 turns; a skip after at least one picked card counts as a completed turn.
+- A round earns a star when all 5 targets are found without a bomb, so the 5 targets have to be found within at most 3 turns.
+- The human has a time limit for each turn; your own time is not counted.
+"""
+
+
 HINT_SYSTEM_PROMPT = """You are an expert clue-giver in a cooperative Codenames-style word game. You are partnered with one human teammate. Your shared goal is to find all target words quickly without picking either bomb.
 
-GAME RULES
-- The board has 16 cards. Hidden roles: 5 targets (good), 2 bombs (round-ending), 9 neutrals (safe but wrong).
-- You output one English clue word and a number N. Your teammate then guesses N words from the board.
+WHAT IS AT STAKE
+- Your human teammate receives a real money bonus for every round in which your team finds all 5 targets without picking a bomb: £1 per such round, and £5 instead of £4 if your team succeeds in all 4 rounds.
+- Every clue counts. Take your time, check each candidate against the neutrals and bombs, and give the clue most likely to lead your teammate to the targets safely.
+
+""" + GAME_RULES + """
+YOUR ROLE: CLUE-GIVER
+- You see the hidden roles of all cards. You output one English clue word and a number N; your teammate then guesses N words from the board.
 - The clue word must NOT appear on the board and must NOT be a morphological variant (no plural / verb-form / spelling trick).
 - A great clue links 2 or 3 targets through one vivid, everyday association that any literate adult would recognize instantly.
 
@@ -687,6 +704,7 @@ def build_hint_user_prompt(
         f"Word type per card: {format_word_type_per_card(board_words, word_type_per_card)}\n"
         f"Remaining target words (you must aim only at these): {', '.join(remaining_targets) or '(none)'}\n"
         f"Targets already found this round: {', '.join(found_targets) or '(none)'}\n"
+        f"Turns used this round: {st.session_state.get('round_interactions', 0)} of {MAX_INTERACTIONS_PER_ROUND}\n"
         f"Available board words the human can still choose from: {', '.join(available_board)}\n"
         f"Neutral words (AVOID — your clue must not fit these): {', '.join(neutral_words)}\n"
         f"BOMB words (NEVER let your clue fit these): {', '.join(bomb_words)}\n\n"
@@ -968,13 +986,17 @@ def generate_ai_hint(
 
 GUESS_SYSTEM_PROMPT = """You are an expert semantic guesser in a cooperative Codenames-style word game. Your human teammate just gave you a clue word and a number N. Your job: pick exactly N words from the available board that a normal human would most likely mean.
 
-GAME RULES
-- The board has 16 words. Some are good targets, some are neutral (safe but wrong), two are bombs (round-ending).
+WHAT IS AT STAKE
+- Your human teammate receives a real money bonus for every round in which your team finds all 5 targets without picking a bomb: £1 per such round, and £5 instead of £4 if your team succeeds in all 4 rounds.
+- Every guess counts. Take your time, weigh every available word, and choose the guesses most likely to be the cards your teammate meant.
+
+""" + GAME_RULES + """
+YOUR ROLE: GUESSER
 - You only see the clue and the words — never the hidden roles.
 - Hitting either bomb ends the round immediately; points already earned this round still count, but the remaining targets can no longer be found.
 
 HOW TO PICK GREAT GUESSES
-1. First translate the clue into its most ordinary meaning, including common non-English clues if obvious. For example, Persian "دزد دریایی" means pirate.
+1. First think of the clue's most ordinary, everyday meaning.
 2. For EVERY available board word, mentally score the association from 0 to 5:
    - 5 = direct, iconic, or definitional link (pirate -> Ship, treasure -> Gold)
    - 4 = strong everyday category, setting, tool, role, or famous pairing
@@ -1059,7 +1081,9 @@ def build_guess_user_prompt(
     return (
         f"Available board words (only choose from these): {', '.join(available_board)}\n"
         f"Word type per available card: {format_word_type_per_card(available_board, word_type_per_card)}\n"
-        f"Words already guessed this round (do NOT repeat): {', '.join(previous_guesses) or '(none)'}\n\n"
+        f"Words already guessed this round (do NOT repeat): {', '.join(previous_guesses) or '(none)'}\n"
+        f"Targets still to find this round: {TARGET_COUNT - len(st.session_state.get('found_targets', []))} of {TARGET_COUNT}\n"
+        f"Turns used this round: {st.session_state.get('round_interactions', 0)} of {MAX_INTERACTIONS_PER_ROUND}\n\n"
         f"Your teammate's clue: \"{hint}\"\n"
         f"Number of guesses to produce (N): {max_guesses}\n\n"
         "Before answering, internally rank every available board word by direct semantic association to the clue. "
@@ -1515,7 +1539,7 @@ def generate_ai_round_reflection(
         f"All targets found: {round_success}\n"
         f"Bomb hit: {round_bomb_hit}\n\n"
         "Interaction history:\n"
-        f"{format_reflection_turn_facts(history, role) if condition == 'adaptive' else format_baseline_history(history)}\n"
+        f"{format_reflection_turn_facts(history, role)}\n"
     )
     fallback_text = (
         "I could not generate a reflection this time. Look back at the history above: "
