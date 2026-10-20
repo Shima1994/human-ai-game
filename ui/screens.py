@@ -155,6 +155,10 @@ AGE_GROUP_OPTIONS = ["18-24", "25-34", "35-44", "45-54", "55+", "Prefer not to s
 # participant may skip it, and the characteristics box only opens on "Yes".
 NEURODIVERGENT_QUESTION = "Are you neurodivergent? (optional)"
 NEURODIVERGENT_OPTIONS = ["Yes", "No", "Prefer not to say"]
+NEURODIVERGENT_DESCRIPTION = (
+    "Neurodivergent describes people whose brain works or learns differently, "
+    "for example people with ADHD, autism (ASD) or dyslexia."
+)
 NEURODIVERGENT_CHARACTERISTICS_QUESTION = (
     "If yes, what neurodivergent characteristics do you have? (optional)"
 )
@@ -1225,11 +1229,21 @@ def screen_name():
                         key="profile_codenames_experience",
                     )
                 with st.container(key="profile_neurodivergent_group"):
+                    # The question is drawn here, with a short description of
+                    # the term under it, so the description sits between the
+                    # question and the options; the radio's own label stays
+                    # the same question, hidden.
+                    st.markdown(
+                        f"<p class='profile-question-label'>{escape(NEURODIVERGENT_QUESTION)}</p>"
+                        f"<p class='profile-question-description'>{escape(NEURODIVERGENT_DESCRIPTION)}</p>",
+                        unsafe_allow_html=True,
+                    )
                     neurodivergent = st.radio(
                         NEURODIVERGENT_QUESTION,
                         NEURODIVERGENT_OPTIONS,
                         index=None,
                         horizontal=True,
+                        label_visibility="collapsed",
                         key="profile_neurodivergent",
                     )
                     neurodivergent_characteristics = ""

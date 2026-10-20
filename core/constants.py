@@ -8,7 +8,7 @@ REFLECTION_MODEL_NAME = "gpt-5.4-2026-03-05"
 # Canonical build metadata. Deployments should set the environment-backed
 # values to their platform's exact identifiers; blank means unavailable and is
 # preferable to fabricated provenance.
-EXPERIMENT_VERSION = os.getenv("EXPERIMENT_VERSION", "pilot-v1")
+EXPERIMENT_VERSION = os.getenv("EXPERIMENT_VERSION", "main-v1")
 SCHEMA_VERSION = "2.4.0"
 CODE_COMMIT = next(
     (

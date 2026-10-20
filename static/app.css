@@ -2551,6 +2551,19 @@ body:has(.turn-invalid-marker.invalid-link) .st-key-clue_general_link_container 
 .st-key-participant_profile_panel .st-key-profile_neurodivergent_group {
     border-bottom: 0 !important;
 }
+.st-key-participant_profile_panel .profile-question-label {
+    margin: 0 0 0.25rem;
+    color: var(--color-heading);
+    font-size: 1rem;
+    font-weight: 740;
+    line-height: 1.35;
+}
+.st-key-participant_profile_panel .profile-question-description {
+    margin: 0 0 -0.4rem;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
 .st-key-participant_profile_panel [data-testid="stWidgetLabel"] {
     margin-bottom: 0.38rem;
 }

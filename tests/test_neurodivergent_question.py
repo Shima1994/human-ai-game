@@ -33,6 +33,13 @@ class NeurodivergentQuestionTests(unittest.TestCase):
             "If yes, what neurodivergent characteristics do you have? (optional)",
         )
 
+    def test_the_term_is_explained_under_the_question(self):
+        at = _profile_page()
+        self.assertFalse(at.exception)
+        page_text = " ".join(element.value for element in at.markdown)
+        self.assertIn("ADHD, autism (ASD) or dyslexia", page_text)
+        self.assertIn(screens.NEURODIVERGENT_DESCRIPTION, page_text)
+
     def test_characteristics_box_opens_only_on_yes(self):
         at = _profile_page()
         self.assertFalse(at.exception)
