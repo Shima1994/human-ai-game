@@ -25,11 +25,13 @@ call_openai_chat(
 )
 ```
 
-The wrapper reads `OPENAI_API_KEY` from Streamlit secrets, optionally loads `.env`, calls the chat-completions API, and returns `(response_text, elapsed_seconds)`.
+The wrapper reads `OPENAI_API_KEY` from the environment, or from Streamlit secrets when it is not set, calls the chat-completions API, and returns `(response_text, elapsed_seconds)`.
 
 ## Condition boundary
 
 The experiment has two conditions with identical data collection but different communication context.
+
+Both conditions give the clue and guess prompts the same `GAME_RULES` block, written as the rules the participant read in the guide (4 rounds with alternating roles; 5 targets, 9 neutrals and 2 bombs; +2/+1 points; at most 3 completed turns and 2 skips per round; a star for all 5 targets without a bomb; the human's time limit), the same "WHAT IS AT STAKE" block about the star bonus (£1 per star, £5 for all four), and the turns used and targets left in the current round. No prompt names the condition.
 
 ### Adaptive
 
@@ -55,7 +57,7 @@ Baseline prompts receive only task-relevant game facts:
 - correct and incorrect selections;
 - neutral/bomb outcome;
 - skip state;
-- round success, bomb, and medal facts.
+- round success and bomb facts.
 
 Baseline context is built with `format_baseline_history(...)` and `format_baseline_round_memory(...)`. It excludes intended cards, expected guesses, rationales, ratings, human explanations, AI explanations, and end-of-round feedback. Dedicated baseline system prompts also remove persistent-teammate-memory instructions.
 
@@ -69,11 +71,11 @@ Function:
 generate_ai_hint(...)
 ```
 
-Used when the AI is clue-giver and the human is guesser. On the first turn of every AI-clue round (a new board) generation starts after the participant presses **Ask AI for a clue**; later turns of the round start it automatically after the previous turn's result. There is no separate reroll function: when the human skips an AI clue (fully or partially), the same `generate_ai_hint(...)` call is reused with a `repair_context` argument that forbids the skipped clue and asks the model to strongly consider the unresolved targets; it may add or choose other targets (see Section 3).
+Used when the AI is clue-giver and the human is guesser. On the first turn of every AI-clue round (a new board) generation starts after the participant presses **Ask AI for a clue**; later turns of the round start it automatically after the previous turn's result. There is no separate reroll function: when the human skips an AI clue (fully or partially), the same `generate_ai_hint(...)` call is reused with a `repair_context` argument that forbids the skipped clue and asks the model to strongly consider the unresolved targets; it may add or choose other targets (see Skip repair below).
 
 ### System behavior
 
-The model is told that the board contains 16 cards: 5 targets, 9 neutrals, and 2 bombs. It must produce a safe one-word English clue that is not a board word or morphological variant. It evaluates all neutrals and both bombs before choosing a target cluster.
+The system prompt contains the bonus block, the shared game rules, and the clue-giver's own rules: it sees all hidden roles and must produce a safe one-word English clue that is not a board word or morphological variant. It evaluates all neutrals and both bombs before choosing a target cluster.
 
 ### Output schema
 
@@ -104,6 +106,7 @@ Both conditions receive:
 
 - word type and per-card word types;
 - remaining targets and targets already found;
+- turns used this round (of 3);
 - available board cards;
 - all neutrals and bombs;
 - previously used/forbidden clues;
@@ -116,21 +119,26 @@ Adaptive additionally receives participant feedback and persistent teammate memo
 - Temperature: `0.55`.
 - JSON mode: enabled.
 - Maximum initial attempts: three.
-- A skip-repair call forbids the skipped clue and otherwise uses the normal validation rules; its targets are not forced to match the unresolved set (see Section 1's opening paragraph and Section 4).
+- A skip-repair call forbids the skipped clue and otherwise uses the normal validation rules; its targets are not forced to match the unresolved set (see Skip repair below).
 - Invalid JSON, schema violations, invalid clues, API errors, and timeouts consume an attempt.
 - After three failed attempts, clue generation raises an error. No clue, intended targets, or expected guesses are fabricated, and the UI asks the participant to try again.
 - The failure event retains the attempt count, last raw response/error, and elapsed response time for debugging.
+- If the accepted clue was already used in the round, the app asks once more with that word explicitly forbidden.
 
 ### Stored fields
 
 - parsed clue and `N`;
 - intended targets and expected guesses;
-- `hint_explanation` (the parsed reasoning);
-- `hint_raw_response`;
-- `hint_response_time_sec` and total hint time;
-- `hint_attempts`.
+- `ai_clue_reasoning` (the parsed reasoning);
+- the raw response (`llm_response_raw`);
+- the AI's response time (`llm_latency_seconds`);
+- `ai_clue_attempts`.
 
 The raw clue-generation reasoning is research data and is not directly rendered as the gameplay clue explanation.
+
+### Skip repair
+
+If the human fully or partially skips an AI clue, the next AI clue is invited, not required, to repair the unresolved intended targets: the prompt asks the model to strongly consider them, but it may add other remaining targets or choose different ones. The skipped clue is forbidden. Adaptive prompts may include the stored skip interpretation, guess reasoning, and participant reflection. Baseline prompts include only the skipped turn, old clue, and unresolved targets. Symmetrically, when the AI skips a human clue, the human sees a short reminder naming their own unresolved intended cards and saying they may give a new clue for them but are free to choose any targets. `repair_targets_included` records whether the next clue actually included the skipped targets.
 
 ## 2. AI guessing a human clue
 
@@ -140,7 +148,7 @@ Function:
 ai_guess(...)
 ```
 
-The AI sees only available card labels, the human clue, `N`, skip availability, and condition-appropriate history. It never receives the current hidden roles while acting as guesser.
+The AI sees only available card labels, the human clue, `N`, skip availability, the targets still to find and turns used this round, and condition-appropriate history. It never receives the current hidden roles while acting as guesser. The system prompt contains the bonus block, the shared game rules, and the guesser's own rules.
 
 The current round's history is passed through `hide_unfound_intended_cards(...)` first: the human's intended cards and expected guesses from earlier turns list only cards already revealed on the board. An intended card the AI has not picked yet is an unfound target, so naming it would reveal where the remaining targets are. Earlier rounds use different boards and are shown in full (adaptive only). The stored history itself is not changed.
 
@@ -176,27 +184,21 @@ Completed guesses are retained and scored; the remaining guesses are abandoned; 
 
 For both `action="skip"` and `action="partial_skip"`, `interpreted_cards` contains only unselected exact board cards that the AI thinks the clue-giver probably meant. Its maximum length equals the number of abandoned guesses (`N - completed guesses`). It is stored separately from cards the AI actually committed as guesses.
 
-### Control responses
+### Full skip
 
-The model may instead return the reroll literal:
-
-```text
-REROLL_HINT
-```
-
-Full skip is represented by JSON `action="skip"` with no completed guesses and a non-empty `interpreted_cards` list. Actions are honored only when the corresponding action remains available.
+A full skip is represented by JSON `action="skip"` with no completed guesses and a non-empty `interpreted_cards` list. Actions are honored only when the corresponding action remains available.
 
 ### Parsing and repair
 
-1. Recognize the literal reroll token.
-2. Parse JSON and filter guesses against exact available board cards.
-3. Read `action` as `guess`, `partial_skip`, or `skip`.
-4. If JSON fails, attempt conservative comma/newline token parsing.
-5. If a normal response contains fewer than `N` usable guesses, make one JSON repair call at temperature `0.0`.
-6. Do not repair a valid partial skip into unsafe filler guesses.
-7. If no guesses remain usable, fall back to an allowed full skip/reroll rather than inventing cards.
+1. Parse JSON and filter guesses against exact available board cards.
+2. Read `action` as `guess`, `partial_skip`, or `skip`.
+3. If JSON fails, attempt conservative comma/newline token parsing.
+4. If a normal response contains fewer than `N` usable guesses, make one JSON repair call at temperature `0.0`.
+5. Do not repair a valid partial skip into unsafe filler guesses.
+6. If the guesses are still fewer than `N`, record them as a partial skip when a skip remains; otherwise fill up from the model's own `interpreted_cards`, then from the remaining cards.
+7. If nothing usable could be parsed (or the API call failed), use a full skip when one remains; otherwise pick cards at random. Both cases are stated in the stored rationale.
 
-Primary-call temperature is `0.2`; forced JSON mode is disabled so the reroll literal remains possible.
+Primary-call temperature is `0.2` without forced JSON mode; the repair call uses forced JSON mode.
 
 ### Condition-specific visibility
 
@@ -208,7 +210,7 @@ Primary-call temperature is `0.2`; forced JSON mode is disabled so the reroll li
 - action and ordered guesses;
 - `guess_rationale` and word count;
 - raw and parsed response;
-- response and total guess timing;
+- the AI's response time (`llm_latency_seconds`);
 - retry/repair metadata;
 - full/partial skip fields and actor;
 - the guesser's separate `skip_interpreted_cards`, word types, and count;
@@ -226,7 +228,7 @@ Function:
 generate_ai_wrong_guess_replacements(...)
 ```
 
-Runs once the AI-as-guesser's turn is scored and at least one selected card was a wrong neutral (never after a bomb, which ends the round). It asks the same guesser model, at temperature `0.0`, to choose the cards it would have picked instead of each wrong one, from the board words not already selected that turn. This is the AI-side counterpart of the human reflection screen's "which card would you choose instead" question, so both directions of that data are collected the same way.
+Runs once the AI-as-guesser's turn is scored and at least one selected card was a wrong neutral (never after a bomb, which ends the round). It asks the same guesser model, at temperature `0.0`, to choose the cards it would have picked instead of each wrong one, from the board words not yet selected in the round. It runs in both conditions and receives only the clue, the wrong cards, and the available cards. This is the AI-side counterpart of the human reflection screen's "which card would you choose instead" question, so both directions of that data are collected the same way.
 
 Output schema:
 
@@ -244,20 +246,18 @@ Function:
 generate_ai_turn_explanation(...)
 ```
 
-After a human finishes guessing an AI clue—including a full or partial skip—the AI produces a short general explanation of its own clue relationship.
-
-If the human fully or partially skips an AI clue, the next AI clue is invited, not required, to repair the unresolved intended targets: the prompt asks the model to strongly consider them, but it may add other remaining targets or choose different ones. The previous clue is forbidden. Adaptive prompts may include the stored skip interpretation, guess reasoning, and participant reflection. Baseline prompts include only the skipped turn, old clue, and unresolved targets; adaptive-only interpretation and reflection are excluded. Symmetrically, when the AI skips a human clue, the human sees a short reminder naming their own unresolved intended cards and saying they may give a new clue for them but are free to choose any targets. `repair_targets_included` records whether the next clue actually included the skipped targets.
+After a human finishes guessing an AI clue, including a full or partial skip, the AI writes a short general explanation of its own clue. This runs in both conditions.
 
 Output schema:
 
 ```json
 {
-  "relationship_type": "short category label",
+  "relationship_type": "Category / shared type | Theme / shared situation | Function / use or purpose | Other",
   "explanation": "one general sentence without board-card names"
 }
 ```
 
-The application checks the explanation against all board words. Invalid responses are retried; if generation remains invalid, a safe fallback is stored with a validation flag and block reason.
+The explanation is capped at 25 words and checked against all board words. An invalid response is retried once with a stricter instruction; if it is still invalid, a safe fallback sentence is stored with a validation flag and block reason.
 
 Adaptive may show the sanitized explanation to the human. Baseline stores it but does not show or reuse it.
 
@@ -276,9 +276,9 @@ The model summarizes clue interpretation, successes, errors, skips, and one acti
 The prompt asks for plain text with each clue's explanation, the skip note, and the final suggestion on a new line. Any Markdown markers are removed before the text is stored, and each line is shown as its own paragraph.
 
 - Temperature: `0.4`.
-- Adaptive context is an explicit fact list per turn (`format_reflection_turn_facts`): who gave the clues, the clue-giver's intended cards, the guesser's picks in order, which correct cards were intended and which were not, neutral and bomb picks, whether and how the guesser skipped, and whether time ran out. The clue and guess prompts keep `format_interaction_history`.
+- The context is an explicit fact list per turn (`format_reflection_turn_facts`): who gave the clues, the clue-giver's intended cards, the guesser's picks in order, which correct cards were intended and which were not, neutral and bomb picks, whether and how the guesser skipped, and whether time ran out. The clue and guess prompts keep `format_interaction_history`.
 - Skips: only the guesser can skip. The prompt tells the AI never to talk about skipping itself when it gave the clues, and not to mention skips when nobody skipped.
-- Baseline context uses fact-only history and therefore excludes human/AI explanation exchange.
+- Baseline gets the same fact list. After the round every card is revealed to the participant in both conditions, and the baseline reflection is never shown or fed back, so this changes nothing the participant sees; it only keeps the stored reflection from guessing facts it was not given.
 - Adaptive displays the reflection and may reuse it in later memory.
 - Baseline stores it without displaying or reusing it.
 - On failure, a fixed fallback sentence is returned instead of the AI's own text (never fabricated as if it were a real model reflection).
@@ -291,12 +291,12 @@ Function:
 generate_ai_round_questionnaire(role, history, round_success, round_bomb_hit, condition)
 ```
 
-Runs after every round, when the human saves their own end-of-round questionnaire, so the two can be compared round by round. The AI answers five 1–5 agreement ratings about this round, mirroring the human's items (`i_understood_human_clues`, `predict_human_interpretation`, `adapted_to_human_behavior`, `reflection_helped`, `shared_understanding`) plus a short `reasoning` string, based strictly on this round's history (adaptive: full history; baseline: fact-only history). Never shown to the participant.
+Runs after every round, when the human saves their own end-of-round questionnaire, so the two can be compared round by round. The AI answers four 1–5 agreement ratings about this round, mirroring the human's items (`i_understood_human_clues` only when the human gave the clues, `predict_human_interpretation` only when the AI gave them, and always `adapted_to_human_behavior`, `reflection_helped`, `shared_understanding`) plus a short `reasoning` string, based strictly on this round's history (adaptive: full history; baseline: fact-only history). Never shown to the participant.
 
 - Temperature: `0.2`; forced JSON mode.
 - Every rating must be an integer 1–5; `reasoning` is capped at 60 words.
-- If the response is not valid JSON, is not an object, or any rating is missing/out of range, all ratings are stored as `None` with a `blocked_reason` (`"invalid_response"`, `"invalid_rating"`, or `"generation_failed"` on an API error) rather than a guessed value.
-- Stored on the round row: the five `ai_round_questionnaire_*` ratings, `ai_round_questionnaire_reasoning`, and the full `ai_round_questionnaire_json`.
+- If the response is not valid JSON, is not an object, or any rating is missing/out of range, all ratings are left empty with a `blocked_reason` (`"invalid_response"`, `"invalid_rating"`, or `"generation_failed"` on an API error) rather than a guessed value.
+- Stored on the round row: the `ai_round_questionnaire_*` ratings (the item that does not apply to the round stays blank), `ai_round_questionnaire_reasoning`, and the full `ai_round_questionnaire_json`.
 
 ## 7. Human-input validation relevant to prompts
 
@@ -306,20 +306,18 @@ Human clues are validated locally before any AI call:
 - not equal or morphologically close to a board card;
 - not previously used in the round.
 
-Human explanation inputs are also local validations:
+Human written inputs are also checked locally, and the form cannot be submitted until they pass:
 
 - ASCII English text with at least one English letter;
-- guess rationale: 3–30 words;
-- pre-AI human clue General Link: 3–20 English words with no board/card names;
-- end-of-round feedback: 3–200 words;
-- board-card names are blocked in turn explanation while hidden information remains relevant;
-- after a bomb ends the round, card names are permitted.
+- guess rationale: 3–30 words, no board-card names;
+- pre-AI human clue General Link: 3–20 words, no board-card names;
+- end-of-round reflection: 3–200 words; card names are allowed here because every card is revealed by then.
 
-Invalid raw text and its block reason can be retained for research audit, while sanitized fields remain empty.
+For AI explanations, an invalid raw text and its block reason are kept for research audit, while the sanitized field holds the fallback.
 
 ## 8. Prompt/data audit fields
 
-All experimental data is written directly to Postgres (see `README.md` for the schema) — there is no CSV export step. The `turns` table's JSONB `data` column includes model and prompt audit fields, also queryable as plain text columns through the read-only `turns_flat` view:
+All experimental data is written directly to Postgres (see `README.md` for the schema); there is no CSV export step. The `turns` table's JSONB `data` column includes model and prompt audit fields, also queryable as plain text columns through the read-only `turns_flat` view:
 
 - `llm_model`;
 - `llm_temperature`;
@@ -338,5 +336,5 @@ Every table also carries a real `condition` column.
 
 - Model outputs remain stochastic; raw responses and latency are retained for audit.
 - Fallback use and repair attempts must be included as covariates when relevant.
-- Baseline leakage tests should inject sentinel explanation strings and assert that they do not occur in either initial or repair prompts.
-- Prompt changes should be versioned in code before production data collection; the current generic prompt-version fields are not a substitute for release tags or commit hashes.
+- Baseline leakage tests inject sentinel strings (intended cards, expected guesses, rationales, explanations, skip interpretations, AI reflections and human feedback) and assert that they never reach a baseline prompt (`tests/test_data_integrity.py`).
+- Every turn stores its prompt versions: `llm_prompt_version` (currently `hint_v5_rules_and_bonus` / `guess_v5_rules_and_bonus`) and `llm_system_prompt_version` (`hint_system_v5_<condition>` / `guess_system_v5_<condition>`). `code_commit` on the session row identifies the exact code.

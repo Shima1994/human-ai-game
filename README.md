@@ -1,245 +1,180 @@
 # Human–AI Cooperative Word Game
 
-A Streamlit research application for studying shared understanding between a human participant and an AI teammate in a constrained, Codenames-inspired word-association task.
+A Streamlit app for a study on shared understanding between a person and an AI teammate. The two play a word-association game inspired by Codenames.
 
-The study has two automatically balanced conditions. Both collect the same behavioral, performance, rating, and explanation data. They differ only in whether explanation and reflection information is exchanged and reused during collaboration.
+There are two conditions, `adaptive` and `baseline`. Both collect the same data. They differ in one thing: whether the explanations and reflections of each teammate are passed on to the other.
 
-## Study design
+## The game
 
-Each session contains four rounds. The human and AI alternate between clue-giver and guesser roles; the starting role is randomized per session.
+A session has four rounds. In each round one teammate gives the clues and the other guesses. The roles swap every round.
 
-Each round uses a 16-card mixed board:
+There are four fixed boards (`B01`–`B04` in `core/words.py`). Every participant sees the same words; only the card positions are shuffled. Each board has 16 cards:
 
-- 5 target cards;
-- 9 neutral cards;
-- 2 bomb cards;
-- a controlled abstract/concrete composition determined by board template A or B;
-- no word reuse within the same four-round session.
+- 5 targets (2 abstract, 3 concrete)
+- 9 neutral cards (5 abstract, 4 concrete)
+- 2 bombs (1 abstract, 1 concrete)
 
-The clue-giver supplies one English clue and a number `N`. The guesser may select up to `N` cards. A bomb ends the round immediately. A round also ends when all targets are found or three turns have been used.
+No word appears on more than one board.
 
-Medals are awarded only when all five targets are found without a bomb:
+The clue-giver gives one English word and a number `N`. The guesser then picks `N` cards one by one, and each card is revealed at once. The guesser may also skip. A round ends when all targets are found, when a bomb is picked, or after three completed turns.
 
-| Turns used | Medal | Score |
-| --- | --- | ---: |
-| 1–2 | Gold | 5 |
-| 3 | Silver | 4 |
-| Unfinished or bomb | None | 0 |
+### Points, stars, medal and bonus
 
-## Experimental conditions
+- A target scores **+2** if the clue-giver meant it and **+1** otherwise. A neutral card scores 0.
+- A round earns a **star** when all five targets are found without a bomb.
+- The points of all four rounds (at most 40) decide the final medal: bronze from 10, silver from 20, gold from 30.
+- Participants who complete the study get a **bonus of £1 per star, or £5 for all four stars**. It is paid through Prolific after the study. The round summary shows the bonus so far, and the final page shows the total. The amount follows from `final_star_count` on the completed session row (`star_bonus_gbp` in `core/game_logic.py`).
 
-Conditions are assigned when a participant profile is registered, not on ordinary Streamlit reruns. Assignment alternates persistently using a single-row counter (`condition_counter`) in Postgres, updated inside a `SELECT ... FOR UPDATE` transaction so two participants registering at the same instant cannot be assigned the same slot:
+## Conditions
 
-```text
-adaptive → baseline → adaptive → baseline → ...
-```
-
-The first/default condition remains `adaptive`. Every output table includes `condition`, allowing all session-, round-, turn-, and event-level records to be joined and analyzed by treatment.
-
-| Behavior | `adaptive` | `baseline` |
+| | `adaptive` | `baseline` |
 | --- | --- | --- |
-| Collect human rationales and reflections | Yes | Yes |
-| Collect AI reasoning and explanations | Yes | Yes |
-| Show AI explanations/reasoning to the human | Yes | No |
-| Pass human explanations/ratings to later AI prompts | Yes | No |
-| Pass persistent teammate-model memory to AI | Yes | No |
-| Pass ordinary game facts (clue, N, guesses, correctness, skips, bomb outcome) | Yes | Yes |
+| Human reasons and reflections are collected | Yes | Yes |
+| AI reasoning and explanations are collected | Yes | Yes |
+| The human sees the AI's explanations and reflection | Yes | No |
+| The AI gets the human's explanations, ratings and reflections | Yes | No |
+| The AI keeps a memory of the whole game | Yes | No |
+| The AI gets the game facts (clues, guesses, results, skips) | Yes | Yes |
 
-Baseline prompt construction uses dedicated fact-only history formatters. Intended cards, expected guesses, rationales, ratings, explanations, and end-of-round feedback are excluded from baseline model context.
+In both conditions the AI gets the same game rules (as the participant's guide states them), the same text about the bonus, and the turns used and targets left. No prompt names the condition. `AI_PROMPTS.md` describes every prompt.
 
-## Interaction flow
+### Assignment
 
-### AI clue-giver / human guesser
+The condition is assigned once, when the participant registers. There are 16 cells: 2 conditions × 2 starting roles × 4 board orders (`core/assignment.py`). The board orders form a balanced 4×4 Latin square (Williams design), so every board appears once in every round position.
 
-- On the first turn of every AI-clue round, the participant presses **Ask AI for a clue**, giving them time to inspect the new board before the timer starts; later turns of the round get their clue automatically.
-- In later rounds, AI clues are generated automatically when the screen loads.
-- Before the board unlocks, the participant rates how well they understand the AI's clue and writes a 3–30 word English rationale.
-- After the turn, the participant rates the shared understanding in both directions: how well they understood the AI, and how well they think the AI understood them.
+Each new participant gets the cell with the fewest participants. A cell counts sessions that were completed or were active in the last 20 minutes, so an abandoned session frees its cell. The choice happens inside a locked database transaction and is stored in the `assignments` table, so two people who register at the same moment are counted correctly.
 
-### Human clue-giver / AI guesser
+Because completed sessions count, pilot and test sessions have to be removed from the tables before the main study.
 
-- The participant enters a one-word English clue and `N`.
-- The participant marks intended targets, predicts the AI's guesses, and rates expected understanding before the AI guesses.
-- The AI returns guesses plus a research rationale.
-- The result is previewed in History and is committed with **Save this turn**, then the same bidirectional shared-understanding rating is collected.
+## What the participant does
 
-After every round, the participant answers four 1–5 agreement statements about that round (the former end-of-game items, each framed as "In this round", e.g. "In this round, I felt that I understood what the AI meant when it gave clues"). Two items fit only one role: understanding the AI's clues is asked only in rounds where the AI gives the clues, predicting how the AI would interpret the participant's clues only in rounds where the AI guesses; the item that does not apply stays blank in that round's row. After round 2 (one guessing and one clue-giving round), the second attention check sits among them. The AI privately answers the mirrored statements about the same round. Its self-report is generated via the LLM, logged for analysis, and never shown to the participant. There is no separate end-of-game questionnaire.
+### When the AI gives the clue
 
-### Full and partial skips
+1. In the first turn of the round, the participant presses **Ask AI for a clue** when ready. Later turns get their clue automatically.
+2. Before picking any card, they write a short reason (3–30 English words, no card names).
+3. After the turn, they rate how well they understood the AI's clue. If they picked a neutral card, they also say which card they would have picked instead.
 
-At most two skips are available per round independently of the three completed-turn limit. A full skip consumes no completed turn; a partial skip retains its completed guesses as one interaction and does not add another turn for the repair action.
+### When the participant gives the clue
 
-Each human clue-giving or guessing task has a configurable decision countdown, rendered as a component that triggers ordinary Streamlit reruns (via `streamlit-autorefresh`) rather than a browser reload, so an expiring timer never wipes session state. Giving a clue is harder than guessing one, so it gets more time: currently 120 seconds for the clue-giver and 90 seconds for the guesser. When the clue-giver's 120 seconds run out, a pop-up gives them 30 extra seconds, once per clue; only when those also run out is it a timeout (turn field `clue_extra_time_used`, event `clue_extra_time_granted`). The practice clue round in the tutorial uses the same 120 + 30 seconds. AI/API calls use a separate, much shorter 20-second technical timeout per request, bounded further by a capped retry with backoff (at most 2–3 attempts depending on the call, short delays between them, and `max_retries=1` on the OpenAI client itself) — this never reduces the participant's decision window. A human timeout consumes the turn without submitting guesses or consuming a skip.
+1. They enter a one-word English clue and `N`.
+2. Before the AI guesses, they mark the cards they meant, predict the AI's picks, rate how well they expect the AI to understand, and write the **General link** (3–20 English words, no card names).
+3. The AI guesses. Its reason is shown only in `adaptive`.
+4. They rate how well the AI understood their clue.
 
-Repair after a skip is encouraged, never forced, in both directions. When a human skips an AI clue, the AI's next clue is asked to strongly consider the same unresolved intended targets (with a different clue) but may add or choose other targets. Adaptive sessions may use the participant's recorded interpretation and reflection to improve that repair; baseline sessions receive the targets without reflection context. When the AI skips a human clue, the human sees a neutral reminder naming their own unresolved intended cards, while remaining free to choose any targets.
+### After each round
 
-- **Full skip:** no card is selected; the clue is abandoned; one full skip is consumed.
-- **Partial skip:** one or more guesses are retained, their correctness is recorded, the remaining guesses are abandoned, and one full skip is consumed.
+The participant writes a short reflection (3–200 English words) and then answers four statements from 1 (strongly disagree) to 5 (strongly agree), each starting with "In this round". One statement depends on the role: "I understood what the AI meant" is asked when the AI gave the clues, and "I could predict how the AI would interpret my clues" when the participant gave them. After round 2, a second attention check sits among these statements.
 
-Humans can stop mid-turn with **Stop guessing and use 1 skip**. The AI may return `action="partial_skip"` with fewer than `N` strong guesses when the remaining choices are dangerously uncertain. Partial skip is preferred over a serious bomb risk, but is accepted only when a skip remains and `0 < completed guesses < N`.
+The AI answers the same statements from its own side of the round. Its answers are stored for analysis and never shown.
 
-Before either a human or the AI uses a full or partial skip, it records the remaining unselected cards it believes the clue-giver most likely intended. Already selected cards are excluded, and the maximum selection count equals the number of abandoned guesses. These `skip_interpreted_cards` are stored separately from completed guesses. Adaptive sessions may show and reuse this interpretation; baseline sessions collect it for analysis but never display it or include it in later prompts.
+## Skips and time limits
 
-After a non-bomb turn containing one or more wrong neutral guesses, the guesser also records exactly the same number of alternative cards they would choose instead. Humans answer this in the reflection step; the AI answers through a separate post-outcome call after learning which of its choices were wrong. Adaptive sessions share and reuse these alternatives, while baseline sessions only store them.
+Each round allows two skips. A skip before any card is picked does not use one of the three turns. A skip after at least one card (a partial skip) counts as a completed turn, and the cards already picked count. Before skipping, the guesser (human or AI) names the cards they think the clue was meant for. After a skip, the next clue is encouraged, but not forced, to try those targets again.
 
-## Input validation
+- **Clue-giver:** 120 seconds. When they run out, a pop-up gives 30 more seconds once per clue. After that, the turn is lost.
+- **Guesser:** 90 seconds, with a warning 30 seconds before the end. If time runs out before any card is picked, one skip is used; cards already picked still count. With both skips used, the guesser gets a last 30 seconds, and if those also run out the round ends without a star.
 
-- Human clues must be exactly one English word.
-- Clues may not equal or closely match a board word and may not repeat within a round.
-- Human rationales and reflections must contain English ASCII text; Persian, Arabic, Japanese, mixed-script, and other non-ASCII responses are rejected.
-- Guess rationales require 3–30 words.
-- Pre-AI human clue explanations require 3–20 English words and may never name board cards, including when the resulting turn ends the round.
-- The board-word restriction is removed after a bomb ends the round because hidden information is no longer at risk.
-- End-of-round human feedback requires 3–200 English words.
+The AI's own time is not counted. Each AI request has a separate 20-second technical timeout and a small number of retries.
 
-## Architecture
+## Input checks
+
+- Clues must be one English word. They may not be a board word or close to one, and may not repeat within the same round.
+- Written answers must be in English (ASCII letters).
+- Reasons and the General link may not name a card on the board. The end-of-round reflection may, because all cards are revealed by then.
+
+## Project structure
 
 ```text
-app.py                    Streamlit entry point and screen routing
+app.py                    Entry point and screen routing
 core/
-  ai_service.py           Prompt construction, OpenAI calls, parsing, retries/backoff
-  constants.py            Models, scoring, timers, and other tunable limits
-  db.py                   Postgres connection, schema, atomic condition allocation, flat views
-  game_logic.py           Board generation, turns, skips, scoring, summaries
-  state.py                Session-state initialization (incl. request-derived device/locale defaults)
-  storage.py              Field-list schemas and row-builders that persist into Postgres
-  tutorial.py             Practice-round content and logic (isolated from real study data)
-  validation.py           Board-word detection for explanations
-  words.py                Abstract/concrete word banks and board templates
+  ai_service.py           Prompts, OpenAI calls, parsing, retries
+  assignment.py           The 16 counterbalancing cells
+  constants.py            Models, points, bonus, timers and limits
+  db.py                   Database connection, tables, assignment, flat views
+  game_logic.py           Rounds, turns, skips, points, stars, bonus
+  prolific.py             Prolific link parameters, completion code, attention checks
+  state.py                Session state at the start
+  storage.py              What is stored in each table
+  tutorial.py             Practice rounds (never stored as study data)
+  validation.py           Checks for card names in written answers
+  words.py                The four boards
 ui/
-  components.py           Board, hint, status bar, rating scale, and History components
-  screens.py              Consent, profile, gameplay, reflection, and results screens
-  game_guide.py            Onboarding/guide copy shown before the study starts
-  study_documents.py      Information sheet, consent, and debriefing text
-  styles.py               Reads, minifies, and injects static/app.css
-static/
-  app.css                  All app CSS (plain stylesheet, not embedded in Python)
-  fonts/                   Self-hosted font files
-.streamlit/
-  config.toml              enableStaticServing, showErrorDetails="none", gatherUsageStats=false
-  secrets.toml              OPENAI_API_KEY, DATABASE_URL (not committed)
-tests/                      pytest suite (unit tests + Streamlit AppTest screen smoke tests)
-AI_PROMPTS.md              Prompt and condition-isolation documentation
+  components.py           Board, status bar, rating scale, history
+  screens.py              All screens of the study
+  game_guide.py           Written guide
+  guide_walkthrough.py    Visual guide
+  study_documents.py      Information sheet, consent and debriefing
+  styles.py               Loads static/app.css
+static/                   CSS and fonts
+.streamlit/config.toml    Streamlit settings
+tests/                    pytest tests
+AI_PROMPTS.md             The AI prompts and what each condition sees
+DEPLOYMENT.md             Running the app on a server
 ```
 
-## Data model
+## Data
 
-All experimental data is written to Postgres (a managed Supabase instance in the current deployment) via `core/db.py`. Each table keeps a small number of real, indexed columns used for joins and filtering, plus one `data JSONB` column holding every field for that row — the field lists in `core/storage.py` (`SESSIONS_LOG_FIELDS`, `ROUNDS_LOG_FIELDS`, `TURNS_LOG_FIELDS`, `EVENTS_LOG_FIELDS`) are the source of truth for exactly which keys live in that JSON document.
+All data goes to a Postgres database (Supabase). Each table has a few real columns for joining and filtering, and a `data` JSONB column with every field. The field lists in `core/storage.py` (`SESSIONS_LOG_FIELDS`, `ROUNDS_LOG_FIELDS`, `TURNS_LOG_FIELDS`, `EVENTS_LOG_FIELDS`) define exactly which fields are stored.
 
-| Table | Grain | Real (indexed) columns |
+| Table | One row per | Real columns |
 | --- | --- | --- |
-| `sessions` | one row per session | `participant_id`, `session_id`, `condition`, `completed`, `last_completed_stage` |
-| `rounds` | one row per round | `session_id`, `round_number`, `condition` |
-| `turns` | one row per turn | `session_id`, `round_number`, `turn_number`, `condition`, `action_type`, `alignment_applicability` |
-| `board_cards` | one row per board card per round | `session_id`, `round_number`, `board_id`, `card_word`, `card_role`, `word_type` |
-| `events` | one row per event | `session_id`, `participant_id`, `condition`, `round_number`, `turn_number`, `event_type`, `timestamp` |
-| `condition_counter` | single row | atomic alternation counter (not experimental data) |
+| `sessions` | session | `participant_id`, `session_id`, `condition`, `completed`, `last_completed_stage` |
+| `rounds` | round | `session_id`, `round_number`, `condition` |
+| `turns` | turn | `session_id`, `round_number`, `turn_number`, `condition`, `action_type`, `alignment_applicability` |
+| `board_cards` | card in a round | `session_id`, `round_number`, `board_instance_id`, `card_word`, `card_role`, `word_type` |
+| `events` | event | `session_id`, `participant_id`, `condition`, `round_number`, `turn_number`, `event_type`, `timestamp` |
+| `assignments` | registered session | `session_id`, `cell_index`, `condition`, `starting_role`, `board_order`, `assigned_at` |
+| `condition_counter` | (single row) | used to lock the assignment; not study data |
 
-`board_cards` is a fully flat table (every card's word/role/word_type as real columns, no JSON) so a card-level query — e.g. "how often was each target word actually guessed" — never requires unpacking JSON.
+The views `sessions_flat`, `rounds_flat` and `turns_flat` show every JSON field as its own text column, for analysis in SQL, pandas or R. The tables join on `session_id`, `round_number` and `turn_number`.
 
-For analysts who prefer plain SQL/pandas/R over unpacking JSON, three read-only views expand each JSONB `data` column into one text column per field: `sessions_flat`, `rounds_flat`, `turns_flat`. These are created (and recreated, since Postgres won't let `CREATE OR REPLACE VIEW` reorder columns) by `core/db.py:ensure_flat_views`, called once per process from `core/storage.py`.
+Missing values are stored as an empty string. Timestamps are in UTC (ISO 8601). Lists and longer structures are stored as JSON.
 
-`session_id`, `participant_id`, `condition`, `round_number`, and `turn_number` are the primary join keys.
+### Main fields
 
-Important turn-level fields include:
+**Turns:** the clue and `N`, the cards the clue-giver meant, the predicted picks, the actual picks in order, which picks were targets, neutral or bombs, points, skips and the cards named at a skip, replacement cards after a wrong pick, the human's reason or General link, the AI's explanation, the human's and the AI's timing, and the raw AI response with model, prompt version and latency.
 
-- clue, `N`, intended cards, expected guesses, actual guess order;
-- correct, incorrect, neutral, and bomb selections;
-- `outcome`, `bomb_hit`, alignment status, error type, and score contribution;
-- action-sequence `turn_number`, `completed_turn_number`, `skip_number`, `skipped_by`, `partial_skip`, `completed_guesses`, and `skipped_guesses`;
-- `skip_interpreted_cards`, their word types, and interpretation count;
-- `missed_intended_targets` and `extra_correct_guesses` (set differences between intended and actual guesses);
-- counterfactual wrong-guess replacements, actor, word types, count, and AI-call metadata;
-- raw and sanitized human/AI explanations plus validation status and block reason;
-- `ai_clue_reasoning` and `ai_clue_attempts` (AI clue turns only);
-- explicit per-turn human timing: `human_clue_time_sec`, `human_guess_time_sec`, `reflection_time_sec`, separate from the AI's response time (`llm_latency_seconds`);
-- raw LLM response, parsed response, model, temperature, retries, and latency;
-- `repair_applied_to_next_prompt`, immediate `repair_source_turn`, stable `repair_chain_id`, and `repair_attempt_number` for repeated repairs;
-- canonical `action_type` and `alignment_applicability` classifications derived from the raw action fields without changing stored outcome metrics.
+**Ratings per turn** (each field holds the answer to one question and is empty when the question was not asked):
 
-Round-level fields additionally include `ai_round_reflection` and `human_round_feedback`, the AI's and the human's end-of-round messages to each other, and the end-of-round questionnaire: the participant's `round_questionnaire_i_understood_ai_clues`, `round_questionnaire_predict_ai_interpretation`, `round_questionnaire_adapted_to_ai_behavior`, `round_questionnaire_reflection_helped`, `round_questionnaire_shared_understanding` and `round_questionnaire_json`, and the AI's private mirrored self-report `ai_round_questionnaire_i_understood_human_clues`, `ai_round_questionnaire_predict_human_interpretation`, `ai_round_questionnaire_adapted_to_human_behavior`, `ai_round_questionnaire_reflection_helped`, `ai_round_questionnaire_shared_understanding`, `ai_round_questionnaire_reasoning` and the full `ai_round_questionnaire_json`.
+- `human_expected_ai_understanding_rating`: before the AI guesses, "How well do you expect the AI to understand your clue?"
+- `human_rating_ai_understood_my_clue`: after the AI guessed, "How well do you think the AI understood your clue?"
+- `human_rating_i_understood_ai_clue`: after the human guessed, "How well do you think you understood the AI's clue?"
 
-Until schema 2.1.0 these ratings were asked once at the end of the game and stored on the session row (`post_game_*`, `ai_post_game_*`); those sessions keep them in their `data` JSON.
+**Rounds:** whether all targets were found, whether a bomb was hit, `round_star`, `total_stars_so_far`, `round_end_reason` (`all_targets_found`, `bomb`, `completed_turn_limit` or `timeout_loss`), the AI's reflection, the human's reflection, the human's answers (`round_questionnaire_*`) and the AI's answers (`ai_round_questionnaire_*`).
 
-Turn metrics use the live game outcome: `hit_rate` is target guesses divided by all submitted guesses, `target_yield` is the number of newly found targets, and `jaccard_alignment` compares intended and guessed-card sets. Skip/timeout rows have zero outcome metrics because no guesses were finalized; unavailable legacy/incomplete metrics remain blank.
+**Sessions:** the Prolific IDs, the profile answers, both attention checks (a submission counts as failed only when both are failed), `final_star_count`, the completion code, `run_type` (`participant`, `pilot` or `test`), and the versions of the experiment, schema, code, deployment and models.
 
-Rating fields represent different stages and directions, not one mutual score. Each field holds the answer to exactly one question and is blank on turns where that question is not asked:
+## Running it locally
 
-- `human_expected_ai_understanding_rating` — turns where the human gives the clue, before the AI guesses: "How well do you expect the AI to understand your clue?"
-- `human_rating_ai_understood_my_clue` — the same turns, after the AI's guesses (or skip): "How well do you think the AI understood your clue?"
-- `human_rating_i_understood_ai_clue` — turns where the AI gives the clue, after the human's guesses (or skip): "How well do you think you understood the AI's clue?"
+To run the app on a server, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Until schema 2.1.0 a single field, `human_perceived_understanding_rating`, held the post-turn answer to different questions depending on the role and on whether guesses were made; those sessions keep it in their `data` JSON.
-
-Schema 2.3.0 stores missing values as an empty string everywhere (never null) and drops five columns that always repeated another one: `remaining_targets_start` (= `target_words`), `bomb_selected` (= `round_terminated_by_bomb`), `ai_explanation` (= `ai_explanation_sanitized`), `human_timed_out` (= `timed_out`) and `turn_score_delta` (= `target_yield`). Older rows keep them in their `data` JSON.
-
-Schema 2.4.0 removes the per-round `medal` (a leftover efficiency rating the participant never saw; it was also dropped from the AI prompts), renames `hint_explanation` to `ai_clue_reasoning` and `hint_attempts` to `ai_clue_attempts` (both filled only on turns where the AI gave the clue), and replaces `hint_time_sec`/`guess_time_sec`, which mixed human decision time with AI response time, by `human_clue_time_sec` and `human_guess_time_sec` (the human's own time only; the AI's response time is `llm_latency_seconds`).
-- `human_explanation_*` is the canonical pre-AI General Link, with `human_explanation_source=pre_ai_human_clue_form` and `human_explanation_collected_at` marking its origin and submission time.
-- `human_round_feedback` is the qualitative end-of-round response. The five `round_questionnaire_*` round fields are the human's per-round questionnaire items (1 = strongly disagree, 5 = strongly agree); the `ai_round_questionnaire_*` fields are the AI's mirrored self-report for the same round. `attention_check_mid_game_answer` (session) is the second attention check, shown among the round 2 questions; the first is `attention_check_profile_answer` on the profile page. A submission counts as failed only when both are failed.
-
-### Serialization conventions
-
-- Nested arrays/objects (card lists, LLM raw responses, the AI questionnaire, etc.) are stored as JSON inside each row's `data` column, or as JSON strings within the flat views' text columns.
-- Booleans are native Postgres `BOOLEAN` values (`true`/`false`), not CSV-style strings.
-- Timestamps are recorded as UTC ISO-8601 strings (timezone-aware, `+00:00` suffix).
-- Raw invalid explanations are retained for audit; sanitized fields are blank when validation fails.
-
-### Provenance and lifecycle
-
-New session rows record `experiment_version`, `schema_version`, `code_commit`, `deployment_version`, `model_identifier`, and `condition_assignment_version`. The source-controlled defaults identify the current pilot and schema. Deployments should provide exact platform identifiers through `CODE_COMMIT` (or `GITHUB_SHA`, `STREAMLIT_GIT_COMMIT`, or `RENDER_GIT_COMMIT`) and `DEPLOYMENT_VERSION`. Unavailable identifiers remain blank; timestamps are never substituted for version identifiers. `model_identifier` records the exact configured model aliases and does not claim that a mutable provider alias is an immutable model snapshot.
-
-Session lifecycle fields are updated only at persisted stage boundaries: participant profile, tutorial, saved gameplay rounds, post-study questionnaire (the last round's questions), and completed debriefing. `last_completed_stage` means the last successfully completed stage, not the currently displayed page. `session_end_reason` is blank for an incomplete or disappeared session and is `completed` only after the participant acknowledges the debriefing. There is currently no explicit participant-withdrawal action or terminal technical-error route, so `withdrawal_requested` and `technical_termination` remain false rather than inferring intent from browser disappearance, AI errors, skips, timeouts, or game outcomes.
-
-Normalized turn `action_type` values are `interaction`, `full_skip`, `partial_skip`, and `timeout`. `alignment_applicability` values are `observed_completed_selection`, `partial_selection`, `interpreted_only_skip`, `timeout_no_behavioral_selection`, and `not_applicable`. Existing Jaccard and hit-rate values are unchanged; this metadata identifies structural placeholder zeros. Normalized round `round_end_reason` values produced by the current state machine are `all_targets_found`, `bomb`, and `completed_turn_limit`. Retryable technical events are not round terminations.
-
-## Storage
-
-All experimental data is written directly to Postgres — there is no local CSV or GitHub mirroring step. `core/db.py` creates the schema on first use (`ensure_schema`, idempotent, cached per process) and every write is an `INSERT ... ON CONFLICT DO UPDATE` upsert keyed by the table's real columns, so retried/rerun writes are safe. `log_event` failures are caught and reported into `st.session_state.remote_log_status`/`remote_log_error` rather than raising, so a transient database issue degrades gracefully instead of crashing the participant's session.
-
-Configure `.streamlit/secrets.toml`:
-
-```toml
-OPENAI_API_KEY = "your-openai-key"
-DATABASE_URL = "postgresql://postgres:[PASSWORD]@<host>:5432/postgres"
-```
-
-`DATABASE_URL` is the direct Postgres connection string (Supabase: Project Settings → Database → Connection string → URI), not the REST API URL/key shown elsewhere in a Supabase project.
-
-Condition allocation reads and increments `condition_counter` inside a single `SELECT ... FOR UPDATE` transaction, so Postgres itself serializes concurrent registrations — there is no optimistic-retry or CAS logic to reason about, and a Streamlit instance restart does not reset alternation.
-
-## Installation and local execution
-
-Python 3.11+ is recommended.
+Use Python 3.12; the app is developed and tested with it.
 
 ```bash
 python -m venv .venv
-# Activate the environment for your operating system
+# activate the environment
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Set `OPENAI_API_KEY` and `DATABASE_URL` in `.streamlit/secrets.toml` (see Storage above). The default models are configured in `core/constants.py` and currently use the pinned snapshot `gpt-5.4-2026-03-05` for clue generation, guessing, turn explanation, and round reflection.
+Put the keys in `.streamlit/secrets.toml` (this file is not committed):
 
-## Verification
+```toml
+OPENAI_API_KEY = "your-openai-key"
+DATABASE_URL = "postgresql://USER:PASSWORD@HOST:PORT/DBNAME"
+```
 
-Run the test suite:
+For Supabase, take the *Transaction pooler* connection string, which works over IPv4. Environment variables with the same names take precedence over this file. The models are set in `core/constants.py` (currently `gpt-5.4-2026-03-05`).
+
+To run the tests:
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-This is a mix of behavioral unit tests (game logic, validation, storage row-shaping, condition allocation) and some tests that check the presence of specific code/CSS rather than exercising behavior — a known gap, not a design goal. `streamlit.testing.v1.AppTest` (bundled with Streamlit) can drive a real screen end-to-end — fill in widgets, click buttons, assert no unhandled exception — without making real OpenAI calls or Postgres writes as long as those code paths aren't triggered; it is the intended direction for replacing the source-grepping tests, but that migration hasn't happened yet.
-
-Recommended study-release checks additionally include:
-
-- schema field uniqueness (`core/storage.py`'s `*_LOG_FIELDS` lists);
-- baseline prompt leak tests using sentinel rationale/reflection values;
-- adaptive/baseline alternation tests;
-- full-skip, partial-skip, bomb, all-targets-found, and four-turn termination scenarios;
-- desktop and mobile Streamlit smoke tests;
-- a real round played end-to-end against the live Supabase instance before each deployment, with the test rows deleted afterward.
+The tests use no database and no OpenAI key.
 
 ## Research purpose
 
-The application supports a Master's thesis titled *"Investigating Intersubjective Alignment in Human–AI Collaboration Through a Cooperative Word Association Game"*. Its central comparison is whether exchanging and reusing short explanations improves subsequent coordination relative to a baseline that collects the same explanation data without sharing it between teammates.
+This app is part of the Master's thesis *"Investigating Intersubjective Alignment in Human–AI Collaboration Through a Cooperative Word Association Game"*. It compares whether sharing and reusing short explanations between the teammates improves their coordination, against a baseline that collects the same explanations without sharing them.

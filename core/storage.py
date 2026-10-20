@@ -895,10 +895,10 @@ def _llm_fields_for_turn(item):
         }
         model = HINT_MODEL_NAME
         temperature = "0.55"
-        # v3 (schema 2.3.0): role-labelled human ratings in the adaptive
-        # memory, corrected bomb rule in the guess prompt.
+        # v5: the shared game rules, the bonus block, and the turns used and
+        # targets left in the prompts.
         prompt_version = "hint_v5_rules_and_bonus"
-        system_version = f"hint_system_v4_{condition}"
+        system_version = f"hint_system_v5_{condition}"
     else:
         raw = item.get("guess_raw_response", "")
         latency = item.get("guess_response_time_sec")
@@ -917,7 +917,7 @@ def _llm_fields_for_turn(item):
         model = GUESS_MODEL_NAME
         temperature = "0.2"
         prompt_version = "guess_v5_rules_and_bonus"
-        system_version = f"guess_system_v4_{condition}"
+        system_version = f"guess_system_v5_{condition}"
     error = raw if str(raw).startswith("<api_error:") else ""
     return {
         "llm_model": model,
