@@ -31,7 +31,7 @@ The wrapper reads `OPENAI_API_KEY` from the environment, or from Streamlit secre
 
 The experiment has two conditions with identical data collection but different communication context.
 
-Both conditions give the clue and guess prompts the same `GAME_RULES` block, written as the rules the participant read in the guide (4 rounds with alternating roles; 5 targets, 9 neutrals and 2 bombs; +2/+1 points; at most 3 completed turns and 2 skips per round; a star for all 5 targets without a bomb; the human's time limit), the same "WHAT IS AT STAKE" block about the star bonus (£1 per star, £5 for all four), and the turns used and targets left in the current round. No prompt names the condition.
+Both conditions give the clue and guess prompts the same `GAME_RULES` block, written as the rules the participant read in the guide (4 rounds with alternating roles; 5 targets, 9 neutrals and 2 bombs; +2/+1 points; at most 3 completed turns and 2 skips per round; a star for all 5 targets without a bomb; the human's time limit), the same "WHAT IS AT STAKE" block (the team's goal is to earn as many stars as possible; the star bonus is £1 per star, £5 for all four), and the turns used and targets left in the current round. No prompt names the condition.
 
 ### Adaptive
 

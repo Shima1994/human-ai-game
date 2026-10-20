@@ -28,6 +28,7 @@ class TeamBonusTests(unittest.TestCase):
         ):
             prompt = getattr(ai_service, name)
             self.assertIn("WHAT IS AT STAKE", prompt, name)
+            self.assertIn("Your team's goal is to earn as many stars as possible.", prompt, name)
             self.assertIn("£1 per such round, and £5 instead of £4", prompt, name)
 
     def test_every_clue_and_guess_prompt_states_the_game_rules(self):

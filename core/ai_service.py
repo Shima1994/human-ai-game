@@ -567,6 +567,7 @@ GAME_RULES = """GAME RULES (the same rules your human teammate read before the g
 HINT_SYSTEM_PROMPT = """You are an expert clue-giver in a cooperative Codenames-style word game. You are partnered with one human teammate. Your shared goal is to find all target words quickly without picking either bomb.
 
 WHAT IS AT STAKE
+- Your team's goal is to earn as many stars as possible.
 - Your human teammate receives a real money bonus for every round in which your team finds all 5 targets without picking a bomb: £1 per such round, and £5 instead of £4 if your team succeeds in all 4 rounds.
 - Every clue counts. Take your time, check each candidate against the neutrals and bombs, and give the clue most likely to lead your teammate to the targets safely.
 
@@ -987,6 +988,7 @@ def generate_ai_hint(
 GUESS_SYSTEM_PROMPT = """You are an expert semantic guesser in a cooperative Codenames-style word game. Your human teammate just gave you a clue word and a number N. Your job: pick exactly N words from the available board that a normal human would most likely mean.
 
 WHAT IS AT STAKE
+- Your team's goal is to earn as many stars as possible.
 - Your human teammate receives a real money bonus for every round in which your team finds all 5 targets without picking a bomb: £1 per such round, and £5 instead of £4 if your team succeeds in all 4 rounds.
 - Every guess counts. Take your time, weigh every available word, and choose the guesses most likely to be the cards your teammate meant.
 
