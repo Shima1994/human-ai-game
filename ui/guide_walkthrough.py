@@ -357,6 +357,8 @@ GUIDE_WALKTHROUGH_SLIDES = (
         "The goal",
         (
             f"You and the AI play as **one team** for {N_ROUNDS} rounds. "
+            "The AI knows the same rules as you and is instructed to play as your teammate: like you, "
+            "its goal is to find all the targets and earn as many stars as possible. "
             f"Each round has a board of {BOARD_SIZE} word cards:",
             fig_goal_board,
             f"**Green** = {TARGET_COUNT} target cards to find · **gray** = {NEUTRAL_COUNT} neutral cards · "

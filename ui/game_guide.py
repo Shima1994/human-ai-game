@@ -5,7 +5,7 @@ from core.constants import (
 )
 
 GUIDE_OVERVIEW = """
-You and the AI are on the same team.
+You and the AI are on the same team. The AI knows the same rules as you and is instructed to play as your teammate: like you, its goal is to find all the targets and earn as many stars as possible.
 
 Your goal is to find all hidden target cards by communicating through word clues, while avoiding the bomb cards.
 
